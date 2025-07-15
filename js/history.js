@@ -1,3 +1,4 @@
+// js/history.js
 document.addEventListener('DOMContentLoaded', async () => {
     const historyList = document.getElementById('history-list');
     const clearHistoryButton = document.getElementById('clearHistory');
@@ -6,7 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         historyList.innerHTML = ''; // Clear loading message
 
         if (items.length === 0) {
-            historyList.innerHTML = `<div class="empty-state">No history found from the last 3 days.</div>`;
+            historyList.innerHTML = `<div class="empty-state">${chrome.i18n.getMessage("historyEmpty")}</div>`;
             return;
         }
 
@@ -49,12 +50,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderHistory(recentHistory);
     }
     
-    clearHistoryButton.addEventListener('click', async () => {
-        if (confirm('Are you sure you want to delete all history? This cannot be undone.')) {
-            await chrome.storage.local.remove('history');
-            loadHistory();
-        }
-    });
+ clearHistoryButton.addEventListener('click', async () => {
+    if (confirm('Are you sure you want to delete all history? This cannot be undone.')) { // Kembali ke teks biasa
+        await chrome.storage.local.remove('history');
+        loadHistory();
+    }
+});
 
     loadHistory();
 });

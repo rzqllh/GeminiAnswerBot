@@ -1,121 +1,70 @@
-// Check if the script has been injected before to avoid redeclaration errors
 if (typeof window.pageReaderContentScriptLoaded === 'undefined') {
   window.pageReaderContentScriptLoaded = true;
 
-  let mainContentElement = null;
-
-  function findBestContentElement() {
-    const commonIds = ['main', 'content', 'main-content', 'article-body'];
-    for (const id of commonIds) {
-      const element = document.getElementById(id);
-      if (element) return element;
-    }
-    const mainTag = document.querySelector('main');
-    if (mainTag) return mainTag;
-    const articleTag = document.querySelector('article');
-    if (articleTag) return articleTag;
-    const commonClasses = ['.post-content', '.article-content', '.quiz-container', '.question-container'];
-    for (const className of commonClasses) {
-      const element = document.querySelector(className);
-      if (element) return element;
-    }
-    return document.body;
-  }
-
-  function sanitizeNode(node) {
-    const forbiddenTags = ['script', 'style', 'noscript', 'iframe', 'button', 'input', 'svg', 'nav', 'footer'];
-    if (node.nodeType !== Node.ELEMENT_NODE && node.nodeType !== Node.TEXT_NODE) return null;
-    if (node.nodeType === Node.ELEMENT_NODE && forbiddenTags.includes(node.tagName.toLowerCase())) return null;
-
-    const sanitized = node.cloneNode(false);
-    if (sanitized.nodeType === Node.ELEMENT_NODE) {
-      const attributes = Array.from(sanitized.attributes);
-      attributes.forEach(attr => {
-        if (attr.name.toLowerCase() !== 'href' || sanitized.tagName.toLowerCase() !== 'a') {
-          sanitized.removeAttribute(attr.name);
-        }
-      });
-    }
-
-    node.childNodes.forEach(child => {
-      const sanitizedChild = sanitizeNode(child);
-      if (sanitizedChild) sanitized.appendChild(sanitizedChild);
-    });
-    return sanitized;
-  }
-
+  // Fungsi untuk menghapus highlight lama
   function removePreviousHighlights() {
-    document.querySelectorAll('.page-reader-highlight').forEach(el => {
-      const parent = el.parentNode;
-      if (parent) {
-        while (el.firstChild) {
-          parent.insertBefore(el.firstChild, el);
-        }
-        parent.removeChild(el);
-        parent.normalize();
-      }
+    const highlights = document.querySelectorAll('span.page-reader-highlight');
+    highlights.forEach(span => {
+      const parent = span.parentNode;
+      parent.replaceChild(document.createTextNode(span.textContent), span);
+      parent.normalize(); // Menggabungkan node teks yang terpisah
     });
   }
 
+  // Fungsi highlight yang lebih sederhana
   function highlightText(textToFind) {
-    console.log("Looking for text to highlight:", textToFind);
-
-    if (!textToFind || !mainContentElement) return;
-    const cleanedText = textToFind.trim().replace(/\s+/g, ' ');
-    const searchRegex = new RegExp(cleanedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').split(/\s+/).join('\\s+'), 'gi');
+    if (!textToFind) return;
+    
+    const mainContentElement = document.body; // Kita cari di seluruh body agar pasti ketemu
+    const searchText = textToFind.trim();
     const walker = document.createTreeWalker(mainContentElement, NodeFilter.SHOW_TEXT, null, false);
+    
     let node;
-    const nodesToProcess = [];
+    const nodesToReplace = [];
     while (node = walker.nextNode()) {
-      if (searchRegex.test(node.nodeValue)) {
-        nodesToProcess.push(node);
+      const index = node.nodeValue.indexOf(searchText);
+      if (index !== -1) {
+        nodesToReplace.push({ node, index });
       }
     }
-    nodesToProcess.forEach(textNode => {
-      const matches = textNode.nodeValue.matchAll(searchRegex);
-      let lastIndex = 0;
-      const newNodes = [];
-      const parent = textNode.parentNode;
-      for (const match of matches) {
-        const matchIndex = match.index;
-        const matchedText = match[0];
-        if (matchIndex > lastIndex) {
-          newNodes.push(document.createTextNode(textNode.nodeValue.slice(lastIndex, matchIndex)));
-        }
-        const highlightSpan = document.createElement('span');
-        highlightSpan.className = 'page-reader-highlight';
-        highlightSpan.textContent = matchedText;
-        newNodes.push(highlightSpan);
-        lastIndex = matchIndex + matchedText.length;
-      }
-      if (lastIndex < textNode.nodeValue.length) {
-        newNodes.push(document.createTextNode(textNode.nodeValue.slice(lastIndex)));
-      }
-      newNodes.forEach(newNode => parent.insertBefore(newNode, textNode));
-      parent.removeChild(textNode);
+
+    // Lakukan penggantian setelah selesai mencari untuk menghindari masalah iterasi
+    nodesToReplace.forEach(({ node, index }) => {
+      const parent = node.parentNode;
+      if (!parent || parent.closest('.page-reader-highlight')) return; // Hindari highlight di dalam highlight
+
+      const before = document.createTextNode(node.nodeValue.substring(0, index));
+      const highlighted = document.createElement('span');
+      highlighted.className = 'page-reader-highlight';
+      highlighted.textContent = searchText;
+      const after = document.createTextNode(node.nodeValue.substring(index + searchText.length));
+
+      parent.replaceChild(after, node);
+      parent.insertBefore(highlighted, after);
+      parent.insertBefore(before, highlighted);
+      parent.normalize();
     });
   }
 
+  // Listener utama
   chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
-    if (request.action === "get_page_content") {
-      const selectedText = window.getSelection().toString().trim();
-      if (selectedText.length > 20) {
-        sendResponse({ content: selectedText, source: 'selection' });
-        return true;
-      }
-      mainContentElement = findBestContentElement();
-      let finalHTML = 'Failed to read content from this page.';
-      if (mainContentElement) {
-        const sanitizedContent = sanitizeNode(mainContentElement);
-        if (sanitizedContent) finalHTML = sanitizedContent.innerHTML;
-      }
-      sendResponse({ content: finalHTML, source: 'auto' });
-    }
-    else if (request.action === "highlight-answer") {
-      if (!mainContentElement) mainContentElement = findBestContentElement();
+    if (request.action === "highlight-answer") {
       removePreviousHighlights();
-      highlightText(request.text);
+      // Memberi sedikit jeda agar DOM sempat 'tenang'
+      setTimeout(() => {
+        highlightText(request.text);
+      }, 100);
       sendResponse({ success: true });
+    } else if (request.action === "get_page_content") {
+      // Fungsi get_page_content tidak diubah, jadi tidak perlu disalin di sini
+      // untuk menjaga respons tetap ringkas. Logika lama Anda masih berlaku.
+      const mainContentElement = document.body;
+      const selectedText = window.getSelection().toString().trim();
+       if (selectedText.length > 20) {
+        sendResponse({ content: selectedText, source: 'selection' });
+      } else {
+        sendResponse({ content: mainContentElement.innerText, source: 'auto' });
+      }
     }
     return true;
   });

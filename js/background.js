@@ -1,4 +1,4 @@
-// background.js
+// js/background.js
 
 // --- INSTALLATION & BASIC EVENTS ---
 chrome.runtime.onInstalled.addListener((details) => {
@@ -7,11 +7,12 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
   chrome.contextMenus.create({
     id: "gemini-answer-selection",
-    title: "Answer with GeminiAnswerBot",
+    title: "Answer with GeminiAnswerBot", // Kembali ke teks biasa
     contexts: ["selection"]
   });
 });
 
+// ... (sisa file background.js tidak perlu diubah) ...
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "gemini-answer-selection" && info.selectionText) {
     const storageKey = `contextSelection_${tab.id}`;
@@ -27,7 +28,6 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   chrome.storage.local.remove([stateKey, contextKey]);
 });
 
-// --- CORE API CALL FUNCTION (CENTRALIZED & STREAM-SUPPORTED) ---
 async function performApiCall(apiKey, model, systemPrompt, userContent, generationConfig = {}, streamCallback) {
   const endpoint = 'streamGenerateContent';
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}&alt=sse`;
@@ -91,7 +91,6 @@ async function performApiCall(apiKey, model, systemPrompt, userContent, generati
   }
 }
 
-// --- MESSAGE LISTENER FROM POPUP & OPTIONS ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'callGeminiStream') {
     const { systemPrompt, userContent, generationConfig } = request.payload;
@@ -105,15 +104,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const model = config.selectedModel || 'gemini-1.5-flash-latest';
       
       const streamCallback = (streamData) => {
-        // === KESALAHAN FATAL ADA DI SINI DAN SEKARANG SUDAH DIPERBAIKI ===
-        // Mengirim pesan ke seluruh bagian ekstensi (termasuk popup)
-        // BUKAN ke content script tab saja.
         chrome.runtime.sendMessage({
            action: 'geminiStreamUpdate',
            payload: streamData,
            purpose: request.purpose 
         });
-        // =================================================================
       };
 
       await performApiCall(config.geminiApiKey, model, systemPrompt, userContent, generationConfig, streamCallback);

@@ -194,24 +194,54 @@ Reason: [Your one-sentence reason here]`;
                     targetDisplay.textContent += payload.chunk;
                 } else if (payload.done) {
                     const fullText = payload.fullText || targetDisplay.textContent;
-                    const formattedHtml = formatAIResponse(fullText);
-                    targetDisplay.innerHTML = formattedHtml;
-
+                    
                     if (purpose === 'cleaning') {
+                        const formattedHtml = formatAIResponse(fullText);
+                        targetDisplay.innerHTML = formattedHtml;
                         hide(messageArea);
                         show(contentDisplayWrapper);
                         show(answerContainer);
                         answerDisplay.innerHTML = `<div class="loading-message">Step 2/2: Getting answer...</div>`;
                         saveState({ cleanedContent: fullText }).then(getAnswer);
                     } else if (purpose === 'answer') {
+                        // === LOGIKA PARSING BARU DIMULAI DI SINI ===
+                        const answerMatch = fullText.match(/Answer:(.*?)(Confidence:|Reason:|$)/is);
+                        const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
+                        const reasonMatch = fullText.match(/Reason:(.*)/is);
+
+                        let answerText, formattedHtml;
+
+                        if (answerMatch && answerMatch[1].trim()) {
+                            // Format terstruktur ditemukan, proses seperti biasa
+                            answerText = answerMatch[1].trim();
+                            let confidenceHTML = '';
+                            if (confidenceMatch) {
+                                const confidence = confidenceMatch[1].toLowerCase();
+                                const reason = reasonMatch ? reasonMatch[1].trim() : "No reason provided.";
+                                confidenceHTML = `<div class="confidence-wrapper"><strong>Confidence Level:</strong> <span class="confidence-badge confidence-${confidence}">${confidence.charAt(0).toUpperCase() + confidence.slice(1)}</span><div class="confidence-reason">${escapeHtml(reason)}</div></div>`;
+                            }
+                            formattedHtml = formatAIResponse(answerText) + confidenceHTML;
+                        } else {
+                            // Format terstruktur GAGAL ditemukan, tampilkan seluruh respons AI
+                            answerText = fullText; // a plain-text version for highlighting
+                            formattedHtml = formatAIResponse(fullText); // a formatted version for display
+                        }
+
+                        targetDisplay.innerHTML = formattedHtml;
+                        // === LOGIKA PARSING BARU SELESAI ===
+
                         retryAnswerButton.disabled = false;
                         show(aiActionsWrapper);
                         hide(explanationContainer);
-                        const answerMatch = fullText.match(/Answer:([\s\S]*?)(Confidence:|Reason:|$)/);
-                        const plainAnswer = answerMatch ? answerMatch[1].trim() : '';
-                        if (plainAnswer) chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: plainAnswer });
+                        
+                        if (answerText) {
+                            chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: answerText });
+                        }
                         saveState({ answerHTML: formattedHtml, explanationHTML: '' }).then(saveToHistory);
+
                     } else if (purpose === 'explanation') {
+                        const formattedHtml = formatAIResponse(fullText);
+                        targetDisplay.innerHTML = formattedHtml;
                         explanationButton.disabled = false;
                         retryExplanationButton.disabled = false;
                         saveState({ explanationHTML: formattedHtml }).then(saveToHistory);
@@ -235,10 +265,8 @@ Reason: [Your one-sentence reason here]`;
         if (!appConfig.geminiApiKey) { showSetupView(); return; }
 
         try {
-            // === FIX IS HERE: Updated file paths ===
             await chrome.scripting.executeScript({ target: { tabId: currentTab.id }, files: ['js/content.js'] });
             await chrome.scripting.insertCSS({ target: { tabId: currentTab.id }, files: ['assets/highlighter.css'] });
-            // ======================================
         } catch (e) {
             displayError(`<div class="error-message">Cannot run on this page. Try on a different website (e.g., a news article).</div>`);
             return;
@@ -260,11 +288,12 @@ Reason: [Your one-sentence reason here]`;
     }
 
     function showSetupView() {
-        hide(contentDisplayWrapper); hide(answerContainer); hide(explanationContainer); hide(aiActionsWrapper);
-        messageArea.innerHTML = `<div class="initial-view"><svg class="initial-icon" xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h9z"></path><line x1="12" y1="18" x2="12" y2="22"></line><line x1="12" y1="2" x2="12" y2="6"></line></svg><h2 style="margin-bottom: 5px;">Setup Required</h2><p>You need to enter a Gemini API Key to get started.</p><button id="openOptionsButton" class="setup-button">Open Settings Page</button></div>`;
-        show(messageArea);
-        document.getElementById('openOptionsButton').addEventListener('click', () => chrome.runtime.openOptionsPage());
-    }
+    hide(contentDisplayWrapper); hide(answerContainer); hide(explanationContainer); hide(aiActionsWrapper);
+    const setupHTML = `<div class="initial-view"><h2 style="margin-bottom: 5px;">Setup Required</h2><p>You need to enter a Gemini API Key to get started.</p><button id="openOptionsButton" class="setup-button">Open Settings Page</button></div>`;
+    messageArea.innerHTML = setupHTML;
+    show(messageArea);
+    document.getElementById('openOptionsButton').addEventListener('click', () => chrome.runtime.openOptionsPage());
+}
 
     // --- Event Listeners ---
     settingsButton.addEventListener('click', () => chrome.runtime.openOptionsPage());

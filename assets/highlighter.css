@@ -1,8 +1,10 @@
 .page-reader-highlight {
-  background-color: #00a2ffa4 !important;
-  color: #000000 !important; 
-  padding: 2px 4px;
-  border-radius: 4px;
-  font-style: inherit !important;
-  font-weight: inherit !important;
+  background-color: rgba(46, 204, 113, 0.6) !important; 
+  color: #000000 !important;
+  border-radius: 3px;
+  padding: 2px 1px;
+  margin: 0 -1px;
+  box-shadow: 0 1px 4px rgba(46, 204, 113, 0.4); 
+  pointer-events: none;
+  transition: all 0.1s ease-in-out;
 }
