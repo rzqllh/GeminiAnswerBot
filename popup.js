@@ -24,7 +24,7 @@ Reason: [Your one-sentence reason here]`;
   const container = document.querySelector('.container');
   const settingsButton = document.getElementById('settingsButton');
   const historyButton = document.getElementById('historyButton');
-  const rescanButton = document.getElementById('rescanButton'); // Tombol baru
+  const rescanButton = document.getElementById('rescanButton');
   const explanationButton = document.getElementById('explanationButton');
   const aiActionsWrapper = document.getElementById('aiActionsWrapper');
   const contentDisplayWrapper = document.getElementById('contentDisplayWrapper');
@@ -40,6 +40,9 @@ Reason: [Your one-sentence reason here]`;
   // --- Global Variables ---
   let currentTab = null;
   let appConfig = {};
+  // To hold the full text from the stream
+  let streamingAnswerText = '';
+  let streamingExplanationText = '';
 
   // --- Helper & Utility Functions ---
   function show(element) { if (element) element.classList.remove('hidden'); }
@@ -72,20 +75,17 @@ Reason: [Your one-sentence reason here]`;
     return processedText.replace(/<br>\s*<ul>/g, '<ul>').replace(/<\/ul>\s*<br>/g, '</ul>');
   }
 
-  // --- Core Logic & API Calls ---
-  async function callGemini(prompt, contentText) {
-    const generationConfig = {
-        temperature: appConfig.temperature !== undefined ? appConfig.temperature : 0.4,
-    };
-    return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({ action: 'callGemini', payload: { systemPrompt: prompt, userContent: contentText, generationConfig } },
-        (response) => {
-          if (chrome.runtime.lastError) return reject(new Error(`Connection failed: ${chrome.runtime.lastError.message}`));
-          if (response && response.success) resolve(response.text);
-          else reject(new Error(response.error || 'An unknown error occurred.'));
-        }
-      );
-    });
+  // --- Core Logic & API Calls (Now for Streaming) ---
+  function callGeminiStream(prompt, contentText, purpose) {
+      const generationConfig = {
+          temperature: appConfig.temperature !== undefined ? appConfig.temperature : 0.4,
+      };
+      // Send a message to background to START the stream
+      chrome.runtime.sendMessage({
+          action: 'callGeminiStream',
+          payload: { systemPrompt: prompt, userContent: contentText, generationConfig },
+          purpose: purpose // e.g., 'answer', 'explanation', 'cleaning'
+      });
   }
 
   // --- State & History Management ---
@@ -150,15 +150,8 @@ Reason: [Your one-sentence reason here]`;
         }
         
         const cleaningPrompt = appConfig.customPrompts?.cleaning || CLEANING_PROMPT;
-        const cleanedContent = await callGemini(cleaningPrompt, textToSendToAI);
-        
-        contentDisplay.innerHTML = formatAIResponse(cleanedContent);
-        show(contentDisplayWrapper);
-        hide(messageArea);
-        
-        await saveState({ cleanedContent });
-        
-        await getAnswer(true);
+        // Start the stream for "cleaning"
+        callGeminiStream(cleaningPrompt, textToSendToAI, 'cleaning');
 
     } catch (error) {
         hide(messageArea);
@@ -166,83 +159,114 @@ Reason: [Your one-sentence reason here]`;
     }
   }
   
-  async function getAnswer(isInitialRun = false) {
-    if (isInitialRun) {
-        show(answerContainer);
-        answerDisplay.innerHTML = `<div class="loading-message">Step 2/2: Getting answer...</div>`;
-    } else {
-        retryAnswerButton.disabled = true;
-        answerDisplay.innerHTML = `<div class="loading-message">AI is re-thinking the answer...</div>`;
-        hide(aiActionsWrapper);
-    }
+  function getAnswer(isInitialRun = false) {
+    const stateKey = currentTab.id.toString();
+    chrome.storage.local.get(stateKey, (result) => {
+        const cleanedContent = result[stateKey]?.cleanedContent;
+        if (!cleanedContent) {
+            displayError(answerDisplay, `<div class="error-message"><strong>Error:</strong> Cleaned content not found.</div>`);
+            return;
+        }
 
-    try {
-        const state = await chrome.storage.local.get(currentTab.id.toString());
-        const cleanedContent = state[currentTab.id.toString()]?.cleanedContent;
-        if (!cleanedContent) throw new Error("Cleaned content not available.");
+        if (isInitialRun) {
+            show(answerContainer);
+        } else {
+            hide(aiActionsWrapper);
+        }
+        
+        retryAnswerButton.disabled = true;
+        answerDisplay.innerHTML = `<div class="loading-message">The AI is thinking...</div>`;
+        streamingAnswerText = ''; // Reset buffer
 
         const answerPrompt = appConfig.customPrompts?.answer || ANSWER_PROMPT;
-        const resultText = await callGemini(answerPrompt, cleanedContent);
-        
-        const answerMatch = resultText.match(/Answer:([\s\S]*?)Confidence:/);
-        const confidenceMatch = resultText.match(/Confidence:\s*(High|Medium|Low)/i);
-        const reasonMatch = resultText.match(/Reason:([\s\S]*)/);
-        const answer = answerMatch ? answerMatch[1].trim() : resultText;
-        const confidence = confidenceMatch ? confidenceMatch[1].toLowerCase() : null;
-        const reason = reasonMatch ? reasonMatch[1].trim() : null;
-        let confidenceHTML = '';
-        if (confidence && reason) {
-            confidenceHTML = `<div class="confidence-wrapper"><strong>Confidence Level:</strong> <span class="confidence-badge confidence-${confidence}">${confidence.charAt(0).toUpperCase() + confidence.slice(1)}</span><div class="confidence-reason">${escapeHtml(reason)}</div></div>`;
+        callGeminiStream(answerPrompt, cleanedContent, 'answer');
+    });
+  }
+
+  function getExplanation() {
+      const stateKey = currentTab.id.toString();
+      chrome.storage.local.get(stateKey, (result) => {
+        const currentState = result[stateKey];
+        if (!currentState || !currentState.cleanedContent) return;
+
+        explanationButton.disabled = true;
+        retryExplanationButton.disabled = true;
+        show(explanationContainer);
+        explanationDisplay.innerHTML = `<div class="loading-message">The AI is thinking...</div>`;
+        streamingExplanationText = ''; // Reset buffer
+
+        let prompt = appConfig.customPrompts?.explanation || EXPLANATION_PROMPT;
+        if (appConfig.explanationTone && appConfig.explanationTone !== 'normal') {
+            const toneInstructions = { sederhana: "\n\nExplain it simply.", teknis: "\n\nProvide a technical explanation.", analogi: "\n\nUse analogies." };
+            prompt += toneInstructions[appConfig.explanationTone] || '';
         }
-        const answerHTML = formatAIResponse(answer) + confidenceHTML;
-        answerDisplay.innerHTML = answerHTML;
-        show(aiActionsWrapper);
-        hide(explanationContainer);
-
-        chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: answer });
-        
-        const newState = await saveState({ answerHTML, explanationHTML: '' });
-        await saveToHistory(newState);
-
-    } catch(error) {
-        displayError(answerDisplay, `<div class="error-message"><strong>Failed to get answer:</strong> ${escapeHtml(error.message)}</div>`);
-    } finally {
-        retryAnswerButton.disabled = false;
-    }
+        callGeminiStream(prompt, currentState.cleanedContent, 'explanation');
+      });
   }
-
-
-  async function getExplanation() {
-      const state = await chrome.storage.local.get(currentTab.id.toString());
-      const currentState = state[currentTab.id.toString()];
-      if (!currentState || !currentState.cleanedContent) return;
-
-      explanationButton.disabled = true;
-      retryExplanationButton.disabled = true;
-      show(explanationContainer);
-      explanationDisplay.innerHTML = `<div class="loading-message">The AI is thinking...</div>`;
-
-      try {
-          let prompt = appConfig.customPrompts?.explanation || EXPLANATION_PROMPT;
-          if (appConfig.explanationTone && appConfig.explanationTone !== 'normal') {
-              const toneInstructions = { sederhana: "\n\nExplain it simply.", teknis: "\n\nProvide a technical explanation.", analogi: "\n\nUse analogies." };
-              prompt += toneInstructions[appConfig.explanationTone] || '';
-          }
-
-          const resultText = await callGemini(prompt, currentState.cleanedContent);
-          const explanationHTML = formatAIResponse(resultText);
-          explanationDisplay.innerHTML = explanationHTML;
+  
+  // --- LISTEN FOR STREAMING UPDATES FROM BACKGROUND.JS ---
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      if (request.action === 'geminiStreamUpdate') {
+          const { payload, purpose } = request;
           
-          const newState = await saveState({ explanationHTML });
-          await saveToHistory(newState);
+          if (payload.success) {
+              if (payload.chunk) {
+                  // A new piece of text has arrived
+                  if (purpose === 'cleaning') {
+                      if (contentDisplay.querySelector('.loading-message')) contentDisplay.innerHTML = '';
+                      contentDisplay.textContent += payload.chunk;
+                  } else if (purpose === 'answer') {
+                      if (answerDisplay.querySelector('.loading-message')) answerDisplay.innerHTML = '';
+                      streamingAnswerText += payload.chunk;
+                      answerDisplay.textContent += payload.chunk;
+                  } else if (purpose === 'explanation') {
+                      if (explanationDisplay.querySelector('.loading-message')) explanationDisplay.innerHTML = '';
+                      streamingExplanationText += payload.chunk;
+                      explanationDisplay.textContent += payload.chunk;
+                  }
+              } else if (payload.done) {
+                  // The stream for this purpose is complete
+                  if (purpose === 'cleaning') {
+                      const cleanedContent = payload.fullText;
+                      contentDisplay.innerHTML = formatAIResponse(cleanedContent);
+                      show(contentDisplayWrapper);
+                      hide(messageArea);
+                      saveState({ cleanedContent }).then(() => {
+                        getAnswer(true); // Automatically start getting the answer
+                      });
+                  } else if (purpose === 'answer') {
+                      const answerHTML = formatAIResponse(streamingAnswerText);
+                      answerDisplay.innerHTML = answerHTML;
+                      retryAnswerButton.disabled = false;
+                      show(aiActionsWrapper);
+                      hide(explanationContainer);
+                      
+                      const answerMatch = streamingAnswerText.match(/Answer:([\s\S]*?)(Confidence:|Reason:|$)/);
+                      const plainAnswer = answerMatch ? answerMatch[1].trim() : '';
+                      if (plainAnswer) {
+                        chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: plainAnswer });
+                      }
 
-      } catch (error) {
-          displayError(explanationDisplay, `<div class="error-message">${escapeHtml(error.message)}</div>`);
-      } finally {
-          explanationButton.disabled = false;
-          retryExplanationButton.disabled = false;
+                      saveState({ answerHTML, explanationHTML: '' }).then(newState => saveToHistory(newState));
+                  } else if (purpose === 'explanation') {
+                      const explanationHTML = formatAIResponse(streamingExplanationText);
+                      explanationDisplay.innerHTML = explanationHTML;
+                      explanationButton.disabled = false;
+                      retryExplanationButton.disabled = false;
+                      
+                      saveState({ explanationHTML }).then(newState => saveToHistory(newState));
+                  }
+              }
+          } else {
+              // An error occurred
+              const errorMessage = `<div class="error-message"><strong>Error:</strong> ${escapeHtml(payload.error)}</div>`;
+              if (purpose === 'cleaning') displayError(contentDisplay, errorMessage);
+              else if (purpose === 'answer') displayError(answerDisplay, errorMessage);
+              else if (purpose === 'explanation') displayError(explanationDisplay, errorMessage);
+          }
       }
-  }
+  });
+
 
   // --- Initialization ---
   async function initializePopup() {
@@ -288,6 +312,9 @@ Reason: [Your one-sentence reason here]`;
   if (rescanButton) rescanButton.addEventListener('click', async () => {
     if (currentTab) {
         await chrome.storage.local.remove(currentTab.id.toString());
+        // Reset buffers
+        streamingAnswerText = '';
+        streamingExplanationText = '';
         runInitialScan();
     }
   });
