@@ -4,17 +4,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const exportMarkdownButton = document.getElementById('exportMarkdown');
     let recentHistory = [];
 
-    function htmlToTextForExport(html) {
-        let tempDiv = document.createElement('div');
-        tempDiv.innerHTML = html;
-        tempDiv.querySelectorAll('.confidence-wrapper').forEach(el => {
-            const confidence = el.querySelector('.confidence-badge')?.textContent || 'N/A';
-            const reason = el.querySelector('.confidence-reason')?.textContent || 'N/A';
-            el.innerHTML = `\n\n**Confidence:** ${confidence}\n\n**Reason:** ${reason}`;
-        });
-        return tempDiv.innerText.trim();
-    }
-    
     function formatForDisplay(text) {
         let processedText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
         processedText = processedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -27,13 +16,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             historyList.innerHTML = `<div class="empty-state">No history found from the last 3 days.</div>`;
             return;
         }
-
         items.forEach(item => {
             const itemElement = document.createElement('div');
             itemElement.className = 'history-item';
             const formattedDate = new Date(item.timestamp).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short'});
 
-            itemElement.innerHTML = `
+            let contentHTML = `
                 <div class="history-item-header">
                     <div class="history-item-title">
                         <a href="${item.url}" target="_blank" title="${item.title}">${item.title || 'Untitled Page'}</a>
@@ -42,11 +30,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
                 <div class="history-item-content">
                     <h3>Quick Answer</h3>
-                    <div class="answer-block">${item.answer ? formatForDisplay(item.answer) : 'Not available.'}</div>
-                    ${item.explanation ? `<h3>Detailed Explanation</h3><div class="explanation-block">${formatForDisplay(item.explanation)}</div>` : ''}
-                    ${item.cleanedContent ? `<h3>Analyzed Content</h3><div class="cleaned-content-block"><pre><code>${item.cleanedContent.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre></div>` : ''}
-                </div>
-            `;
+                    <div class="content-block">${item.answer ? formatForDisplay(item.answer) : 'Not available.'}</div>
+                    ${item.explanation ? `<h3>Detailed Explanation</h3><div class="content-block">${formatForDisplay(item.explanation)}</div>` : ''}
+                    ${item.cleanedContent ? `<h3>Analyzed Content</h3><div class="content-block"><pre>${item.cleanedContent.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre></div>` : ''}
+                </div>`;
+            itemElement.innerHTML = contentHTML;
             historyList.appendChild(itemElement);
         });
     }
@@ -71,21 +59,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             alert('No history to export.');
             return;
         }
-
         let markdownContent = `# GeminiAnswerBot History\n\n*Exported on: ${new Date().toLocaleString()}*\n\n---\n\n`;
-
         recentHistory.forEach(item => {
             markdownContent += `## ❓ Question from: [${item.title || 'Untitled'}](${item.url})\n`;
             markdownContent += `*Saved on: ${new Date(item.timestamp).toLocaleString()}*\n\n`;
             markdownContent += "### Quick Answer\n\n";
-            markdownContent += `${htmlToTextForExport(item.answer)}\n\n`;
+            markdownContent += `${item.answer}\n\n`;
             if (item.explanation) {
                 markdownContent += "### Detailed Explanation\n\n";
                 markdownContent += `${item.explanation}\n\n`;
             }
             markdownContent += "---\n\n";
         });
-
         const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');

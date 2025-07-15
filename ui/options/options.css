@@ -92,8 +92,6 @@ input[type="text"]:focus, select:focus, textarea:focus {
 }
 #saveButton { background-color: var(--apple-blue); }
 #saveButton:hover { background-color: #0056b3; }
-#testButton { background-color: #8e8e93; }
-#testButton:hover { background-color: #6e6e73; }
 
 #status { font-size: 13px; font-weight: 500; height: 16px; text-align: left; transition: color 0.3s; }
 #status.success { color: var(--apple-green); }

@@ -111,7 +111,7 @@ header p {
     margin-top: 0;
 }
 
-.answer-block, .explanation-block, .cleaned-content-block {
+.content-block {
     font-size: 14px;
     line-height: 1.6;
     background: rgba(0,0,0,0.02);
@@ -120,38 +120,13 @@ header p {
     margin-top: 4px;
     overflow-x: auto;
 }
-.cleaned-content-block pre {
+.content-block pre {
     margin: 0;
     white-space: pre-wrap;
     word-wrap: break-word;
+    font-family: inherit;
+    font-size: inherit;
 }
-.answer-block strong {
-    font-weight: 600;
-}
-.answer-block .confidence-wrapper {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid var(--separator-color);
-    font-size: 13px;
-}
-.answer-block .confidence-badge {
-    display: inline-block;
-    padding: 3px 8px;
-    border-radius: 20px;
-    font-weight: 600;
-    font-size: 12px;
-    color: white;
-    margin-left: 6px;
-}
-.answer-block .confidence-high { background-color: var(--apple-green); }
-.answer-block .confidence-medium { background-color: var(--apple-yellow); color: #333; }
-.answer-block .confidence-low { background-color: var(--apple-red); }
-.answer-block .confidence-reason {
-    margin-top: 6px;
-    color: var(--secondary-text-color);
-    font-style: italic;
-}
-
 
 .empty-state {
     text-align: center;

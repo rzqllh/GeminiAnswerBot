@@ -74,7 +74,8 @@
     function findBestContentElement() {
         const selectors = [
             'main', 'article', '#main', '#content', '#main-content', 
-            '.post-content', '.article-content', '.quiz-container', '.question-container'
+            '.post-content', '.article-content', '.quiz-container', '.question-container',
+            '[role="main"]'
         ];
         for (const selector of selectors) {
             const element = document.querySelector(selector);
@@ -83,17 +84,31 @@
         return document.body;
     }
     
-    const contentElement = findBestContentElement();
-    const tempDiv = document.createElement('div');
-    // Sanitize by cloning to avoid modifying live DOM structure for extraction
-    const contentClone = contentElement.cloneNode(true);
-    // Remove non-content elements for a cleaner text extraction
-    contentClone.querySelectorAll('script, style, nav, footer, header, aside, form').forEach(el => el.remove());
-    
-    // Convert block elements to newlines for better text structure
-    tempDiv.innerHTML = contentClone.innerHTML
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<\/p>|<\/div>|<\/li>|<\/h[1-6]>/gi, '\n');
+    function extractContent() {
+        const contentElement = findBestContentElement();
+        if (!contentElement) return "";
+
+        const tempDiv = document.createElement('div');
+        const contentClone = contentElement.cloneNode(true);
+        contentClone.querySelectorAll('script, style, nav, footer, header, aside, form, button, input, [role="navigation"], [role="banner"], [role="contentinfo"]').forEach(el => el.remove());
         
-    return tempDiv.innerText;
+        tempDiv.innerHTML = contentClone.innerHTML
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<\/p>|<\/div>|<\/li>|<\/h[1-6]>/gi, '\n');
+            
+        const extractedText = tempDiv.innerText;
+
+        if (extractedText && extractedText.trim().length > 50) {
+            return extractedText;
+        }
+        
+        return "";
+    }
+
+    // Delay extraction slightly to allow dynamic content to render
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve(extractContent());
+        }, 4000); // Wait 500ms before trying to read the page
+    });
 })();

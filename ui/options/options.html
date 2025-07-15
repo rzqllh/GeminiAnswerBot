@@ -17,7 +17,6 @@
       <label for="apiKey">Your API Key</label>
       <div class="input-wrapper">
         <input type="text" id="apiKey" placeholder="Paste your Gemini API key here">
-        <button id="testButton" class="button">Test</button>
         <button id="saveButton" class="button">Save</button>
       </div>
       <div id="status"></div>
@@ -61,13 +60,13 @@
       <p class="description">Leave blank to use the system's default prompt.</p>
 
       <label for="cleaningPrompt">Content Cleaning Prompt:</label>
-      <textarea id="cleaningPrompt" rows="5"></textarea>
+      <textarea id="cleaningPrompt" rows="5" placeholder="You are a text cleaner..."></textarea>
 
       <label for="answerPrompt">Answering Prompt:</label>
-      <textarea id="answerPrompt" rows="5"></textarea>
+      <textarea id="answerPrompt" rows="5" placeholder="Act as an expert quiz solver..."></textarea>
 
       <label for="explanationPrompt">Explanation Prompt:</label>
-      <textarea id="explanationPrompt" rows="5"></textarea>
+      <textarea id="explanationPrompt" rows="5" placeholder="Act as an expert tutor..."></textarea>
     </div>
 
   </div>
