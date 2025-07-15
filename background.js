@@ -125,16 +125,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       await performApiCall(config.geminiApiKey, model, systemPrompt, userContent, generationConfig, streamCallback);
     });
     
-    // Return true to indicate we will respond asynchronously (though we won't use sendResponse)
     return true; 
   }
   
-  // Test connection remains a simple non-streaming call
+  // === HOTFIX STARTS HERE ===
   if (request.action === 'testApiConnection') {
     const { apiKey } = request.payload;
     const testModel = 'gemini-1.5-flash-latest';
-    const testPrompt = "If you receive the text 'Test', respond with only the word 'OK'.";
-    const testContent = "Test";
+    // More specific prompt to ensure a consistent response
+    const testContent = "Please reply with only the word 'OK' and nothing else.";
     const endpoint = 'generateContent';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${testModel}:${endpoint}?key=${apiKey}`;
 
@@ -143,17 +142,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: testContent }] }] })
     })
-    .then(res => res.json())
+    .then(res => {
+        if (!res.ok) {
+            // If response is not 2xx, parse the error JSON
+            return res.json().then(err => {
+                throw new Error(err.error?.message || `HTTP Error: ${res.status}`);
+            });
+        }
+        return res.json();
+    })
     .then(result => {
-       const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
-       if (text.includes("OK")) {
-         sendResponse({ success: true, text });
+       const text = result.candidates?.[0]?.content?.parts?.[0]?.text.trim() || "";
+       // Check if the response is exactly "OK" or contains it, case-insensitive
+       if (text.toUpperCase() === 'OK') {
+         sendResponse({ success: true, text: "Connection successful!" });
        } else {
-         sendResponse({ success: false, error: result.error?.message || "Test failed" });
+         // Provide a more informative error message
+         sendResponse({ success: false, error: `Test failed. AI responded with: "${text}"` });
        }
     })
     .catch(err => sendResponse({ success: false, error: err.message }));
 
     return true; // Keep message channel open for async response
   }
+  // === HOTFIX ENDS HERE ===
 });
