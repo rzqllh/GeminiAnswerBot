@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 
 # Gemini Answer Bot ✨🧠 (Chrome Extension)
 
@@ -83,3 +84,6 @@ Project ini berada di bawah lisensi [MIT License](LICENSE). Silakan gunakan dan 
 ---
 
 > Dibuat dengan semangat untuk membuat AI lebih mudah diakses semua orang. 🚀
+=======
+# GeminiAnswerBot
+>>>>>>> 7a5749b538772e9937512dd607139b6f2552cd67
