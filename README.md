@@ -30,9 +30,7 @@
 
 1. Buka halaman web apa pun.
 2. Klik ikon ekstensi **Gemini Answer Bot** di toolbar Chrome.
-3. Ketik pertanyaan Anda di kolom chat. Misalnya:
-   > “Apa poin utama dari artikel ini?”  
-   > “Jelaskan bagian ketiga dari halaman ini.”
+3. Gemini Answer Bot akan otomatis scanning page dan menjawab soal yang tertera pada tab yang sdengan dibuka
 4. Jawaban AI akan muncul langsung di popup.
 
 💡 Anda juga bisa melihat riwayat percakapan sebelumnya melalui tab **Riwayat**.
