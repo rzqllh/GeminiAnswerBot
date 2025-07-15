@@ -1,0 +1,21 @@
+# Sistem dan editor
+.DS_Store
+Thumbs.db
+*.log
+
+# VSCode / JetBrains
+.vscode/
+.idea/
+
+# Backup / temp file
+*.bak
+*.tmp
+*~
+
+# API key lokal / config sensitif (kalau kamu simpan di file, misal)
+config.json
+secrets.js
+.env
+
+# Zipped file
+*.zip

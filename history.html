@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>History - GeminiAnswerBot</title>
-    <meta charset="UTF-8">
+    <meta charset="UTF-M">
     <link rel="stylesheet" href="history.css">
 </head>
 <body>
@@ -11,12 +11,12 @@
             <h1>History</h1>
             <p>Showing activity from the last 3 days.</p>
         </header>
-        <div class="actions">
-            <button id="exportMarkdown">Export as Markdown</button>
-            <button id="clearHistory">Clear All History</button>
-        </div>
         <main id="history-list">
-            </main>
+            <div class="loading-message">Loading history...</div>
+        </main>
+        <footer>
+            <button id="clearHistory">Clear All History</button>
+        </footer>
     </div>
     <script src="history.js"></script>
 </body>

@@ -1,8 +1,8 @@
 .page-reader-highlight {
-  background-color: #538aff9a !important; 
-  color: #000000 !important; /* Ensure text is readable */
+  background-color: #ffd700 !important; /* Warna kuning stabilo */
+  color: #000000 !important; /* Pastikan teks tetap terbaca */
   padding: 2px 4px;
-  border-radius: 6px;
+  border-radius: 3px;
   box-shadow: 0 0 5px rgba(255, 215, 0, 0.7);
   font-style: inherit !important;
   font-weight: inherit !important;
