@@ -1,26 +1,26 @@
 {
   "manifest_version": 3,
   "name": "GeminiAnswerBot",
-  "version": "14.0",
+  "version": "18.1",
   "description": "An intelligent quiz assistant powered by Gemini AI.",
   "permissions": ["activeTab", "scripting", "storage", "contextMenus"],
   "host_permissions": ["https://generativelanguage.googleapis.com/*"],
-  "options_page": "options.html",
+  "options_page": "ui/options.html",
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "js/background.js"
   },
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "ui/popup.html",
     "default_icon": {
-      "128": "icon.png"
+      "128": "assets/icon.png"
     }
   },
   "icons": {
-    "128": "icon.png"
+    "128": "assets/icon.png"
   },
   "web_accessible_resources": [
     {
-      "resources": ["highlighter.css"],
+      "resources": ["assets/highlighter.css"],
       "matches": ["<all_urls>"]
     }
   ]
