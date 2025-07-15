@@ -118,12 +118,17 @@ Reason: [Your one-sentence reason here]`,
           return;
         }
         
-        if (response && response.success && response.text.includes('OK')) {
-          showStatus('API key validated. Connection successful!', 'success');
+        // === LOGIC REVISED HERE ===
+        if (response && response.success) {
+          // Display the success message sent from background.js
+          showStatus(response.text, 'success');
         } else {
-          const errorMessage = response.error || 'Unexpected response.';
-          showStatus(`Test failed: ${errorMessage}`, 'error');
+          // Display the detailed error message sent from background.js
+          const errorMessage = response.error || 'An unknown error occurred.';
+          showStatus(errorMessage, 'error');
         }
+        // =========================
+
         testButton.disabled = false;
       }
     );
@@ -134,6 +139,7 @@ Reason: [Your one-sentence reason here]`,
     statusDiv.textContent = message;
     statusDiv.className = type; 
     
+    // Clear success/normal messages after a timeout, but keep error messages visible
     if (type !== 'error') {
         setTimeout(() => {
             if (statusDiv.textContent === message) {
