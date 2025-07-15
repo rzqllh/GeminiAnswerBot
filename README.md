@@ -28,10 +28,11 @@
 
 ## 🧪 Cara Menggunakan
 
-1. Buka halaman web apa pun.
-2. Klik ikon ekstensi **Gemini Answer Bot** di toolbar Chrome.
-3. Gemini Answer Bot akan otomatis scanning page dan menjawab soal yang tertera pada tab yang sdengan dibuka
-4. Jawaban AI akan muncul langsung di popup.
+1.  Buka halaman web apa pun.
+2.  Klik ikon ekstensi **Gemini Answer** Bot di toolbar Chrome.
+3.  Gemini Answer Bot akan otomatis memindai halaman dan menjawab soal yang tertera pada tab yang sedang dibuka.
+4.  Jawaban AI akan muncul langsung di popup.
+5.  Anda juga bisa melihat riwayat percakapan sebelumnya melalui tab **Riwayat**.
 
 💡 Anda juga bisa melihat riwayat percakapan sebelumnya melalui tab **Riwayat**.
 
@@ -39,11 +40,29 @@
 
 ## 🔐 Konfigurasi API Key
 
-Agar ekstensi dapat berfungsi, Anda memerlukan **API key Gemini** dari Google AI.
+Agar ekstensi dapat berfungsi, Anda memerlukan **API key Gemini dari Google AI**. Ikuti langkah-langkah berikut untuk mendapatkannya:
 
-1. Buka halaman **Opsi** pada ekstensi (klik kanan > Options).
-2. Masukkan API key Gemini Anda.
-3. Klik **Save**, lalu refresh popup.
+1.  **Akses Google AI Studio:** Buka [Google AI Studio](https://aistudio.google.com/).
+2.  **Masuk dengan Akun Google Anda:** Gunakan akun Google yang biasa Anda gunakan.
+3.  **Buat atau Pilih Proyek Google Cloud:**
+    *   Jika Anda belum memiliki proyek, Anda perlu membuatnya. Di Google AI Studio, Anda akan diarahkan untuk membuat proyek baru atau memilih proyek yang sudah ada.
+    *   **Untuk membuat proyek baru:**
+        a. Cari opsi "New Project" di konsol Google Cloud (Anda mungkin perlu membuat akun Google Cloud jika belum punya).
+        b. Berikan **Nama Proyek** yang deskriptif (misalnya, `Quiz Assistant Project`).
+        c. Tentukan **Project ID** yang unik (misalnya, `quiz-assistant-gemini-xyz`). ID ini tidak bisa diubah setelah dibuat.
+        d. Jika Anda bagian dari organisasi, pilih organisasi Anda.
+        e. Anda **perlu menghubungkan akun penagihan (billing account)**. Jika belum punya, Anda akan diminta untuk membuatnya. Google Cloud menawarkan kredit gratis untuk pengguna baru, yang sangat berguna untuk mencoba.
+        f. Klik "Create" untuk menyelesaikan pembuatan proyek.
+4.  **Hasilkan API Key:**
+    *   Setelah proyek Anda siap, kembali ke Google AI Studio (atau navigasikan ke "APIs & Services" > "Credentials" di Google Cloud Console).
+    *   Cari tombol "Get API key" atau "Create API key".
+    *   Pilih proyek yang baru saja Anda buat.
+    *   Klik "Create" untuk menghasilkan kunci API.
+    *   **Salin dan simpan API key Anda dengan aman.** Perlakukan kunci ini seperti kata sandi.
+5.  **Masukkan API Key ke Ekstensi:**
+    *   Buka halaman **Opsi** ekstensi (biasanya dengan mengklik kanan ikon ekstensi di toolbar Chrome lalu pilih "Options").
+    *   Masukkan API key Gemini Anda ke dalam kolom yang tersedia.
+    *   Klik **"Save"**, lalu **refresh popup** ekstensi (jika ada tombol refresh) atau refresh tab tempat Anda menggunakan ekstensi.
 
 ---
 
