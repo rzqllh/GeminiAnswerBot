@@ -63,8 +63,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 async function performApiCall(apiKey, model, systemPrompt, userContent, generationConfig = {}, streamCallback) {
+  console.log("Background Script: performApiCall started."); // Debugging
   const endpoint = 'streamGenerateContent';
-  // Menggunakan gemini-1.5-flash-latest sebagai default jika tidak ada model yang dipilih
   const resolvedModel = model || 'gemini-1.5-flash-latest';
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:${endpoint}?key=${apiKey}&alt=sse`;
 
@@ -79,16 +79,35 @@ async function performApiCall(apiKey, model, systemPrompt, userContent, generati
     generationConfig: generationConfig
   };
 
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), 60000); // Timeout setelah 60 detik (1 menit)
+
   try {
+    console.log("Background Script: Fetching API URL:", apiUrl); // Debugging
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: controller.signal // Kaitkan signal controller dengan fetch
     });
+
+    clearTimeout(id); // Bersihkan timeout jika fetch berhasil
 
     if (!response.ok) {
       const errorBody = await response.json();
-      throw new Error(errorBody.error?.message || `Request failed with status ${response.status}`);
+      console.error("Background Script: API error response:", errorBody); // Debugging
+      // Handle specific API errors for better user feedback
+      let errorMessage = errorBody.error?.message || `Request failed with status ${response.status}`;
+      if (errorMessage.includes("API key not valid")) {
+          errorMessage = "Kunci API tidak valid. Periksa pengaturan Anda.";
+      } else if (errorMessage.includes("The model is overloaded")) {
+          errorMessage = "Model AI saat ini sedang sibuk (overloaded). Silakan coba lagi sebentar.";
+      } else if (errorMessage.includes("quota")) {
+          errorMessage = "Batas penggunaan API tercapai. Silakan periksa kuota Anda di Google Cloud Console.";
+      } else if (response.status === 400 && errorMessage.includes("Unsupported content")) {
+          errorMessage = "Konten tidak didukung oleh model AI. Coba berikan teks yang berbeda atau lebih singkat.";
+      }
+      throw new Error(errorMessage);
     }
 
     const reader = response.body.getReader();
@@ -109,41 +128,52 @@ async function performApiCall(apiKey, model, systemPrompt, userContent, generati
           if (textPart) {
             fullText += textPart;
             streamCallback({ success: true, chunk: textPart });
+            // console.log("Background Script: Received chunk."); // Debugging: terlalu banyak log jika diaktifkan
           }
         } catch (e) {
-          // Ignore parsing errors for malformed stream chunks
+          // Ignore parsing errors for malformed stream chunks or partial data
+          console.warn("Background Script: Error parsing stream chunk:", e); // Debugging
         }
       }
     }
 
     if (!fullText.trim()) {
-      throw new Error("The AI returned an empty response.");
+      throw new Error("The AI returned an empty response. (Mungkin tidak ada jawaban yang relevan)");
     }
     
+    console.log("Background Script: Stream completed successfully."); // Debugging
     streamCallback({ success: true, done: true, fullText: fullText });
 
   } catch (error) {
-    streamCallback({ success: false, error: error.message });
+    clearTimeout(id); // Bersihkan timeout jika terjadi error
+    console.error("Background Script: Error during API call:", error); // Debugging
+    if (error.name === 'AbortError') {
+      streamCallback({ success: false, error: 'Permintaan API dibatalkan karena timeout (lebih dari 60 detik). Mungkin masalah jaringan atau AI terlalu sibuk.' });
+    } else {
+      streamCallback({ success: false, error: error.message });
+    }
   }
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'callGeminiStream') {
-    const { systemPrompt, userContent, generationConfig, originalUserContent } = request.payload; // originalUserContent ditambahkan
+    console.log("Background Script: Received 'callGeminiStream' request."); // Debugging
+    const { systemPrompt, userContent, generationConfig, originalUserContent } = request.payload; 
     
     chrome.storage.sync.get(['geminiApiKey', 'selectedModel'], async (config) => {
       if (!config.geminiApiKey) {
+        console.error("Background Script: API Key not set."); // Debugging
         sendResponse({ success: false, error: 'API Key has not been set.' });
         return;
       }
       
-      // Gunakan model yang dipilih dari pengaturan atau default
       const model = config.selectedModel || 'gemini-1.5-flash-latest';
       
       const streamCallback = (streamData) => {
+        // console.log("Background Script: Sending stream update to popup."); // Debugging: terlalu banyak log jika diaktifkan
         chrome.runtime.sendMessage({
            action: 'geminiStreamUpdate',
-           payload: { ...streamData, originalUserContent: originalUserContent }, // originalUserContent diteruskan kembali
+           payload: { ...streamData, originalUserContent: originalUserContent }, 
            purpose: request.purpose 
         });
       };
@@ -151,13 +181,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       await performApiCall(config.geminiApiKey, model, systemPrompt, userContent, generationConfig, streamCallback);
     });
     
-    // Return true to indicate that sendResponse will be called asynchronously
     return true; 
   }
   
   if (request.action === 'testApiConnection') {
+    console.log("Background Script: Received 'testApiConnection' request."); // Debugging
     const { apiKey } = request.payload;
-    const testModel = 'gemini-1.5-flash-latest'; // Selalu gunakan model ringan untuk test koneksi
+    const testModel = 'gemini-1.5-flash-latest'; 
     const testContent = "Please reply with only the word 'OK' and nothing else.";
     const endpoint = 'generateContent';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${testModel}:${endpoint}?key=${apiKey}`;
@@ -170,7 +200,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     .then(res => {
         if (!res.ok) {
             return res.json().then(err => {
-                throw new Error(err.error?.message || `HTTP Error: ${res.status}`);
+                // Handle specific test API errors
+                let errorMessage = err.error?.message || `HTTP Error: ${res.status}`;
+                if (errorMessage.includes("API key not valid")) {
+                    errorMessage = "Kunci API tidak valid. Periksa kembali kunci Anda.";
+                } else if (errorMessage.includes("quota")) {
+                    errorMessage = "Batas penggunaan API tercapai. Periksa kuota Anda.";
+                }
+                throw new Error(errorMessage);
             });
         }
         return res.json();
@@ -178,13 +215,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     .then(result => {
        const text = result.candidates?.[0]?.content?.parts?.[0]?.text.trim() || "";
        if (text.toUpperCase() === 'OK') {
-         sendResponse({ success: true, text: "Connection successful!" });
+         sendResponse({ success: true, text: "Koneksi berhasil! AI merespons dengan baik." });
        } else {
-         sendResponse({ success: false, error: `Test failed. AI responded with: "${text}"` });
+         sendResponse({ success: false, error: `Tes gagal. AI merespons dengan tidak terduga: "${text}"` });
        }
     })
     .catch(err => sendResponse({ success: false, error: err.message }));
 
-    return true; // Indicates that sendResponse will be called asynchronously
+    return true; 
   }
 });

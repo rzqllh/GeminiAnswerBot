@@ -20,16 +20,16 @@ Answer: [Your Answer Here]
 Confidence: [High/Medium/Low]
 Reason: [Your one-sentence reason here]`;
 
-    const EXPLANATION_PROMPT = `Act as an expert tutor. For the following quiz content, provide a clear, step-by-step explanation for why the provided answer is correct and why the other options are incorrect. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting.`; // PROMPT BAHASA DITINGKATKAN
+    const EXPLANATION_PROMPT = `Act as an expert tutor. For the following quiz content, provide a clear, step-by-step explanation for why the provided answer is correct and why the other options are incorrect. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting.`;
 
     // New predefined prompts for context menu
-    const SUMMARIZE_PROMPT = `Summarize the following text concisely. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting:`; // PROMPT BAHASA DITINGKATKAN
+    const SUMMARIZE_PROMPT = `Summarize the following text concisely. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting:`;
     const TRANSLATE_PROMPT = `Translate the following text into 
     1. English
     2. Indonesian
     
-    Importnant: if the default language is english, no need to translate to english. vice versa:`; // Bisa diubah ke bahasa lain jika ada setting (tetap seperti ini sesuai instruksi sebelumnya)
-    const DEFINE_PROMPT = `Provide a clear and concise definition for the following term or concept found in the text. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting:`; // PROMPT BAHASA DITINGKATKAN
+    Importnant: if the default language is english, no need to translate to english. vice versa:`; 
+    const DEFINE_PROMPT = `Provide a clear and concise definition for the following term or concept found in the text. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting:`;
 
     // --- DOM Elements ---
     const container = document.querySelector('.container');
@@ -47,20 +47,21 @@ Reason: [Your one-sentence reason here]`;
     const messageArea = document.getElementById('messageArea');
     const retryAnswerButton = document.getElementById('retryAnswer');
     const retryExplanationButton = document.getElementById('retryExplanation');
-    const loadingSpinner = document.querySelector('.loading-spinner'); // Elemen spinner baru
+    const loadingSpinner = document.querySelector('.loading-spinner'); 
 
     // --- Global Variables ---
     let currentTab = null;
     let appConfig = {};
     let streamingAnswerText = '';
     let streamingExplanationText = '';
+    let hideToastTimeout = null; // Untuk mengelola timeout toast
 
     // --- Helper & Utility Functions ---
     function show(element) { if (element) element.classList.remove('hidden'); }
     function hide(element) { if (element) element.classList.add('hidden'); }
     // Revisi di sini: Memastikan 'unsafe' selalu berupa string
     function escapeHtml(unsafe) { 
-        return String(unsafe) // Mengkonversi 'unsafe' menjadi string
+        return String(unsafe) 
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
@@ -68,27 +69,36 @@ Reason: [Your one-sentence reason here]`;
             .replace(/'/g, "&#039;"); 
     }
 
-    function displayError(htmlMessage) {
+    // Fungsi displayError sekarang akan menampilkan pesan sebagai "toast"
+    function displayToast(message, type = 'error', duration = 5000) {
+        clearTimeout(hideToastTimeout); // Bersihkan timeout sebelumnya jika ada
+
+        // Sembunyikan elemen UI utama dan tampilkan messageArea
         hide(contentDisplayWrapper);
         hide(answerContainer);
         hide(explanationContainer);
         hide(aiActionsWrapper);
-        hide(loadingSpinner); // Sembunyikan spinner saat error
-        messageArea.innerHTML = htmlMessage;
+        hide(loadingSpinner); 
+
+        messageArea.innerHTML = `<div class="toast-notification toast-${type}">${message}</div>`;
         show(messageArea);
+
+        // Atur timeout untuk menyembunyikan toast
+        hideToastTimeout = setTimeout(() => {
+            hide(messageArea);
+        }, duration);
     }
 
     function formatAIResponse(text) {
-        // Revisi di sini: Memastikan 'text' selalu berupa string sebelum pemrosesan
         let processedText = String(text).replace(/```[\s\S]*?```/g, '~~~CODE_BLOCK~~~');
         processedText = escapeHtml(processedText).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/^\s*[\*\-]\s(.*)/gm, '<li>$1</li>');
-        processedText = processedText.replace(/<\/li>\s*<li>/g, '</li><li>'); // Handle multiple list items on one line
-        const listRegex = /(<ul><li>.*?<\/li><\/ul>)|(<li>.*<\/li>)/s; // Updated regex to handle full <ul> or individual <li>
-        if (!processedText.startsWith('<ul>') && listRegex.test(processedText)) { // Only add <ul> if not already wrapped
+        processedText = processedText.replace(/<\/li>\s*<li>/g, '</li><li>'); 
+        const listRegex = /(<ul><li>.*?<\/li><\/ul>)|(<li>.*<\/li>)/s; 
+        if (!processedText.startsWith('<ul>') && listRegex.test(processedText)) { 
             processedText = processedText.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
         }
         processedText = processedText.replace(/\n/g, '<br>');
-        const codeBlocks = String(text).match(/```[\s\S]*?```/g) || []; // Memastikan 'text' adalah string
+        const codeBlocks = String(text).match(/```[\s\S]*?```/g) || []; 
         codeBlocks.forEach(block => {
             const language = (block.match(/^```(\w+)\n/) || [])[1] || '';
             const cleanCode = block.replace(/^```\w*\n|```$/g, '');
@@ -99,9 +109,9 @@ Reason: [Your one-sentence reason here]`;
     }
 
     function callGeminiStream(prompt, contentText, purpose, originalUserContent = '') {
+        console.log("Popup: Sending 'callGeminiStream' to background.js for purpose:", purpose); // Debugging
         const generationConfig = { temperature: appConfig.temperature !== undefined ? appConfig.temperature : 0.4 };
-        show(loadingSpinner); // Tampilkan spinner
-        // originalUserContent ditambahkan untuk dikirim kembali ke listener geminiStreamUpdate
+        show(loadingSpinner); 
         chrome.runtime.sendMessage({ action: 'callGeminiStream', payload: { systemPrompt: prompt, userContent: contentText, generationConfig, originalUserContent }, purpose: purpose });
     }
 
@@ -118,13 +128,13 @@ Reason: [Your one-sentence reason here]`;
         const { history = [] } = await chrome.storage.local.get('history');
         const newEntry = {
             id: Date.now(),
-            cleanedContent: stateData.cleanedContent, // This might be the raw selected text for context actions
+            cleanedContent: stateData.cleanedContent, 
             answerHTML: stateData.answerHTML,
             explanationHTML: stateData.explanationHTML || '',
             url: currentTab.url,
             title: currentTab.title,
             timestamp: new Date().toISOString(),
-            actionType: contextActionType || 'quiz' // Tambahkan tipe aksi ke history
+            actionType: contextActionType || 'quiz' 
         };
         history.unshift(newEntry);
         if (history.length > 100) history.pop();
@@ -133,7 +143,7 @@ Reason: [Your one-sentence reason here]`;
 
     function restoreUiFromState(state) {
         hide(messageArea);
-        hide(loadingSpinner); // Sembunyikan spinner
+        hide(loadingSpinner); 
         if (state.cleanedContent) {
             contentDisplay.innerHTML = formatAIResponse(state.cleanedContent);
             show(contentDisplayWrapper);
@@ -153,19 +163,17 @@ Reason: [Your one-sentence reason here]`;
     async function runInitialScan(contentFromContextMenu = null, contextActionType = null) {
         hide(contentDisplayWrapper); hide(answerContainer); hide(explanationContainer); hide(aiActionsWrapper);
         show(messageArea);
-        show(loadingSpinner); // Tampilkan spinner saat mulai scan
+        show(loadingSpinner); 
         
         let textToProcess;
         let selectedPrompt;
-        let purpose = 'quiz_answer'; // Default purpose for initial scan (quiz solving)
-        let originalSelectedTextForContext = contentFromContextMenu; // Store original selected text for history/display
+        let purpose = 'quiz_answer'; 
+        let originalSelectedTextForContext = contentFromContextMenu; 
 
         try {
             if (contentFromContextMenu && contextActionType) {
-                // Scenario: Opened via context menu
                 textToProcess = contentFromContextMenu;
                 
-                // Determine prompt based on contextActionType
                 const customPrompts = appConfig.customPrompts || {};
                 switch (contextActionType) {
                     case 'summarize':
@@ -173,7 +181,7 @@ Reason: [Your one-sentence reason here]`;
                         purpose = 'summarize_action';
                         break;
                     case 'explain':
-                        selectedPrompt = customPrompts.explain_context || EXPLANATION_PROMPT; // Use general explanation or custom
+                        selectedPrompt = customPrompts.explain_context || EXPLANATION_PROMPT; 
                         purpose = 'explain_action';
                         break;
                     case 'translate':
@@ -185,48 +193,47 @@ Reason: [Your one-sentence reason here]`;
                         purpose = 'define_action';
                         break;
                     default:
-                        // Fallback to general answer if context action is unknown
                         selectedPrompt = customPrompts.answer || ANSWER_PROMPT;
                         purpose = 'quiz_answer';
                 }
                 messageArea.innerHTML = `<div class="loading-message">Getting ${contextActionType} for selected text...</div>`;
             } else {
-                // Scenario: Standard popup open or rescan
                 messageArea.innerHTML = `<div class="loading-message">Step 1/2: Cleaning content...</div>`;
                 const response = await new Promise((resolve, reject) => {
                     chrome.tabs.sendMessage(currentTab.id, { action: "get_page_content" }, (response) => {
+                        // Check chrome.runtime.lastError immediately after sendMessage
                         if (chrome.runtime.lastError) {
-                            // Tangani error jika channel tertutup (popup ditutup terlalu cepat)
                             const error = chrome.runtime.lastError;
                             if (error.message.includes("The message channel closed")) {
-                                console.warn("Message channel closed during get_page_content:", error.message);
-                                reject(new Error("Halaman tidak merespons atau popup ditutup. Silakan coba lagi."));
+                                console.warn("Popup: Message channel closed during get_page_content. This often happens if the popup is closed too quickly.");
+                                reject(new Error("Pesan tidak dapat dikirim ke halaman karena popup ditutup atau halaman tidak aktif. Silakan coba lagi."));
                             } else {
-                                reject(new Error(error.message));
+                                reject(new Error(`Terjadi kesalahan saat mendapatkan konten halaman: ${error.message}`));
                             }
-                            return; // Penting untuk keluar setelah reject
+                            return; 
                         }
                         resolve(response);
                     });
                 });
                 
-                if (!response || !response.content) throw new Error("Could not get a response from the content script.");
+                if (!response || !response.content) {
+                    throw new Error("Tidak ada konten yang dapat dibaca ditemukan di halaman. Atau script konten tidak merespons.");
+                }
                 
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = response.content.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>|<\/div>|<\/li>/gi, '\n');
                 textToProcess = tempDiv.innerText;
-                if (!textToProcess.trim()) throw new Error("No readable content was found on the page.");
+                if (!textToProcess.trim()) throw new Error("Tidak ada konten yang dapat dibaca ditemukan di halaman.");
                 
                 selectedPrompt = appConfig.customPrompts?.cleaning || CLEANING_PROMPT;
                 purpose = 'cleaning';
             }
 
-            // Apply general response tone if set and not a specific cleaning prompt
             if (appConfig.responseTone && appConfig.responseTone !== 'normal' && purpose !== 'cleaning') {
                 const toneInstructions = { 
                     sederhana: "\n\nExplain it simply.", 
                     teknis: "\n\nProvide a technical explanation.", 
-                    analogi: "\n\nUse analogies." 
+                    analogi: "\n\nUse Analogies." 
                 };
                 selectedPrompt += toneInstructions[appConfig.responseTone] || '';
             }
@@ -234,9 +241,8 @@ Reason: [Your one-sentence reason here]`;
             callGeminiStream(selectedPrompt, textToProcess, purpose, originalSelectedTextForContext);
 
         } catch (error) {
-            // Revisi di sini: Memastikan error.message selalu berupa string
-            displayError(`<div class="error-message"><strong>Analysis Failed:</strong> ${escapeHtml(error.message || 'Unknown error occurred.')}</div>`);
-            hide(loadingSpinner); // Sembunyikan spinner saat error
+            // Menggunakan displayToast untuk semua error di runInitialScan
+            displayToast(`<strong>Analisis Gagal:</strong> ${escapeHtml(error.message || 'Terjadi kesalahan tidak dikenal.')}`, 'error');
         }
     }
 
@@ -244,25 +250,23 @@ Reason: [Your one-sentence reason here]`;
         chrome.storage.local.get(currentTab.id.toString(), (result) => {
             const cleanedContent = result[currentTab.id.toString()]?.cleanedContent;
             if (!cleanedContent) {
-                answerDisplay.innerHTML = `<div class="error-message"><strong>Error:</strong> Cleaned content not found for getting answer.</div>`;
+                displayToast(`<strong>Error:</strong> Konten yang dibersihkan tidak ditemukan untuk mendapatkan jawaban.`, 'error');
                 retryAnswerButton.disabled = false;
-                hide(loadingSpinner); // Sembunyikan spinner
                 return;
             }
             retryAnswerButton.disabled = true;
             streamingAnswerText = '';
             let prompt = appConfig.customPrompts?.answer || ANSWER_PROMPT;
 
-            // Apply general response tone if set
             if (appConfig.responseTone && appConfig.responseTone !== 'normal') {
                 const toneInstructions = { 
                     sederhana: "\n\nExplain it simply.", 
                     teknis: "\n\nProvide a technical explanation.", 
-                    analogi: "\n\nUse analogies." 
+                    analogi: "\n\nUse Analogies." 
                 };
                 prompt += toneInstructions[appConfig.responseTone] || '';
             }
-            show(loadingSpinner); // Tampilkan spinner
+            show(loadingSpinner); 
             callGeminiStream(prompt, cleanedContent, 'answer');
         });
     }
@@ -271,55 +275,48 @@ Reason: [Your one-sentence reason here]`;
         chrome.storage.local.get(currentTab.id.toString(), (result) => {
             const currentState = result[currentTab.id.toString()];
             if (!currentState || !currentState.cleanedContent) {
-                explanationDisplay.innerHTML = `<div class="error-message"><strong>Error:</strong> Cleaned content not found for getting explanation.</div>`;
+                displayToast(`<strong>Error:</strong> Konten yang dibersihkan tidak ditemukan untuk mendapatkan penjelasan.`, 'error');
                 explanationButton.disabled = false;
                 retryExplanationButton.disabled = false;
-                hide(loadingSpinner); // Sembunyikan spinner
                 return;
             }
             explanationButton.disabled = true;
             retryExplanationButton.disabled = true;
-            show(explanationContainer);
-            explanationDisplay.innerHTML = `<div class="loading-message">The AI is thinking...</div>`;
+            show(explanationContainer); // Tetap tampilkan kontainer penjelasan
+            explanationDisplay.innerHTML = `<div class="loading-message">The AI is thinking...</div>`; // Pesan loading standar di area penjelasan
             streamingExplanationText = '';
             let prompt = appConfig.customPrompts?.explanation || EXPLANATION_PROMPT;
             
-            // Apply general response tone if set
             if (appConfig.responseTone && appConfig.responseTone !== 'normal') {
                 const toneInstructions = { 
                     sederhana: "\n\nExplain it simply.", 
                     teknis: "\n\nProvide a technical explanation.", 
-                    analogi: "\n\nUse analogies." 
+                    analogi: "\n\nUse Analogies." 
                 };
                 prompt += toneInstructions[appConfig.responseTone] || '';
             }
-            show(loadingSpinner); // Tampilkan spinner
+            show(loadingSpinner); 
             callGeminiStream(prompt, currentState.cleanedContent, 'explanation');
         });
     }
 
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (request.action === 'geminiStreamUpdate') {
+            console.log("Popup: Received 'geminiStreamUpdate' with purpose:", request.purpose, "and payload:", request.payload); // Debugging
             const { payload, purpose } = request;
             let targetDisplay;
-            // Determine target display based on purpose
             if (purpose === 'cleaning') targetDisplay = contentDisplay;
             else if (purpose === 'answer' || purpose === 'quiz_answer') targetDisplay = answerDisplay;
             else if (purpose === 'explanation') targetDisplay = explanationDisplay;
             else if (['summarize_action', 'explain_action', 'translate_action', 'define_action'].includes(purpose)) {
-                // For context menu actions, display directly in answerDisplay
                 targetDisplay = answerDisplay;
-                if (payload.chunk) {
-                    // Clear message area and set initial UI if first chunk for context action
-                    if (messageArea.classList.contains('hidden') === false) { // check if messageArea is visible
-                        hide(messageArea);
-                        show(contentDisplayWrapper); // contentDisplayWrapper for showing the selected text
-                        show(answerContainer); // answerContainer for the AI response
-                        // Revisi di sini: Memastikan request.payload.originalUserContent selalu string
-                        // Menampilkan teks yang dipilih untuk konteks menu di contentDisplay
-                        contentDisplay.innerHTML = `<strong>Selected Text:</strong><br>${escapeHtml(request.payload.originalUserContent || 'No text selected.')}<br><hr>`; 
-                        targetDisplay.innerHTML = ''; // Clear loading message from answerDisplay
-                    }
+                if (payload.chunk && !contentDisplay.dataset.contextTextSet) { 
+                    //hide(messageArea); // Tidak perlu hide messageArea jika kita akan pakai untuk toast notif
+                    show(contentDisplayWrapper);
+                    show(answerContainer);
+                    contentDisplay.innerHTML = `<h3>Selected Text:</h3><div class="selected-text-preview">${escapeHtml(request.payload.originalUserContent || 'No text selected.')}</div><hr>`; 
+                    contentDisplay.dataset.contextTextSet = 'true'; 
+                    targetDisplay.innerHTML = ''; 
                 }
             }
 
@@ -329,13 +326,20 @@ Reason: [Your one-sentence reason here]`;
                     if (targetDisplay.querySelector('.loading-message')) targetDisplay.innerHTML = '';
                     targetDisplay.textContent += payload.chunk;
                 } else if (payload.done) {
-                    hide(loadingSpinner); // Sembunyikan spinner saat selesai
+                    console.log("Popup: Stream done for purpose:", purpose); // Debugging
+                    hide(loadingSpinner); 
+                    // Reset flag contextTextSet
+                    if (contentDisplay.dataset.contextTextSet) {
+                        delete contentDisplay.dataset.contextTextSet;
+                    }
+                    hide(messageArea); // Sembunyikan messageArea jika sukses dan tidak ada error
+
                     const fullText = payload.fullText || targetDisplay.textContent;
                     
                     if (purpose === 'cleaning') {
                         const formattedHtml = formatAIResponse(fullText);
                         targetDisplay.innerHTML = formattedHtml;
-                        hide(messageArea);
+                        //hide(messageArea); // Sudah di hide di awal stream, atau tidak perlu di sini jika messageArea untuk toast
                         show(contentDisplayWrapper);
                         show(answerContainer);
                         answerDisplay.innerHTML = `<div class="loading-message">Step 2/2: Getting answer...</div>`;
@@ -343,7 +347,8 @@ Reason: [Your one-sentence reason here]`;
                     } else if (purpose === 'answer' || purpose === 'quiz_answer') {
                         const answerMatch = fullText.match(/Answer:(.*?)(Confidence:|Reason:|$)/is);
                         const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
-                        const reasonMatch = fullText.match(/Reason:(.*)/is);
+                        const reasonMatch = fullText ? fullText.match(/Reason:(.*)/is) : null; 
+                        
 
                         let answerText, formattedHtml;
 
@@ -364,80 +369,81 @@ Reason: [Your one-sentence reason here]`;
                         targetDisplay.innerHTML = formattedHtml;
                         retryAnswerButton.disabled = false;
                         show(aiActionsWrapper);
-                        hide(explanationContainer); // Hide explanation container if it's a new answer
+                        hide(explanationContainer); 
                         
                         if (appConfig.autoHighlight && answerText) {
                             chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: answerText });
                         }
-                        saveState({ answerHTML: formattedHtml, explanationHTML: '' }).then(() => saveToHistory({ cleanedContent: fullText, answerHTML: formattedHtml, explanationHTML: '' }, 'quiz')); // Save as quiz action
+                        saveState({ answerHTML: formattedHtml, explanationHTML: '' }).then(() => saveToHistory({ cleanedContent: fullText, answerHTML: formattedHtml, explanationHTML: '' }, 'quiz')); 
 
                     } else if (purpose === 'explanation') {
                         const formattedHtml = formatAIResponse(fullText);
                         targetDisplay.innerHTML = formattedHtml;
                         explanationButton.disabled = false;
                         retryExplanationButton.disabled = false;
-                        saveState({ explanationHTML: formattedHtml }).then(() => saveToHistory({ cleanedContent: 'N/A', answerHTML: formattedHtml, explanationHTML: '' }, 'explanation')); // Save explanation
+                        saveState({ explanationHTML: formattedHtml }).then(() => saveToHistory({ cleanedContent: 'N/A', answerHTML: formattedHtml, explanationHTML: '' }, 'explanation')); 
 
                     } else if (['summarize_action', 'explain_action', 'translate_action', 'define_action'].includes(purpose)) {
-                        // For context menu actions, the fullText is the direct answer.
                         const formattedHtml = formatAIResponse(fullText);
                         targetDisplay.innerHTML = formattedHtml;
-                        // Hide the "Get Explanation" button for these direct actions
                         hide(aiActionsWrapper); 
-                        hide(explanationContainer); // Ensure explanation is hidden
+                        hide(explanationContainer); 
 
-                        // Save this action to history
-                        // Pass the original selected text to cleanedContent for history context
                         const originalSelectedText = request.payload.originalUserContent; 
                         saveToHistory({ 
                             cleanedContent: originalSelectedText, 
                             answerHTML: formattedHtml, 
                             explanationHTML: '' 
-                        }, purpose.replace('_action', '')); // Save purpose without '_action'
+                        }, purpose.replace('_action', '')); 
                     }
                 }
             } else {
-                hide(loadingSpinner); // Sembunyikan spinner saat error
-                // Revisi di sini: Memastikan payload.error selalu berupa string
-                (targetDisplay || messageArea).innerHTML = `<div class="error-message"><strong>Error:</strong> ${escapeHtml(payload.error || 'An unknown error occurred during AI streaming.')}</div>`;
+                console.error("Popup: Gemini stream update failed for purpose:", purpose, "Error:", payload.error); // Debugging
+                hide(loadingSpinner); 
+                // Menggunakan displayToast untuk menampilkan error dari background.js
+                displayToast(`<strong>Error AI:</strong> ${escapeHtml(payload.error || 'Terjadi kesalahan tidak dikenal saat streaming AI.')}`, 'error');
                 if (purpose === 'answer' || purpose === 'quiz_answer') retryAnswerButton.disabled = false;
                 if (purpose === 'explanation') { explanationButton.disabled = false; retryExplanationButton.disabled = false; }
             }
         }
-        return false; // Mengembalikan false karena ini adalah event stream, bukan request-response yang memerlukan sendResponse
+        return false; 
     });
 
     async function initialize() {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (!tab) { displayError(`<div class="error-message">Could not find an active tab.</div>`); return; }
+        if (!tab) { displayToast(`Tidak dapat menemukan tab aktif.`, 'error'); return; }
         currentTab = tab;
 
-        // Load config including new 'responseTone'
         appConfig = await chrome.storage.sync.get(['geminiApiKey', 'responseTone', 'temperature', 'customPrompts', 'autoHighlight']);
         if (!appConfig.geminiApiKey) { showSetupView(); return; }
 
         try {
+            console.log("popup.js: Attempting to inject content.js and highlighter.css...");
             await chrome.scripting.executeScript({ target: { tabId: currentTab.id }, files: ['js/content.js'] });
             await chrome.scripting.insertCSS({ target: { tabId: currentTab.id }, files: ['assets/highlighter.css'] });
+            console.log("popup.js: Content script and CSS injected successfully.");
         } catch (e) {
-            displayError(`<div class="error-message">Cannot run on this page. Try on a different website (e.g., a news article).<br><br>Jika ini adalah halaman internal Chrome (seperti chrome://extensions), Anda tidak dapat menjalankan ekstensi di sini.</div>`);
+            console.error("popup.js: Failed to inject content script or CSS:", e);
+            let errorMessage = `Ekstensi tidak dapat berjalan di halaman ini. Coba di situs web yang berbeda (misalnya, artikel berita, halaman kuis).`;
+            if (e.message.includes("Cannot access a chrome://")) {
+                errorMessage += `<br><br>Ini adalah halaman internal Chrome (seperti chrome://extensions), Anda tidak dapat menjalankan ekstensi di sini.`;
+            } else if (e.message.includes("is not allowed to inject script")) {
+                 errorMessage += `<br><br>Ekstensi tidak memiliki izin untuk berinteraksi dengan situs ini. Pastikan Anda telah memberikan semua izin yang diminta saat instalasi.`;
+            }
+            displayToast(`<strong>Gagal Memuat Halaman:</strong> ${errorMessage}`, 'error');
             return;
         }
 
         const contextKey = `contextSelection_${currentTab.id}`;
-        const actionKey = `contextAction_${currentTab.id}`; // Get context action key
+        const actionKey = `contextAction_${currentTab.id}`; 
         const contextData = await chrome.storage.local.get([contextKey, actionKey]);
 
-        // Check if popup was opened from context menu
         if (contextData[contextKey] && contextData[actionKey]) {
             const selectedText = contextData[contextKey];
             const actionType = contextData[actionKey];
-            // Clear context data from storage
             await chrome.storage.local.remove([contextKey, actionKey, currentTab.id.toString()]);
-            // Run scan with specific action
             runInitialScan(selectedText, actionType);
         } else {
-            // Standard flow: check saved state or perform new scan
             const savedState = (await chrome.storage.local.get(currentTab.id.toString()))[currentTab.id.toString()];
             if (savedState && savedState.cleanedContent) {
                 restoreUiFromState(savedState);
@@ -449,7 +455,7 @@ Reason: [Your one-sentence reason here]`;
 
     function showSetupView() {
     hide(contentDisplayWrapper); hide(answerContainer); hide(explanationContainer); hide(aiActionsWrapper);
-    hide(loadingSpinner); // Sembunyikan spinner saat setup view
+    hide(loadingSpinner); 
     const setupHTML = `<div class="initial-view"><h2 style="margin-bottom: 5px;">Setup Required</h2><p>You need to enter a Gemini API Key to get started.</p><button id="openOptionsButton" class="setup-button">Open Settings Page</button></div>`;
     messageArea.innerHTML = setupHTML;
     show(messageArea);

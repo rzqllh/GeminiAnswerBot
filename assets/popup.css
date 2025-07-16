@@ -13,6 +13,8 @@
   --apple-green: #34c759;
   --apple-yellow: #ffcc00;
   --apple-red: #ff3b30;
+  --selected-text-bg: #e0f2f7; /* Warna latar belakang baru untuk teks terpilih */
+  --selected-text-border: #b3e5fc; /* Warna border baru untuk teks terpilih */
 }
 
 /* === Base & Layout === */
@@ -66,16 +68,55 @@ body {
   word-wrap: break-word;
   color: var(--primary-text-color); /* Pastikan warna teks kontras */
 }
+/* Style untuk teks yang dipilih (context menu) */
+#contentDisplay .selected-text-preview {
+    background-color: var(--selected-text-bg);
+    border: 1px solid var(--selected-text-border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 8px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--primary-text-color);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+}
+
 #messageArea {
   order: -3;
   display: flex;
-  flex-direction: column; /* Ubah untuk spinner */
+  flex-direction: column; 
   align-items: center;
   justify-content: center;
   min-height: 150px;
   text-align: center;
   color: var(--secondary-text-color);
 }
+/* Basic Toast Notification Styles */
+.toast-notification {
+    background-color: var(--apple-red); /* Default for error */
+    color: white;
+    padding: 12px 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    font-size: 14px;
+    font-weight: 500;
+    max-width: 90%;
+    word-wrap: break-word;
+    text-align: center;
+    line-height: 1.4;
+    transition: all 0.3s ease-in-out;
+}
+
+.toast-notification.toast-error {
+    background-color: var(--apple-red);
+}
+.toast-notification.toast-success {
+    background-color: var(--apple-green);
+}
+.toast-notification.toast-info {
+    background-color: var(--apple-blue);
+}
+
 .initial-icon { color: #c7c7cc; }
 .initial-view p { margin-top: 8px; font-size: 14px; }
 .manual-selection-notice {
@@ -276,7 +317,8 @@ code {
 }
 .setup-button:hover { background-color: var(--apple-blue-hover); }
 
-.error-message {
+/* Removed .error-message because it's replaced by toast-notification for user-facing errors */
+/* .error-message {
   background-color: #ffebee;
   color: #c62828;
   border: 1px solid #ef9a9a;
@@ -286,4 +328,4 @@ code {
   line-height: 1.5;
   word-wrap: break-word;
 }
-.error-message a { color: #c62828; font-weight: bold; }
+.error-message a { color: #c62828; font-weight: bold; } */
