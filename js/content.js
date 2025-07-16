@@ -56,15 +56,25 @@ if (typeof window.pageReaderContentScriptLoaded === 'undefined') {
       }, 100);
       sendResponse({ success: true });
     } else if (request.action === "get_page_content") {
-      // Fungsi get_page_content tidak diubah, jadi tidak perlu disalin di sini
-      // untuk menjaga respons tetap ringkas. Logika lama Anda masih berlaku.
-      const mainContentElement = document.body;
       const selectedText = window.getSelection().toString().trim();
-       if (selectedText.length > 20) { // Jika ada seleksi yang cukup panjang, gunakan itu
-        sendResponse({ content: selectedText, source: 'selection' });
-      } else { // Jika tidak ada atau terlalu pendek, ambil seluruh konten halaman
-        sendResponse({ content: mainContentElement.innerText, source: 'auto' });
+      let pageContent = '';
+
+      if (selectedText.length > 20) { // Jika ada seleksi yang cukup panjang, gunakan itu
+        pageContent = selectedText;
+      } else { 
+        // Coba cari elemen konten utama yang umum
+        const articleElement = document.querySelector('article') || document.querySelector('main');
+        if (articleElement && articleElement.innerText.length > 100) { // Hanya jika cukup banyak konten
+            pageContent = articleElement.innerText;
+        } else {
+            // Fallback ke innerText body jika tidak ada atau artikel terlalu pendek
+            pageContent = document.body.innerText;
+        }
+        
+        // Pembersihan awal: Mengurangi baris kosong berlebihan
+        pageContent = pageContent.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
       }
+      sendResponse({ content: pageContent, source: selectedText.length > 20 ? 'selection' : 'auto' });
     }
     return true; // Penting untuk asynchronous sendResponse
   });

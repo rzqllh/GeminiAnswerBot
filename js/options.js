@@ -6,7 +6,7 @@ RULES:
 1. Remove all irrelevant text (menus, sidebars, footers, ads, navigation links, etc.). 
 2. Preserve the original formatting of the question, options, and especially code blocks. 
 3. Format all content using standard Markdown (e.g., use triple backticks for code). 
-4. Directly return only the cleaned Markdown text. Do not add any introductory phrases like "Here is the cleaned text:".`,
+4. Directly return only the cleaned Markdown text. Do not add any introductory phrases like "Here is the cleaned text:".`, // PROMPT DITINGKATKAN
     answer: `Act as an expert quiz solver. Based on the following cleaned text, your tasks are:
 1.  Provide the single, most correct answer for the question(s).
 2.  Provide a confidence score (High, Medium, or Low).

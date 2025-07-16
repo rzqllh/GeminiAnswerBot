@@ -7,7 +7,7 @@ RULES:
 1. Remove all irrelevant text (menus, sidebars, footers, ads, navigation links, etc.). 
 2. Preserve the original formatting of the question, options, and especially code blocks. 
 3. Format all content using standard Markdown (e.g., use triple backticks for code). 
-4. Directly return only the cleaned Markdown text. Do not add any introductory phrases like "Here is the cleaned text:".`;
+4. Directly return only the cleaned Markdown text. Do not add any introductory phrases like "Here is the cleaned text:".`; // PROMPT DITINGKATKAN
 
     const ANSWER_PROMPT = `Act as an expert quiz solver. Based on the following cleaned text, your tasks are:
 1.  Provide the single, most correct answer for the question(s).
@@ -90,7 +90,7 @@ Reason: [Your one-sentence reason here]`;
         codeBlocks.forEach(block => {
             const language = (block.match(/^```(\w+)\n/) || [])[1] || '';
             const cleanCode = block.replace(/^```\w*\n|```$/g, '');
-            const codeHtml = `<div class="code-block-wrapper"><button class="copy-code-button" title="Copy Code Snippet"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span>Copy</span></button><pre><code class="language-${language}">${escapeHtml(cleanCode.trim())}</code></pre></div>`;
+            const codeHtml = `<div class="code-block-wrapper"><button class="copy-code-button" title="Copy Code Snippet"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span>Copy</span></button><pre><code class="language-${language}">${escapeHtml(cleanCode.trim())}</code></pre></div>`;
             processedText = processedText.replace('~~~CODE_BLOCK~~~', codeHtml);
         });
         return processedText.replace(/<br>\s*<ul>/g, '<ul>').replace(/<\/ul>\s*<br>/g, '</ul>');
