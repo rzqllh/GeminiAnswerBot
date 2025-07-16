@@ -6,7 +6,7 @@ RULES:
 1. Remove all irrelevant text (menus, sidebars, footers, ads, navigation links, etc.). 
 2. Preserve the original formatting of the question, options, and especially code blocks. 
 3. Format all content using standard Markdown (e.g., use triple backticks for code). 
-4. Directly return only the cleaned Markdown text. Do not add any introductory phrases like "Here is the cleaned text:".`, // PROMPT DITINGKATKAN
+4. Directly return only the cleaned Markdown text. Do not add any introductory phrases like "Here is the cleaned text:".`,
     answer: `Act as an expert quiz solver. Based on the following cleaned text, your tasks are:
 1.  Provide the single, most correct answer for the question(s).
 2.  Provide a confidence score (High, Medium, or Low).
@@ -17,14 +17,14 @@ FORMAT:
 Answer: [Your Answer Here]
 Confidence: [High/Medium/Low]
 Reason: [Your one-sentence reason here]`,
-    explanation: `Act as an expert tutor. For the following quiz content, provide a clear, step-by-step explanation for why the provided answer is correct and why the other options are incorrect. IMPORTANT: Respond in english/indonesian language as the question and use Markdown for formatting.`,
-    summarize: `Summarize the following text concisely. Respond in the same language as the provided text and use Markdown for formatting:`, // Default for summarize
+    explanation: `Act as an expert tutor. For the following quiz content, provide a clear, step-by-step explanation for why the provided answer is correct and why the other options are incorrect. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting.`, // PROMPT BAHASA DITINGKATKAN
+    summarize: `Summarize the following text concisely. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting:`, // PROMPT BAHASA DITINGKATKAN
     translate: `Translate the following text into 
     1. English
     2. Indonesian
     
-    Importnant: if the default language is english, no need to translate to english. vice versa:`, // Default for translate
-    define: `Provide a clear and concise definition for the following term or concept found in the text:`, // Default for define
+    Importnant: if the default language is english, no need to translate to english. vice versa:`, // Default for translate (tetap sesuai instruksi sebelumnya)
+    define: `Provide a clear and concise definition for the following term or concept found in the text. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting:`, // PROMPT BAHASA DITINGKATKAN
   };
 
   // --- DOM Elements ---

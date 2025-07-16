@@ -7,7 +7,7 @@ RULES:
 1. Remove all irrelevant text (menus, sidebars, footers, ads, navigation links, etc.). 
 2. Preserve the original formatting of the question, options, and especially code blocks. 
 3. Format all content using standard Markdown (e.g., use triple backticks for code). 
-4. Directly return only the cleaned Markdown text. Do not add any introductory phrases like "Here is the cleaned text:".`; // PROMPT DITINGKATKAN
+4. Directly return only the cleaned Markdown text. Do not add any introductory phrases like "Here is the cleaned text:".`;
 
     const ANSWER_PROMPT = `Act as an expert quiz solver. Based on the following cleaned text, your tasks are:
 1.  Provide the single, most correct answer for the question(s).
@@ -20,16 +20,16 @@ Answer: [Your Answer Here]
 Confidence: [High/Medium/Low]
 Reason: [Your one-sentence reason here]`;
 
-    const EXPLANATION_PROMPT = `Act as an expert tutor. For the following quiz content, provide a clear, step-by-step explanation for why the provided answer is correct and why the other options are incorrect. IMPORTANT: Respond in the same language as the question and use Markdown for formatting.`;
+    const EXPLANATION_PROMPT = `Act as an expert tutor. For the following quiz content, provide a clear, step-by-step explanation for why the provided answer is correct and why the other options are incorrect. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting.`; // PROMPT BAHASA DITINGKATKAN
 
     // New predefined prompts for context menu
-    const SUMMARIZE_PROMPT = `Summarize the following text concisely. Respond in the same language as the provided text and use Markdown for formatting:`;
+    const SUMMARIZE_PROMPT = `Summarize the following text concisely. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting:`; // PROMPT BAHASA DITINGKATKAN
     const TRANSLATE_PROMPT = `Translate the following text into 
     1. English
     2. Indonesian
     
-    Importnant: if the default language is english, no need to translate to english. vice versa:`; // Bisa diubah ke bahasa lain jika ada setting
-    const DEFINE_PROMPT = `Provide a clear and concise definition for the following term or concept found in the text:`;
+    Importnant: if the default language is english, no need to translate to english. vice versa:`; // Bisa diubah ke bahasa lain jika ada setting (tetap seperti ini sesuai instruksi sebelumnya)
+    const DEFINE_PROMPT = `Provide a clear and concise definition for the following term or concept found in the text. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting:`; // PROMPT BAHASA DITINGKATKAN
 
     // --- DOM Elements ---
     const container = document.querySelector('.container');
@@ -47,6 +47,7 @@ Reason: [Your one-sentence reason here]`;
     const messageArea = document.getElementById('messageArea');
     const retryAnswerButton = document.getElementById('retryAnswer');
     const retryExplanationButton = document.getElementById('retryExplanation');
+    const loadingSpinner = document.querySelector('.loading-spinner'); // Elemen spinner baru
 
     // --- Global Variables ---
     let currentTab = null;
@@ -72,6 +73,7 @@ Reason: [Your one-sentence reason here]`;
         hide(answerContainer);
         hide(explanationContainer);
         hide(aiActionsWrapper);
+        hide(loadingSpinner); // Sembunyikan spinner saat error
         messageArea.innerHTML = htmlMessage;
         show(messageArea);
     }
@@ -90,7 +92,7 @@ Reason: [Your one-sentence reason here]`;
         codeBlocks.forEach(block => {
             const language = (block.match(/^```(\w+)\n/) || [])[1] || '';
             const cleanCode = block.replace(/^```\w*\n|```$/g, '');
-            const codeHtml = `<div class="code-block-wrapper"><button class="copy-code-button" title="Copy Code Snippet"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span>Copy</span></button><pre><code class="language-${language}">${escapeHtml(cleanCode.trim())}</code></pre></div>`;
+            const codeHtml = `<div class="code-block-wrapper"><button class="copy-code-button" title="Copy Code Snippet"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span>Copy</span></button><pre><code class="language-${language}">${escapeHtml(cleanCode.trim())}</code></pre></div>`;
             processedText = processedText.replace('~~~CODE_BLOCK~~~', codeHtml);
         });
         return processedText.replace(/<br>\s*<ul>/g, '<ul>').replace(/<\/ul>\s*<br>/g, '</ul>');
@@ -98,6 +100,7 @@ Reason: [Your one-sentence reason here]`;
 
     function callGeminiStream(prompt, contentText, purpose, originalUserContent = '') {
         const generationConfig = { temperature: appConfig.temperature !== undefined ? appConfig.temperature : 0.4 };
+        show(loadingSpinner); // Tampilkan spinner
         // originalUserContent ditambahkan untuk dikirim kembali ke listener geminiStreamUpdate
         chrome.runtime.sendMessage({ action: 'callGeminiStream', payload: { systemPrompt: prompt, userContent: contentText, generationConfig, originalUserContent }, purpose: purpose });
     }
@@ -130,6 +133,7 @@ Reason: [Your one-sentence reason here]`;
 
     function restoreUiFromState(state) {
         hide(messageArea);
+        hide(loadingSpinner); // Sembunyikan spinner
         if (state.cleanedContent) {
             contentDisplay.innerHTML = formatAIResponse(state.cleanedContent);
             show(contentDisplayWrapper);
@@ -149,6 +153,7 @@ Reason: [Your one-sentence reason here]`;
     async function runInitialScan(contentFromContextMenu = null, contextActionType = null) {
         hide(contentDisplayWrapper); hide(answerContainer); hide(explanationContainer); hide(aiActionsWrapper);
         show(messageArea);
+        show(loadingSpinner); // Tampilkan spinner saat mulai scan
         
         let textToProcess;
         let selectedPrompt;
@@ -231,6 +236,7 @@ Reason: [Your one-sentence reason here]`;
         } catch (error) {
             // Revisi di sini: Memastikan error.message selalu berupa string
             displayError(`<div class="error-message"><strong>Analysis Failed:</strong> ${escapeHtml(error.message || 'Unknown error occurred.')}</div>`);
+            hide(loadingSpinner); // Sembunyikan spinner saat error
         }
     }
 
@@ -240,6 +246,7 @@ Reason: [Your one-sentence reason here]`;
             if (!cleanedContent) {
                 answerDisplay.innerHTML = `<div class="error-message"><strong>Error:</strong> Cleaned content not found for getting answer.</div>`;
                 retryAnswerButton.disabled = false;
+                hide(loadingSpinner); // Sembunyikan spinner
                 return;
             }
             retryAnswerButton.disabled = true;
@@ -255,7 +262,7 @@ Reason: [Your one-sentence reason here]`;
                 };
                 prompt += toneInstructions[appConfig.responseTone] || '';
             }
-
+            show(loadingSpinner); // Tampilkan spinner
             callGeminiStream(prompt, cleanedContent, 'answer');
         });
     }
@@ -267,6 +274,7 @@ Reason: [Your one-sentence reason here]`;
                 explanationDisplay.innerHTML = `<div class="error-message"><strong>Error:</strong> Cleaned content not found for getting explanation.</div>`;
                 explanationButton.disabled = false;
                 retryExplanationButton.disabled = false;
+                hide(loadingSpinner); // Sembunyikan spinner
                 return;
             }
             explanationButton.disabled = true;
@@ -285,7 +293,7 @@ Reason: [Your one-sentence reason here]`;
                 };
                 prompt += toneInstructions[appConfig.responseTone] || '';
             }
-
+            show(loadingSpinner); // Tampilkan spinner
             callGeminiStream(prompt, currentState.cleanedContent, 'explanation');
         });
     }
@@ -321,6 +329,7 @@ Reason: [Your one-sentence reason here]`;
                     if (targetDisplay.querySelector('.loading-message')) targetDisplay.innerHTML = '';
                     targetDisplay.textContent += payload.chunk;
                 } else if (payload.done) {
+                    hide(loadingSpinner); // Sembunyikan spinner saat selesai
                     const fullText = payload.fullText || targetDisplay.textContent;
                     
                     if (purpose === 'cleaning') {
@@ -388,6 +397,7 @@ Reason: [Your one-sentence reason here]`;
                     }
                 }
             } else {
+                hide(loadingSpinner); // Sembunyikan spinner saat error
                 // Revisi di sini: Memastikan payload.error selalu berupa string
                 (targetDisplay || messageArea).innerHTML = `<div class="error-message"><strong>Error:</strong> ${escapeHtml(payload.error || 'An unknown error occurred during AI streaming.')}</div>`;
                 if (purpose === 'answer' || purpose === 'quiz_answer') retryAnswerButton.disabled = false;
@@ -439,6 +449,7 @@ Reason: [Your one-sentence reason here]`;
 
     function showSetupView() {
     hide(contentDisplayWrapper); hide(answerContainer); hide(explanationContainer); hide(aiActionsWrapper);
+    hide(loadingSpinner); // Sembunyikan spinner saat setup view
     const setupHTML = `<div class="initial-view"><h2 style="margin-bottom: 5px;">Setup Required</h2><p>You need to enter a Gemini API Key to get started.</p><button id="openOptionsButton" class="setup-button">Open Settings Page</button></div>`;
     messageArea.innerHTML = setupHTML;
     show(messageArea);

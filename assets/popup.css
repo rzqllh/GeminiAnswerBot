@@ -51,25 +51,25 @@ body {
 /* === Content & Message Area === */
 #contentDisplayWrapper {
   order: -3;
-  background-color: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background-color: var(--card-bg-color); /* Ubah ke warna kartu */
   border-radius: 14px;
   padding: 16px;
   max-height: 280px;
   overflow-y: auto;
   position: relative;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(229, 229, 234, 0.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Lebih menonjol */
+  border: 1px solid var(--separator-color); /* Border yang jelas */
 }
 #contentDisplay {
   font-size: 14px;
   line-height: 1.6;
   word-wrap: break-word;
+  color: var(--primary-text-color); /* Pastikan warna teks kontras */
 }
 #messageArea {
   order: -3;
   display: flex;
+  flex-direction: column; /* Ubah untuk spinner */
   align-items: center;
   justify-content: center;
   min-height: 150px;
@@ -86,6 +86,23 @@ body {
   margin-bottom: 8px;
   text-align: center;
 }
+
+/* Loading Spinner */
+.loading-spinner {
+  border: 4px solid #f3f3f3; /* Light grey */
+  border-top: 4px solid var(--apple-blue); /* Blue */
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin-top: 15px; /* Jarak dari teks */
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 
 /* === Buttons === */
 button {
@@ -140,6 +157,7 @@ button:active { transform: scale(0.96); }
   display: flex;
   align-items: center;
   gap: 6px;
+  color: var(--primary-text-color); /* Pastikan judul terlihat jelas */
 }
 .retry-button {
   padding: 4px;
@@ -237,7 +255,11 @@ code {
 /* === Loading & Setup === */
 .loading-message {
   font-size: 14px;
-  animation: pulse 1.5s infinite ease-in-out;
+  animation: none; /* Hapus animasi pulse dari Sprint 1, diganti dengan spinner */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 @keyframes pulse {
   0%, 100% { opacity: 0.6; }
