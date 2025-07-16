@@ -17,7 +17,14 @@ FORMAT:
 Answer: [Your Answer Here]
 Confidence: [High/Medium/Low]
 Reason: [Your one-sentence reason here]`,
-    explanation: `Act as an expert tutor. For the following quiz content, provide a clear, step-by-step explanation for why the provided answer is correct and why the other options are incorrect. IMPORTANT: Respond in the same language as the question and use Markdown for formatting.`
+    explanation: `Act as an expert tutor. For the following quiz content, provide a clear, step-by-step explanation for why the provided answer is correct and why the other options are incorrect. IMPORTANT: Respond in english/indonesian language as the question and use Markdown for formatting.`,
+    summarize: `Summarize the following text concisely. Respond in the same language as the provided text and use Markdown for formatting:`, // Default for summarize
+    translate: `Translate the following text into 
+    1. English
+    2. Indonesian
+    
+    Importnant: if the default language is english, no need to translate to english. vice versa:`, // Default for translate
+    define: `Provide a clear and concise definition for the following term or concept found in the text:`, // Default for define
   };
 
   // --- DOM Elements ---
@@ -25,7 +32,7 @@ Reason: [Your one-sentence reason here]`,
   const testButton = document.getElementById('testButton');
   const apiKeyInput = document.getElementById('apiKey');
   const modelSelect = document.getElementById('modelSelect');
-  const explanationToneSelect = document.getElementById('explanationToneSelect');
+  const responseToneSelect = document.getElementById('responseToneSelect'); // Diubah namanya
   const statusDiv = document.getElementById('status');
   const autoHighlightToggle = document.getElementById('autoHighlightToggle');
   const temperatureSlider = document.getElementById('temperatureSlider');
@@ -33,19 +40,24 @@ Reason: [Your one-sentence reason here]`,
   const cleaningPromptTextarea = document.getElementById('cleaningPrompt');
   const answerPromptTextarea = document.getElementById('answerPrompt');
   const explanationPromptTextarea = document.getElementById('explanationPrompt');
+  // New prompt textareas for context menu actions
+  const summarizePromptTextarea = document.getElementById('summarizePrompt');
+  const translatePromptTextarea = document.getElementById('translatePrompt');
+  const definePromptTextarea = document.getElementById('definePrompt');
+
 
   // --- Load all saved settings ---
   chrome.storage.sync.get([
     'geminiApiKey', 
     'selectedModel', 
-    'explanationTone',
+    'responseTone', // Diubah namanya
     'autoHighlight', 
     'customPrompts',
     'temperature'
   ], function(result) {
     apiKeyInput.value = result.geminiApiKey || '';
     modelSelect.value = result.selectedModel || 'gemini-1.5-flash-latest';
-    explanationToneSelect.value = result.explanationTone || 'normal';
+    responseToneSelect.value = result.responseTone || 'normal'; // Diubah namanya
     autoHighlightToggle.checked = result.autoHighlight || false;
     
     const temperature = result.temperature !== undefined ? result.temperature : 0.4;
@@ -56,12 +68,18 @@ Reason: [Your one-sentence reason here]`,
     cleaningPromptTextarea.placeholder = DEFAULT_PROMPTS.cleaning;
     answerPromptTextarea.placeholder = DEFAULT_PROMPTS.answer;
     explanationPromptTextarea.placeholder = DEFAULT_PROMPTS.explanation;
+    summarizePromptTextarea.placeholder = DEFAULT_PROMPTS.summarize; // Placeholder for new prompts
+    translatePromptTextarea.placeholder = DEFAULT_PROMPTS.translate;
+    definePromptTextarea.placeholder = DEFAULT_PROMPTS.define;
 
     // Set saved values if they exist
     const prompts = result.customPrompts || {};
     cleaningPromptTextarea.value = prompts.cleaning || '';
     answerPromptTextarea.value = prompts.answer || '';
     explanationPromptTextarea.value = prompts.explanation || '';
+    summarizePromptTextarea.value = prompts.summarize || ''; // Load custom context prompts
+    translatePromptTextarea.value = prompts.translate || '';
+    definePromptTextarea.value = prompts.define || '';
   });
 
   // --- Event listener for Temperature Slider ---
@@ -73,20 +91,23 @@ Reason: [Your one-sentence reason here]`,
   saveButton.addEventListener('click', function() {
     const apiKey = apiKeyInput.value.trim();
     const selectedModel = modelSelect.value;
-    const explanationTone = explanationToneSelect.value;
+    const responseTone = responseToneSelect.value; // Diubah namanya
     const autoHighlight = autoHighlightToggle.checked;
     const temperature = parseFloat(temperatureSlider.value);
     const customPrompts = {
       cleaning: cleaningPromptTextarea.value.trim(),
       answer: answerPromptTextarea.value.trim(),
-      explanation: explanationPromptTextarea.value.trim()
+      explanation: explanationPromptTextarea.value.trim(),
+      summarize: summarizePromptTextarea.value.trim(), // Save new custom prompts
+      translate: translatePromptTextarea.value.trim(),
+      define: definePromptTextarea.value.trim()
     };
     
     if (apiKey) {
       chrome.storage.sync.set({ 
         'geminiApiKey': apiKey,
         'selectedModel': selectedModel,
-        'explanationTone': explanationTone,
+        'responseTone': responseTone, // Diubah namanya
         'autoHighlight': autoHighlight,
         'temperature': temperature,
         'customPrompts': customPrompts
@@ -118,17 +139,12 @@ Reason: [Your one-sentence reason here]`,
           return;
         }
         
-        // === LOGIC REVISED HERE ===
         if (response && response.success) {
-          // Display the success message sent from background.js
           showStatus(response.text, 'success');
         } else {
-          // Display the detailed error message sent from background.js
           const errorMessage = response.error || 'An unknown error occurred.';
           showStatus(errorMessage, 'error');
         }
-        // =========================
-
         testButton.disabled = false;
       }
     );
@@ -139,7 +155,6 @@ Reason: [Your one-sentence reason here]`,
     statusDiv.textContent = message;
     statusDiv.className = type; 
     
-    // Clear success/normal messages after a timeout, but keep error messages visible
     if (type !== 'error') {
         setTimeout(() => {
             if (statusDiv.textContent === message) {

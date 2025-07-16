@@ -1,14 +1,18 @@
 {
   "manifest_version": 3,
   "name": "GeminiAnswerBot",
-  "version": "14.0",
-  "description": "An intelligent quiz assistant powered by Gemini AI.",
-  "permissions": ["activeTab", "scripting", "storage", "contextMenus"],
-  "host_permissions": ["https://generativelanguage.googleapis.com/*"],
-  "options_page": "ui/options.html",
-  "background": {
-    "service_worker": "js/background.js"
-  },
+  "version": "18.2",
+  "description": "Your Gemini-powered Chrome extension.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "contextMenus" 
+  ],
+  "host_permissions": [
+    "https://generativelanguage.googleapis.com/*",
+    "<all_urls>" 
+  ],
   "action": {
     "default_popup": "ui/popup.html",
     "default_icon": {
@@ -18,6 +22,10 @@
   "icons": {
     "128": "assets/icon.png"
   },
+  "background": {
+    "service_worker": "js/background.js"
+  },
+  "options_page": "ui/options.html",
   "web_accessible_resources": [
     {
       "resources": ["assets/highlighter.css"],

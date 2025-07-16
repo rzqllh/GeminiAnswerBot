@@ -1,3 +1,5 @@
+// js/popup.js
+
 document.addEventListener('DOMContentLoaded', async function () {
     // --- PROMPTS ---
     const CLEANING_PROMPT = `You are a text cleaner. Your only job is to analyze the following messy text from a webpage and extract the main quiz content. 
@@ -19,6 +21,15 @@ Confidence: [High/Medium/Low]
 Reason: [Your one-sentence reason here]`;
 
     const EXPLANATION_PROMPT = `Act as an expert tutor. For the following quiz content, provide a clear, step-by-step explanation for why the provided answer is correct and why the other options are incorrect. IMPORTANT: Respond in the same language as the question and use Markdown for formatting.`;
+
+    // New predefined prompts for context menu
+    const SUMMARIZE_PROMPT = `Summarize the following text concisely. Respond in the same language as the provided text and use Markdown for formatting:`;
+    const TRANSLATE_PROMPT = `Translate the following text into 
+    1. English
+    2. Indonesian
+    
+    Importnant: if the default language is english, no need to translate to english. vice versa:`; // Bisa diubah ke bahasa lain jika ada setting
+    const DEFINE_PROMPT = `Provide a clear and concise definition for the following term or concept found in the text:`;
 
     // --- DOM Elements ---
     const container = document.querySelector('.container');
@@ -46,7 +57,15 @@ Reason: [Your one-sentence reason here]`;
     // --- Helper & Utility Functions ---
     function show(element) { if (element) element.classList.remove('hidden'); }
     function hide(element) { if (element) element.classList.add('hidden'); }
-    function escapeHtml(unsafe) { return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+    // Revisi di sini: Memastikan 'unsafe' selalu berupa string
+    function escapeHtml(unsafe) { 
+        return String(unsafe) // Mengkonversi 'unsafe' menjadi string
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;"); 
+    }
 
     function displayError(htmlMessage) {
         hide(contentDisplayWrapper);
@@ -58,13 +77,16 @@ Reason: [Your one-sentence reason here]`;
     }
 
     function formatAIResponse(text) {
-        let processedText = text.replace(/```[\s\S]*?```/g, '~~~CODE_BLOCK~~~');
+        // Revisi di sini: Memastikan 'text' selalu berupa string sebelum pemrosesan
+        let processedText = String(text).replace(/```[\s\S]*?```/g, '~~~CODE_BLOCK~~~');
         processedText = escapeHtml(processedText).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/^\s*[\*\-]\s(.*)/gm, '<li>$1</li>');
-        processedText = processedText.replace(/<\/li>\s*<li>/g, '</li><li>');
-        const listRegex = /(<li>.*<\/li>)/s;
-        if (listRegex.test(processedText)) processedText = processedText.replace(listRegex, '<ul>$1</ul>');
+        processedText = processedText.replace(/<\/li>\s*<li>/g, '</li><li>'); // Handle multiple list items on one line
+        const listRegex = /(<ul><li>.*?<\/li><\/ul>)|(<li>.*<\/li>)/s; // Updated regex to handle full <ul> or individual <li>
+        if (!processedText.startsWith('<ul>') && listRegex.test(processedText)) { // Only add <ul> if not already wrapped
+            processedText = processedText.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+        }
         processedText = processedText.replace(/\n/g, '<br>');
-        const codeBlocks = text.match(/```[\s\S]*?```/g) || [];
+        const codeBlocks = String(text).match(/```[\s\S]*?```/g) || []; // Memastikan 'text' adalah string
         codeBlocks.forEach(block => {
             const language = (block.match(/^```(\w+)\n/) || [])[1] || '';
             const cleanCode = block.replace(/^```\w*\n|```$/g, '');
@@ -88,16 +110,17 @@ Reason: [Your one-sentence reason here]`;
         return newState;
     }
 
-    async function saveToHistory(stateData) {
+    async function saveToHistory(stateData, contextActionType = null) {
         const { history = [] } = await chrome.storage.local.get('history');
         const newEntry = {
             id: Date.now(),
-            cleanedContent: stateData.cleanedContent,
+            cleanedContent: stateData.cleanedContent, // This might be the raw selected text for context actions
             answerHTML: stateData.answerHTML,
             explanationHTML: stateData.explanationHTML || '',
             url: currentTab.url,
             title: currentTab.title,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            actionType: contextActionType || 'quiz' // Tambahkan tipe aksi ke history
         };
         history.unshift(newEntry);
         if (history.length > 100) history.pop();
@@ -122,29 +145,75 @@ Reason: [Your one-sentence reason here]`;
     }
 
     // --- Main Action Handlers ---
-    async function runInitialScan(contentFromContextMenu = null) {
+    async function runInitialScan(contentFromContextMenu = null, contextActionType = null) {
         hide(contentDisplayWrapper); hide(answerContainer); hide(explanationContainer); hide(aiActionsWrapper);
         show(messageArea);
-        messageArea.innerHTML = `<div class="loading-message">Step 1/2: Cleaning content...</div>`;
+        
+        let textToProcess;
+        let selectedPrompt;
+        let purpose = 'quiz_answer'; // Default purpose for initial scan (quiz solving)
 
         try {
-            let textToSendToAI;
-            if (contentFromContextMenu) {
-                textToSendToAI = contentFromContextMenu;
+            if (contentFromContextMenu && contextActionType) {
+                // Scenario: Opened via context menu
+                textToProcess = contentFromContextMenu;
+                
+                // Determine prompt based on contextActionType
+                const customPrompts = appConfig.customPrompts || {};
+                switch (contextActionType) {
+                    case 'summarize':
+                        selectedPrompt = customPrompts.summarize || SUMMARIZE_PROMPT;
+                        purpose = 'summarize_action';
+                        break;
+                    case 'explain':
+                        selectedPrompt = customPrompts.explain_context || EXPLANATION_PROMPT; // Use general explanation or custom
+                        purpose = 'explain_action';
+                        break;
+                    case 'translate':
+                        selectedPrompt = customPrompts.translate || TRANSLATE_PROMPT;
+                        purpose = 'translate_action';
+                        break;
+                    case 'define':
+                        selectedPrompt = customPrompts.define || DEFINE_PROMPT;
+                        purpose = 'define_action';
+                        break;
+                    default:
+                        // Fallback to general answer if context action is unknown
+                        selectedPrompt = customPrompts.answer || ANSWER_PROMPT;
+                        purpose = 'quiz_answer';
+                }
+                messageArea.innerHTML = `<div class="loading-message">Getting ${contextActionType} for selected text...</div>`;
             } else {
+                // Scenario: Standard popup open or rescan
+                messageArea.innerHTML = `<div class="loading-message">Step 1/2: Cleaning content...</div>`;
                 const response = await chrome.tabs.sendMessage(currentTab.id, { action: "get_page_content" });
                 if (chrome.runtime.lastError) throw new Error(chrome.runtime.lastError.message);
                 if (!response || !response.content) throw new Error("Could not get a response from the content script.");
                 
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = response.content.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>|<\/div>|<\/li>/gi, '\n');
-                textToSendToAI = tempDiv.innerText;
-                if (!textToSendToAI.trim()) throw new Error("No readable content was found on the page.");
+                textToProcess = tempDiv.innerText;
+                if (!textToProcess.trim()) throw new Error("No readable content was found on the page.");
+                
+                selectedPrompt = appConfig.customPrompts?.cleaning || CLEANING_PROMPT;
+                purpose = 'cleaning';
             }
-            const cleaningPrompt = appConfig.customPrompts?.cleaning || CLEANING_PROMPT;
-            callGeminiStream(cleaningPrompt, textToSendToAI, 'cleaning');
+
+            // Apply general response tone if set and not a specific cleaning prompt
+            if (appConfig.responseTone && appConfig.responseTone !== 'normal' && purpose !== 'cleaning') {
+                const toneInstructions = { 
+                    sederhana: "\n\nExplain it simply.", 
+                    teknis: "\n\nProvide a technical explanation.", 
+                    analogi: "\n\nUse analogies." 
+                };
+                selectedPrompt += toneInstructions[appConfig.responseTone] || '';
+            }
+
+            callGeminiStream(selectedPrompt, textToProcess, purpose);
+
         } catch (error) {
-            displayError(`<div class="error-message"><strong>Analysis Failed:</strong> ${escapeHtml(error.message)}</div>`);
+            // Revisi di sini: Memastikan error.message selalu berupa string
+            displayError(`<div class="error-message"><strong>Analysis Failed:</strong> ${escapeHtml(error.message || 'Unknown error occurred.')}</div>`);
         }
     }
 
@@ -157,8 +226,19 @@ Reason: [Your one-sentence reason here]`;
             }
             retryAnswerButton.disabled = true;
             streamingAnswerText = '';
-            const answerPrompt = appConfig.customPrompts?.answer || ANSWER_PROMPT;
-            callGeminiStream(answerPrompt, cleanedContent, 'answer');
+            let prompt = appConfig.customPrompts?.answer || ANSWER_PROMPT;
+
+            // Apply general response tone if set
+            if (appConfig.responseTone && appConfig.responseTone !== 'normal') {
+                const toneInstructions = { 
+                    sederhana: "\n\nExplain it simply.", 
+                    teknis: "\n\nProvide a technical explanation.", 
+                    analogi: "\n\nUse analogies." 
+                };
+                prompt += toneInstructions[appConfig.responseTone] || '';
+            }
+
+            callGeminiStream(prompt, cleanedContent, 'answer');
         });
     }
 
@@ -172,10 +252,17 @@ Reason: [Your one-sentence reason here]`;
             explanationDisplay.innerHTML = `<div class="loading-message">The AI is thinking...</div>`;
             streamingExplanationText = '';
             let prompt = appConfig.customPrompts?.explanation || EXPLANATION_PROMPT;
-            if (appConfig.explanationTone && appConfig.explanationTone !== 'normal') {
-                const toneInstructions = { sederhana: "\n\nExplain it simply.", teknis: "\n\nProvide a technical explanation.", analogi: "\n\nUse analogies." };
-                prompt += toneInstructions[appConfig.explanationTone] || '';
+            
+            // Apply general response tone if set
+            if (appConfig.responseTone && appConfig.responseTone !== 'normal') {
+                const toneInstructions = { 
+                    sederhana: "\n\nExplain it simply.", 
+                    teknis: "\n\nProvide a technical explanation.", 
+                    analogi: "\n\nUse analogies." 
+                };
+                prompt += toneInstructions[appConfig.responseTone] || '';
             }
+
             callGeminiStream(prompt, currentState.cleanedContent, 'explanation');
         });
     }
@@ -184,9 +271,26 @@ Reason: [Your one-sentence reason here]`;
         if (request.action === 'geminiStreamUpdate') {
             const { payload, purpose } = request;
             let targetDisplay;
+            // Determine target display based on purpose
             if (purpose === 'cleaning') targetDisplay = contentDisplay;
-            if (purpose === 'answer') targetDisplay = answerDisplay;
-            if (purpose === 'explanation') targetDisplay = explanationDisplay;
+            else if (purpose === 'answer' || purpose === 'quiz_answer') targetDisplay = answerDisplay;
+            else if (purpose === 'explanation') targetDisplay = explanationDisplay;
+            else if (['summarize_action', 'explain_action', 'translate_action', 'define_action'].includes(purpose)) {
+                // For context menu actions, display directly in answerDisplay
+                targetDisplay = answerDisplay;
+                if (payload.chunk) {
+                    // Clear message area and set initial UI if first chunk for context action
+                    if (messageArea.classList.contains('hidden') === false) { // check if messageArea is visible
+                        hide(messageArea);
+                        show(contentDisplayWrapper); // contentDisplayWrapper for showing the selected text
+                        show(answerContainer); // answerContainer for the AI response
+                        // Revisi di sini: Memastikan request.payload.userContent selalu string
+                        contentDisplay.innerHTML = `<strong>Selected Text:</strong><br>${escapeHtml(request.payload.userContent || 'No text selected.')}<br><hr>`; // Display selected text
+                        targetDisplay.innerHTML = ''; // Clear loading message from answerDisplay
+                    }
+                }
+            }
+
 
             if (payload.success) {
                 if (payload.chunk) {
@@ -203,8 +307,7 @@ Reason: [Your one-sentence reason here]`;
                         show(answerContainer);
                         answerDisplay.innerHTML = `<div class="loading-message">Step 2/2: Getting answer...</div>`;
                         saveState({ cleanedContent: fullText }).then(getAnswer);
-                    } else if (purpose === 'answer') {
-                        // === LOGIKA PARSING BARU DIMULAI DI SINI ===
+                    } else if (purpose === 'answer' || purpose === 'quiz_answer') {
                         const answerMatch = fullText.match(/Answer:(.*?)(Confidence:|Reason:|$)/is);
                         const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
                         const reasonMatch = fullText.match(/Reason:(.*)/is);
@@ -212,7 +315,6 @@ Reason: [Your one-sentence reason here]`;
                         let answerText, formattedHtml;
 
                         if (answerMatch && answerMatch[1].trim()) {
-                            // Format terstruktur ditemukan, proses seperti biasa
                             answerText = answerMatch[1].trim();
                             let confidenceHTML = '';
                             if (confidenceMatch) {
@@ -222,34 +324,49 @@ Reason: [Your one-sentence reason here]`;
                             }
                             formattedHtml = formatAIResponse(answerText) + confidenceHTML;
                         } else {
-                            // Format terstruktur GAGAL ditemukan, tampilkan seluruh respons AI
-                            answerText = fullText; // a plain-text version for highlighting
-                            formattedHtml = formatAIResponse(fullText); // a formatted version for display
+                            answerText = fullText;
+                            formattedHtml = formatAIResponse(fullText);
                         }
 
                         targetDisplay.innerHTML = formattedHtml;
-                        // === LOGIKA PARSING BARU SELESAI ===
-
                         retryAnswerButton.disabled = false;
                         show(aiActionsWrapper);
-                        hide(explanationContainer);
+                        hide(explanationContainer); // Hide explanation container if it's a new answer
                         
-                        if (answerText) {
+                        if (appConfig.autoHighlight && answerText) {
                             chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: answerText });
                         }
-                        saveState({ answerHTML: formattedHtml, explanationHTML: '' }).then(saveToHistory);
+                        saveState({ answerHTML: formattedHtml, explanationHTML: '' }).then(() => saveToHistory({ cleanedContent: fullText, answerHTML: formattedHtml, explanationHTML: '' }, 'quiz')); // Save as quiz action
 
                     } else if (purpose === 'explanation') {
                         const formattedHtml = formatAIResponse(fullText);
                         targetDisplay.innerHTML = formattedHtml;
                         explanationButton.disabled = false;
                         retryExplanationButton.disabled = false;
-                        saveState({ explanationHTML: formattedHtml }).then(saveToHistory);
+                        saveState({ explanationHTML: formattedHtml }).then(() => saveToHistory({ cleanedContent: 'N/A', answerHTML: formattedHtml, explanationHTML: '' }, 'explanation')); // Save explanation
+
+                    } else if (['summarize_action', 'explain_action', 'translate_action', 'define_action'].includes(purpose)) {
+                        // For context menu actions, the fullText is the direct answer.
+                        const formattedHtml = formatAIResponse(fullText);
+                        targetDisplay.innerHTML = formattedHtml;
+                        // Hide the "Get Explanation" button for these direct actions
+                        hide(aiActionsWrapper); 
+                        hide(explanationContainer); // Ensure explanation is hidden
+
+                        // Save this action to history
+                        // Pass the original selected text to cleanedContent for history context
+                        const originalSelectedText = request.payload.userContent; 
+                        saveToHistory({ 
+                            cleanedContent: originalSelectedText, 
+                            answerHTML: formattedHtml, 
+                            explanationHTML: '' 
+                        }, purpose.replace('_action', '')); // Save purpose without '_action'
                     }
                 }
             } else {
-                (targetDisplay || messageArea).innerHTML = `<div class="error-message"><strong>Error:</strong> ${escapeHtml(payload.error)}</div>`;
-                if (purpose === 'answer') retryAnswerButton.disabled = false;
+                // Revisi di sini: Memastikan payload.error selalu berupa string
+                (targetDisplay || messageArea).innerHTML = `<div class="error-message"><strong>Error:</strong> ${escapeHtml(payload.error || 'An unknown error occurred during AI streaming.')}</div>`;
+                if (purpose === 'answer' || purpose === 'quiz_answer') retryAnswerButton.disabled = false;
                 if (purpose === 'explanation') { explanationButton.disabled = false; retryExplanationButton.disabled = false; }
             }
         }
@@ -261,7 +378,8 @@ Reason: [Your one-sentence reason here]`;
         if (!tab) { displayError(`<div class="error-message">Could not find an active tab.</div>`); return; }
         currentTab = tab;
 
-        appConfig = await chrome.storage.sync.get(['geminiApiKey', 'explanationTone', 'temperature', 'customPrompts']);
+        // Load config including new 'responseTone'
+        appConfig = await chrome.storage.sync.get(['geminiApiKey', 'responseTone', 'temperature', 'customPrompts', 'autoHighlight']);
         if (!appConfig.geminiApiKey) { showSetupView(); return; }
 
         try {
@@ -273,11 +391,19 @@ Reason: [Your one-sentence reason here]`;
         }
 
         const contextKey = `contextSelection_${currentTab.id}`;
-        const contextData = await chrome.storage.local.get(contextKey);
-        if (contextData[contextKey]) {
-            await chrome.storage.local.remove([contextKey, currentTab.id.toString()]);
-            runInitialScan(contextData[contextKey]);
+        const actionKey = `contextAction_${currentTab.id}`; // Get context action key
+        const contextData = await chrome.storage.local.get([contextKey, actionKey]);
+
+        // Check if popup was opened from context menu
+        if (contextData[contextKey] && contextData[actionKey]) {
+            const selectedText = contextData[contextKey];
+            const actionType = contextData[actionKey];
+            // Clear context data from storage
+            await chrome.storage.local.remove([contextKey, actionKey, currentTab.id.toString()]);
+            // Run scan with specific action
+            runInitialScan(selectedText, actionType);
         } else {
+            // Standard flow: check saved state or perform new scan
             const savedState = (await chrome.storage.local.get(currentTab.id.toString()))[currentTab.id.toString()];
             if (savedState && savedState.cleanedContent) {
                 restoreUiFromState(savedState);

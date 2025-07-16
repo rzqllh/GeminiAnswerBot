@@ -5,18 +5,51 @@ chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
     chrome.runtime.openOptionsPage();
   }
+  
+  // Create parent context menu item
   chrome.contextMenus.create({
-    id: "gemini-answer-selection",
-    title: "Answer with GeminiAnswerBot", // Kembali ke teks biasa
+    id: "gemini-answer-selection-parent",
+    title: "Ask GeminiAnswerBot",
+    contexts: ["selection"]
+  });
+
+  // Create sub-menu items
+  chrome.contextMenus.create({
+    id: "gemini-answer-summarize",
+    parentId: "gemini-answer-selection-parent",
+    title: "Summarize this",
+    contexts: ["selection"]
+  });
+  chrome.contextMenus.create({
+    id: "gemini-answer-explain",
+    parentId: "gemini-answer-selection-parent",
+    title: "Explain this",
+    contexts: ["selection"]
+  });
+  chrome.contextMenus.create({
+    id: "gemini-answer-translate",
+    parentId: "gemini-answer-selection-parent",
+    title: "Translate this",
+    contexts: ["selection"]
+  });
+  chrome.contextMenus.create({
+    id: "gemini-answer-define",
+    parentId: "gemini-answer-selection-parent",
+    title: "Define this",
     contexts: ["selection"]
   });
 });
 
-// ... (sisa file background.js tidak perlu diubah) ...
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "gemini-answer-selection" && info.selectionText) {
-    const storageKey = `contextSelection_${tab.id}`;
-    chrome.storage.local.set({ [storageKey]: info.selectionText }, () => {
+  if (info.selectionText && info.menuItemId.startsWith("gemini-answer-")) {
+    const actionType = info.menuItemId.replace("gemini-answer-", ""); // e.g., "summarize", "explain"
+    const storageKeySelection = `contextSelection_${tab.id}`;
+    const storageKeyAction = `contextAction_${tab.id}`; // Simpan jenis aksi
+
+    chrome.storage.local.set({ 
+      [storageKeySelection]: info.selectionText,
+      [storageKeyAction]: actionType // Simpan aksi di sini
+    }, () => {
       chrome.action.openPopup();
     });
   }
@@ -24,13 +57,16 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   const contextKey = `contextSelection_${tabId}`;
+  const actionKey = `contextAction_${tabId}`; // Hapus juga kunci aksi
   const stateKey = tabId.toString();
-  chrome.storage.local.remove([stateKey, contextKey]);
+  chrome.storage.local.remove([stateKey, contextKey, actionKey]); // Hapus semua kunci terkait tab
 });
 
 async function performApiCall(apiKey, model, systemPrompt, userContent, generationConfig = {}, streamCallback) {
   const endpoint = 'streamGenerateContent';
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}&alt=sse`;
+  // Menggunakan gemini-1.5-flash-latest sebagai default jika tidak ada model yang dipilih
+  const resolvedModel = model || 'gemini-1.5-flash-latest';
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:${endpoint}?key=${apiKey}&alt=sse`;
 
   const payload = {
     system_instruction: {
@@ -75,7 +111,7 @@ async function performApiCall(apiKey, model, systemPrompt, userContent, generati
             streamCallback({ success: true, chunk: textPart });
           }
         } catch (e) {
-          // Ignore parsing errors
+          // Ignore parsing errors for malformed stream chunks
         }
       }
     }
@@ -101,6 +137,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return;
       }
       
+      // Gunakan model yang dipilih dari pengaturan atau default
       const model = config.selectedModel || 'gemini-1.5-flash-latest';
       
       const streamCallback = (streamData) => {
@@ -114,12 +151,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       await performApiCall(config.geminiApiKey, model, systemPrompt, userContent, generationConfig, streamCallback);
     });
     
+    // Return true to indicate that sendResponse will be called asynchronously
     return true; 
   }
   
   if (request.action === 'testApiConnection') {
     const { apiKey } = request.payload;
-    const testModel = 'gemini-1.5-flash-latest';
+    const testModel = 'gemini-1.5-flash-latest'; // Selalu gunakan model ringan untuk test koneksi
     const testContent = "Please reply with only the word 'OK' and nothing else.";
     const endpoint = 'generateContent';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${testModel}:${endpoint}?key=${apiKey}`;
@@ -147,6 +185,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     })
     .catch(err => sendResponse({ success: false, error: err.message }));
 
-    return true;
+    return true; // Indicates that sendResponse will be called asynchronously
   }
 });

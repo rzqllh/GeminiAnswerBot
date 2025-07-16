@@ -60,12 +60,12 @@ if (typeof window.pageReaderContentScriptLoaded === 'undefined') {
       // untuk menjaga respons tetap ringkas. Logika lama Anda masih berlaku.
       const mainContentElement = document.body;
       const selectedText = window.getSelection().toString().trim();
-       if (selectedText.length > 20) {
+       if (selectedText.length > 20) { // Jika ada seleksi yang cukup panjang, gunakan itu
         sendResponse({ content: selectedText, source: 'selection' });
-      } else {
+      } else { // Jika tidak ada atau terlalu pendek, ambil seluruh konten halaman
         sendResponse({ content: mainContentElement.innerText, source: 'auto' });
       }
     }
-    return true;
+    return true; // Penting untuk asynchronous sendResponse
   });
 }

@@ -16,15 +16,30 @@ document.addEventListener('DOMContentLoaded', async () => {
             itemElement.className = 'history-item';
 
             const formattedDate = new Date(item.timestamp).toLocaleString();
+            const actionLabel = item.actionType === 'quiz' ? 'Quiz Answer' : // Menambahkan label aksi
+                                item.actionType === 'summarize' ? 'Summary' :
+                                item.actionType === 'explain' ? 'Explanation (Context)' :
+                                item.actionType === 'translate' ? 'Translation' :
+                                item.actionType === 'define' ? 'Definition' : 'AI Response'; // Fallback
+            
+            // Tampilkan teks yang diproses (cleanedContent) jika ada dan bukan quiz biasa
+            const contentSource = item.actionType === 'quiz' ? 'Question Content' : 'Selected Text';
+            const contentDisplay = item.cleanedContent ? `
+                <h3>${contentSource}</h3>
+                <div class="answer-block" style="background:none; padding:0; border:none; margin-bottom:12px;">${item.cleanedContent.length > 200 ? escapeHtml(item.cleanedContent.substring(0,200)) + '...' : escapeHtml(item.cleanedContent)}</div>
+            ` : '';
+
 
             itemElement.innerHTML = `
                 <div class="history-item-header">
                     <div class="history-item-title">
                         <a href="${item.url}" target="_blank" title="${item.title}">${item.title}</a>
+                        <span style="font-size:12px; color:var(--secondary-text-color); margin-left:8px;">(${actionLabel})</span>
                     </div>
                     <div class="history-item-meta">${formattedDate}</div>
                 </div>
                 <div class="history-item-content">
+                    ${contentDisplay}
                     <div class="answer-block">${item.answerHTML}</div>
                     ${item.explanationHTML ? `
                         <h3>Explanation</h3>
@@ -34,6 +49,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
             historyList.appendChild(itemElement);
         });
+    }
+    
+    // Helper to escape HTML for display
+    function escapeHtml(unsafe) {
+        return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
 
     async function loadHistory() {
@@ -51,7 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
  clearHistoryButton.addEventListener('click', async () => {
-    if (confirm('Are you sure you want to delete all history? This cannot be undone.')) { // Kembali ke teks biasa
+    if (confirm('Are you sure you want to delete all history? This cannot be undone.')) {
         await chrome.storage.local.remove('history');
         loadHistory();
     }
