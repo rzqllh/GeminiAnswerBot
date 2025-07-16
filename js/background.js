@@ -129,7 +129,7 @@ async function performApiCall(apiKey, model, systemPrompt, userContent, generati
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'callGeminiStream') {
-    const { systemPrompt, userContent, generationConfig } = request.payload;
+    const { systemPrompt, userContent, generationConfig, originalUserContent } = request.payload; // originalUserContent ditambahkan
     
     chrome.storage.sync.get(['geminiApiKey', 'selectedModel'], async (config) => {
       if (!config.geminiApiKey) {
@@ -143,7 +143,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const streamCallback = (streamData) => {
         chrome.runtime.sendMessage({
            action: 'geminiStreamUpdate',
-           payload: streamData,
+           payload: { ...streamData, originalUserContent: originalUserContent }, // originalUserContent diteruskan kembali
            purpose: request.purpose 
         });
       };

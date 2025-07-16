@@ -96,9 +96,10 @@ Reason: [Your one-sentence reason here]`;
         return processedText.replace(/<br>\s*<ul>/g, '<ul>').replace(/<\/ul>\s*<br>/g, '</ul>');
     }
 
-    function callGeminiStream(prompt, contentText, purpose) {
+    function callGeminiStream(prompt, contentText, purpose, originalUserContent = '') {
         const generationConfig = { temperature: appConfig.temperature !== undefined ? appConfig.temperature : 0.4 };
-        chrome.runtime.sendMessage({ action: 'callGeminiStream', payload: { systemPrompt: prompt, userContent: contentText, generationConfig }, purpose: purpose });
+        // originalUserContent ditambahkan untuk dikirim kembali ke listener geminiStreamUpdate
+        chrome.runtime.sendMessage({ action: 'callGeminiStream', payload: { systemPrompt: prompt, userContent: contentText, generationConfig, originalUserContent }, purpose: purpose });
     }
 
     async function saveState(data) {
@@ -152,6 +153,7 @@ Reason: [Your one-sentence reason here]`;
         let textToProcess;
         let selectedPrompt;
         let purpose = 'quiz_answer'; // Default purpose for initial scan (quiz solving)
+        let originalSelectedTextForContext = contentFromContextMenu; // Store original selected text for history/display
 
         try {
             if (contentFromContextMenu && contextActionType) {
@@ -186,8 +188,23 @@ Reason: [Your one-sentence reason here]`;
             } else {
                 // Scenario: Standard popup open or rescan
                 messageArea.innerHTML = `<div class="loading-message">Step 1/2: Cleaning content...</div>`;
-                const response = await chrome.tabs.sendMessage(currentTab.id, { action: "get_page_content" });
-                if (chrome.runtime.lastError) throw new Error(chrome.runtime.lastError.message);
+                const response = await new Promise((resolve, reject) => {
+                    chrome.tabs.sendMessage(currentTab.id, { action: "get_page_content" }, (response) => {
+                        if (chrome.runtime.lastError) {
+                            // Tangani error jika channel tertutup (popup ditutup terlalu cepat)
+                            const error = chrome.runtime.lastError;
+                            if (error.message.includes("The message channel closed")) {
+                                console.warn("Message channel closed during get_page_content:", error.message);
+                                reject(new Error("Halaman tidak merespons atau popup ditutup. Silakan coba lagi."));
+                            } else {
+                                reject(new Error(error.message));
+                            }
+                            return; // Penting untuk keluar setelah reject
+                        }
+                        resolve(response);
+                    });
+                });
+                
                 if (!response || !response.content) throw new Error("Could not get a response from the content script.");
                 
                 const tempDiv = document.createElement('div');
@@ -209,7 +226,7 @@ Reason: [Your one-sentence reason here]`;
                 selectedPrompt += toneInstructions[appConfig.responseTone] || '';
             }
 
-            callGeminiStream(selectedPrompt, textToProcess, purpose);
+            callGeminiStream(selectedPrompt, textToProcess, purpose, originalSelectedTextForContext);
 
         } catch (error) {
             // Revisi di sini: Memastikan error.message selalu berupa string
@@ -222,6 +239,7 @@ Reason: [Your one-sentence reason here]`;
             const cleanedContent = result[currentTab.id.toString()]?.cleanedContent;
             if (!cleanedContent) {
                 answerDisplay.innerHTML = `<div class="error-message"><strong>Error:</strong> Cleaned content not found for getting answer.</div>`;
+                retryAnswerButton.disabled = false;
                 return;
             }
             retryAnswerButton.disabled = true;
@@ -245,7 +263,12 @@ Reason: [Your one-sentence reason here]`;
     function getExplanation() {
         chrome.storage.local.get(currentTab.id.toString(), (result) => {
             const currentState = result[currentTab.id.toString()];
-            if (!currentState || !currentState.cleanedContent) return;
+            if (!currentState || !currentState.cleanedContent) {
+                explanationDisplay.innerHTML = `<div class="error-message"><strong>Error:</strong> Cleaned content not found for getting explanation.</div>`;
+                explanationButton.disabled = false;
+                retryExplanationButton.disabled = false;
+                return;
+            }
             explanationButton.disabled = true;
             retryExplanationButton.disabled = true;
             show(explanationContainer);
@@ -284,8 +307,9 @@ Reason: [Your one-sentence reason here]`;
                         hide(messageArea);
                         show(contentDisplayWrapper); // contentDisplayWrapper for showing the selected text
                         show(answerContainer); // answerContainer for the AI response
-                        // Revisi di sini: Memastikan request.payload.userContent selalu string
-                        contentDisplay.innerHTML = `<strong>Selected Text:</strong><br>${escapeHtml(request.payload.userContent || 'No text selected.')}<br><hr>`; // Display selected text
+                        // Revisi di sini: Memastikan request.payload.originalUserContent selalu string
+                        // Menampilkan teks yang dipilih untuk konteks menu di contentDisplay
+                        contentDisplay.innerHTML = `<strong>Selected Text:</strong><br>${escapeHtml(request.payload.originalUserContent || 'No text selected.')}<br><hr>`; 
                         targetDisplay.innerHTML = ''; // Clear loading message from answerDisplay
                     }
                 }
@@ -355,7 +379,7 @@ Reason: [Your one-sentence reason here]`;
 
                         // Save this action to history
                         // Pass the original selected text to cleanedContent for history context
-                        const originalSelectedText = request.payload.userContent; 
+                        const originalSelectedText = request.payload.originalUserContent; 
                         saveToHistory({ 
                             cleanedContent: originalSelectedText, 
                             answerHTML: formattedHtml, 
@@ -370,7 +394,7 @@ Reason: [Your one-sentence reason here]`;
                 if (purpose === 'explanation') { explanationButton.disabled = false; retryExplanationButton.disabled = false; }
             }
         }
-        return true;
+        return false; // Mengembalikan false karena ini adalah event stream, bukan request-response yang memerlukan sendResponse
     });
 
     async function initialize() {
@@ -386,7 +410,7 @@ Reason: [Your one-sentence reason here]`;
             await chrome.scripting.executeScript({ target: { tabId: currentTab.id }, files: ['js/content.js'] });
             await chrome.scripting.insertCSS({ target: { tabId: currentTab.id }, files: ['assets/highlighter.css'] });
         } catch (e) {
-            displayError(`<div class="error-message">Cannot run on this page. Try on a different website (e.g., a news article).</div>`);
+            displayError(`<div class="error-message">Cannot run on this page. Try on a different website (e.g., a news article).<br><br>Jika ini adalah halaman internal Chrome (seperti chrome://extensions), Anda tidak dapat menjalankan ekstensi di sini.</div>`);
             return;
         }
 
