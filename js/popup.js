@@ -2,34 +2,40 @@
 
 document.addEventListener('DOMContentLoaded', async function () {
     // --- PROMPTS ---
-    const CLEANING_PROMPT = `You are a text cleaner. Your only job is to analyze the following messy text from a webpage and extract the main quiz content. 
-RULES: 
-1. Remove all irrelevant text (menus, sidebars, footers, ads, navigation links, etc.). 
-2. Preserve the original formatting of the question, options, and especially code blocks. 
-3. Format all content using standard Markdown (e.g., use triple backticks for code). 
-4. Directly return only the cleaned Markdown text. Do not add any introductory phrases like "Here is the cleaned text:".`;
+    // Menggunakan CODE_BLOCK_START/END sebagai placeholder untuk menghindari masalah sintaks JavaScript
+    const CLEANING_PROMPT = `You are an extremely meticulous text cleaner and quiz content extractor. Your SOLE purpose is to identify and extract ONLY the quiz question and its exact provided options from the raw, potentially noisy webpage text provided.
 
-    const ANSWER_PROMPT = `Act as an expert quiz solver. Based on the following cleaned text, your tasks are:
-1.  Provide the single, most correct answer for the question(s).
-2.  Provide a confidence score (High, Medium, or Low).
-3.  Provide a brief, one-sentence reason for your confidence level.
+CRITICAL RULES FOR EXTRACTION:
+1.  **Identify The Single Question:** Locate the main quiz question.
+2.  **Identify All Options:** Locate *all* the multiple-choice or selection options directly associated with that question.
+3.  **Strict Exclusion:** ABSOLUTELY filter out and remove *all other text and elements*. This includes, but is not limited to: menus, sidebars, headers, footers, advertisements, navigation links, contextual instructions not part of the question itself (e.g., "Next", "Previous", "Submit"), scores, category names, general page content unrelated to the specific quiz question and its options.
+4.  **Preserve Original Formatting:** Maintain the exact wording, spelling, and any special characters or code snippets within the question and options.
+5.  **Markdown Formatting:** Format the extracted content using standard Markdown. Use CODE_BLOCK_START and CODE_BLOCK_END for any multi-line code blocks found within options (e.g., "CODE_BLOCK_START\\nconsole.log('hello')\\nCODE_BLOCK_END"), and wrap inline code with single backticks (\`inline code\`). If the option text itself is a HTML tag (like <p>), you should also wrap it in CODE_BLOCK_START/END to preserve its literal form.
+6.  **Direct Output:** Return ONLY the cleaned Markdown text. Do NOT add any introductory phrases, summaries, explanations, or conversational text. Your output must be purely the extracted question and its options.
+7.  **CRITICAL LANGUAGE RULE**: Analyze the language of the provided raw webpage text. You MUST respond in the EXACT SAME LANGUAGE as the input text. No translation is allowed unless explicitly requested for a translation task.
+`; // PROMPT DITINGKATKAN LAGI UNTUK BAHASA DAN KEJELASAN
+
+    const ANSWER_PROMPT = `Act as an expert quiz solver. Based on the following cleaned quiz text (containing only the question and its options), your tasks are:
+1. Identify the single, most correct answer *from the provided options*.
+2. Provide a confidence score (High, Medium, or Low).
+3. Provide a brief, one-sentence reason for your confidence level.
 
 Respond in the exact format below, without any extra words or explanations.
 FORMAT:
-Answer: [Your Answer Here]
+Answer: [The exact text of the chosen option. If it's a multi-line code block, output it as CODE_BLOCK_START...CODE_BLOCK_END. If it's inline code, output it as \`inline code\`.]
 Confidence: [High/Medium/Low]
-Reason: [Your one-sentence reason here]`;
+Reason: [Your one-sentence reason here]
+CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content you processed. Do NOT translate any part of the answer or reason.
+`; // PROMPT DITINGKATKAN LAGI UNTUK BAHASA
 
-    const EXPLANATION_PROMPT = `Act as an expert tutor. For the following quiz content, provide a clear, step-by-step explanation for why the provided answer is correct and why the other options are incorrect. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting.`;
-
-    // New predefined prompts for context menu
-    const SUMMARIZE_PROMPT = `Summarize the following text concisely. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting:`;
+    const EXPLANATION_PROMPT = `Act as an expert tutor. For the following quiz content, provide a clear, step-by-step explanation for why the provided answer is correct and why the other options are incorrect. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting. CODE_BLOCK_START and CODE_BLOCK_END denote multi-line code blocks. Single backticks (\`) denote inline code. CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content you processed. Do NOT translate.`; 
+    const SUMMARIZE_PROMPT = `Summarize the following text concisely. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting: CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the input text. Do NOT translate.`; 
     const TRANSLATE_PROMPT = `Translate the following text into 
     1. English
     2. Indonesian
     
     Importnant: if the default language is english, no need to translate to english. vice versa:`; 
-    const DEFINE_PROMPT = `Provide a clear and concise definition for the following term or concept found in the text. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting:`;
+    const DEFINE_PROMPT = `Provide a clear and concise definition for the following term or concept found in the text. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting: CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the input text. Do NOT translate.`; 
 
     // --- DOM Elements ---
     const container = document.querySelector('.container');
@@ -54,12 +60,11 @@ Reason: [Your one-sentence reason here]`;
     let appConfig = {};
     let streamingAnswerText = '';
     let streamingExplanationText = '';
-    let hideToastTimeout = null; // Untuk mengelola timeout toast
+    let hideToastTimeout = null; 
 
     // --- Helper & Utility Functions ---
     function show(element) { if (element) element.classList.remove('hidden'); }
     function hide(element) { if (element) element.classList.add('hidden'); }
-    // Revisi di sini: Memastikan 'unsafe' selalu berupa string
     function escapeHtml(unsafe) { 
         return String(unsafe) 
             .replace(/&/g, "&amp;")
@@ -69,11 +74,9 @@ Reason: [Your one-sentence reason here]`;
             .replace(/'/g, "&#039;"); 
     }
 
-    // Fungsi displayError sekarang akan menampilkan pesan sebagai "toast"
     function displayToast(message, type = 'error', duration = 5000) {
-        clearTimeout(hideToastTimeout); // Bersihkan timeout sebelumnya jika ada
+        clearTimeout(hideToastTimeout); 
 
-        // Sembunyikan elemen UI utama dan tampilkan messageArea
         hide(contentDisplayWrapper);
         hide(answerContainer);
         hide(explanationContainer);
@@ -83,14 +86,16 @@ Reason: [Your one-sentence reason here]`;
         messageArea.innerHTML = `<div class="toast-notification toast-${type}">${message}</div>`;
         show(messageArea);
 
-        // Atur timeout untuk menyembunyikan toast
         hideToastTimeout = setTimeout(() => {
             hide(messageArea);
         }, duration);
     }
 
     function formatAIResponse(text) {
-        let processedText = String(text).replace(/```[\s\S]*?```/g, '~~~CODE_BLOCK~~~');
+        // Ganti placeholder CODE_BLOCK_START/END kembali ke triple backticks untuk tampilan
+        let processedText = String(text).replace(/CODE_BLOCK_START\n([\s\S]*?)\nCODE_BLOCK_END/g, '```\n$1\n```');
+        processedText = processedText.replace(/CODE_BLOCK_START/g, '`').replace(/CODE_BLOCK_END/g, '`'); 
+
         processedText = escapeHtml(processedText).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/^\s*[\*\-]\s(.*)/gm, '<li>$1</li>');
         processedText = processedText.replace(/<\/li>\s*<li>/g, '</li><li>'); 
         const listRegex = /(<ul><li>.*?<\/li><\/ul>)|(<li>.*<\/li>)/s; 
@@ -98,18 +103,67 @@ Reason: [Your one-sentence reason here]`;
             processedText = processedText.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
         }
         processedText = processedText.replace(/\n/g, '<br>');
-        const codeBlocks = String(text).match(/```[\s\S]*?```/g) || []; 
+        
+        const codeBlocks = processedText.match(/```[\s\S]*?```/g) || []; 
         codeBlocks.forEach(block => {
             const language = (block.match(/^```(\w+)\n/) || [])[1] || '';
             const cleanCode = block.replace(/^```\w*\n|```$/g, '');
             const codeHtml = `<div class="code-block-wrapper"><button class="copy-code-button" title="Copy Code Snippet"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span>Copy</span></button><pre><code class="language-${language}">${escapeHtml(cleanCode.trim())}</code></pre></div>`;
-            processedText = processedText.replace('~~~CODE_BLOCK~~~', codeHtml);
+            processedText = processedText.replace(block, codeHtml); 
         });
         return processedText.replace(/<br>\s*<ul>/g, '<ul>').replace(/<\/ul>\s*<br>/g, '</ul>');
     }
 
+    // Helper untuk menyiapkan teks highlight
+    function prepareTextForHighlight(text) {
+        let highlightCandidates = [];
+
+        // 1. Ambil teks asli dari AI, bersihkan placeholder
+        let cleanedText = String(text)
+            .replace(/CODE_BLOCK_START\n([\s\S]*?)\nCODE_BLOCK_END/g, '$1') // Untuk multi-line code blocks
+            .replace(/`([^`]+)`/g, '$1') // Untuk inline code backticks
+            .trim();
+        
+        if (cleanedText.length > 0) {
+            highlightCandidates.push(cleanedText);
+        }
+
+        // 2. Jika teks asli dari AI adalah literal tag HTML (misal: <table>)
+        // Coba juga mencari variasi escape atau teks polosnya
+        const htmlTagRegex = /^<([a-z][a-z0-9]*)\b[^>]*>$/i; 
+        const tagMatch = cleanedText.match(htmlTagRegex);
+
+        if (tagMatch) {
+            const tagName = tagMatch[1]; // misal: "table" dari "<table>"
+            const escapedTag = `&lt;${tagName}&gt;`; // misal: "&lt;table&gt;"
+            const plainTextTag = tagName; // misal: "table"
+
+            if (escapedTag.length > 0) highlightCandidates.push(escapedTag);
+            if (plainTextTag.length > 0) highlightCandidates.push(plainTextTag);
+        }
+
+        // 3. Tambahkan versi yang didekode HTML jika ada entitas di dalamnya (ini untuk page content)
+        // Misalnya, jika jawaban AI adalah '&lt;table&gt;', Mark.js perlu mencari `<table>` juga
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = cleanedText;
+        const decodedText = tempDiv.textContent || '';
+        if (decodedText !== cleanedText && decodedText.length > 0) {
+            highlightCandidates.push(decodedText);
+             // Jika decodedText adalah tag (misal dari &lt;table&gt; jadi <table>),
+             // tambahkan versi plain textnya (table)
+             const decodedTagMatch = decodedText.match(htmlTagRegex);
+             if (decodedTagMatch) {
+                 highlightCandidates.push(decodedTagMatch[1]);
+             }
+        }
+        
+        // Filter duplikat dan nilai kosong
+        return [...new Set(highlightCandidates.filter(c => c && c.trim().length > 0))];
+    }
+
+
     function callGeminiStream(prompt, contentText, purpose, originalUserContent = '') {
-        console.log("Popup: Sending 'callGeminiStream' to background.js for purpose:", purpose); // Debugging
+        console.log("Popup: Sending 'callGeminiStream' to background.js for purpose:", purpose); 
         const generationConfig = { temperature: appConfig.temperature !== undefined ? appConfig.temperature : 0.4 };
         show(loadingSpinner); 
         chrome.runtime.sendMessage({ action: 'callGeminiStream', payload: { systemPrompt: prompt, userContent: contentText, generationConfig, originalUserContent }, purpose: purpose });
@@ -154,12 +208,12 @@ Reason: [Your one-sentence reason here]`;
             show(aiActionsWrapper);
         }
         if (state.explanationHTML) {
-            explanationDisplay.innerHTML = state.explanationHTML;
+            explanationDisplay.innerHTML = formatAIResponse(state.explanationHTML); 
             show(explanationContainer);
         }
     }
 
-    // --- Main Action Handlers ---
+    // --- Main Action Handerls ---
     async function runInitialScan(contentFromContextMenu = null, contextActionType = null) {
         hide(contentDisplayWrapper); hide(answerContainer); hide(explanationContainer); hide(aiActionsWrapper);
         show(messageArea);
@@ -201,13 +255,16 @@ Reason: [Your one-sentence reason here]`;
                 messageArea.innerHTML = `<div class="loading-message">Step 1/2: Cleaning content...</div>`;
                 const response = await new Promise((resolve, reject) => {
                     chrome.tabs.sendMessage(currentTab.id, { action: "get_page_content" }, (response) => {
-                        // Check chrome.runtime.lastError immediately after sendMessage
                         if (chrome.runtime.lastError) {
                             const error = chrome.runtime.lastError;
                             if (error.message.includes("The message channel closed")) {
                                 console.warn("Popup: Message channel closed during get_page_content. This often happens if the popup is closed too quickly.");
                                 reject(new Error("Pesan tidak dapat dikirim ke halaman karena popup ditutup atau halaman tidak aktif. Silakan coba lagi."));
-                            } else {
+                            } else if (error.message.includes("Could not establish connection")) { 
+                                console.error("Popup: Could not establish connection to content script:", error.message);
+                                reject(new Error("Gagal terhubung ke script halaman. Pastikan halaman dimuat sepenuhnya dan coba lagi."));
+                            }
+                            else {
                                 reject(new Error(`Terjadi kesalahan saat mendapatkan konten halaman: ${error.message}`));
                             }
                             return; 
@@ -220,9 +277,7 @@ Reason: [Your one-sentence reason here]`;
                     throw new Error("Tidak ada konten yang dapat dibaca ditemukan di halaman. Atau script konten tidak merespons.");
                 }
                 
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = response.content.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>|<\/div>|<\/li>/gi, '\n');
-                textToProcess = tempDiv.innerText;
+                textToProcess = response.content; 
                 if (!textToProcess.trim()) throw new Error("Tidak ada konten yang dapat dibaca ditemukan di halaman.");
                 
                 selectedPrompt = appConfig.customPrompts?.cleaning || CLEANING_PROMPT;
@@ -240,8 +295,8 @@ Reason: [Your one-sentence reason here]`;
 
             callGeminiStream(selectedPrompt, textToProcess, purpose, originalSelectedTextForContext);
 
-        } catch (error) {
-            // Menggunakan displayToast untuk semua error di runInitialScan
+        }
+        catch (error) {
             displayToast(`<strong>Analisis Gagal:</strong> ${escapeHtml(error.message || 'Terjadi kesalahan tidak dikenal.')}`, 'error');
         }
     }
@@ -282,8 +337,8 @@ Reason: [Your one-sentence reason here]`;
             }
             explanationButton.disabled = true;
             retryExplanationButton.disabled = true;
-            show(explanationContainer); // Tetap tampilkan kontainer penjelasan
-            explanationDisplay.innerHTML = `<div class="loading-message">The AI is thinking...</div>`; // Pesan loading standar di area penjelasan
+            show(explanationContainer); 
+            explanationDisplay.innerHTML = `<div class="loading-message">The AI is thinking...</div>`; 
             streamingExplanationText = '';
             let prompt = appConfig.customPrompts?.explanation || EXPLANATION_PROMPT;
             
@@ -302,7 +357,7 @@ Reason: [Your one-sentence reason here]`;
 
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (request.action === 'geminiStreamUpdate') {
-            console.log("Popup: Received 'geminiStreamUpdate' with purpose:", request.purpose, "and payload:", request.payload); // Debugging
+            console.log("Popup: Received 'geminiStreamUpdate' with purpose:", request.purpose, "and payload:", request.payload); 
             const { payload, purpose } = request;
             let targetDisplay;
             if (purpose === 'cleaning') targetDisplay = contentDisplay;
@@ -311,7 +366,6 @@ Reason: [Your one-sentence reason here]`;
             else if (['summarize_action', 'explain_action', 'translate_action', 'define_action'].includes(purpose)) {
                 targetDisplay = answerDisplay;
                 if (payload.chunk && !contentDisplay.dataset.contextTextSet) { 
-                    //hide(messageArea); // Tidak perlu hide messageArea jika kita akan pakai untuk toast notif
                     show(contentDisplayWrapper);
                     show(answerContainer);
                     contentDisplay.innerHTML = `<h3>Selected Text:</h3><div class="selected-text-preview">${escapeHtml(request.payload.originalUserContent || 'No text selected.')}</div><hr>`; 
@@ -326,20 +380,18 @@ Reason: [Your one-sentence reason here]`;
                     if (targetDisplay.querySelector('.loading-message')) targetDisplay.innerHTML = '';
                     targetDisplay.textContent += payload.chunk;
                 } else if (payload.done) {
-                    console.log("Popup: Stream done for purpose:", purpose); // Debugging
+                    console.log("Popup: Stream done for purpose:", purpose); 
                     hide(loadingSpinner); 
-                    // Reset flag contextTextSet
                     if (contentDisplay.dataset.contextTextSet) {
                         delete contentDisplay.dataset.contextTextSet;
                     }
-                    hide(messageArea); // Sembunyikan messageArea jika sukses dan tidak ada error
+                    hide(messageArea); 
 
                     const fullText = payload.fullText || targetDisplay.textContent;
                     
                     if (purpose === 'cleaning') {
                         const formattedHtml = formatAIResponse(fullText);
                         targetDisplay.innerHTML = formattedHtml;
-                        //hide(messageArea); // Sudah di hide di awal stream, atau tidak perlu di sini jika messageArea untuk toast
                         show(contentDisplayWrapper);
                         show(answerContainer);
                         answerDisplay.innerHTML = `<div class="loading-message">Step 2/2: Getting answer...</div>`;
@@ -371,8 +423,10 @@ Reason: [Your one-sentence reason here]`;
                         show(aiActionsWrapper);
                         hide(explanationContainer); 
                         
+                        // Kirim teks jawaban yang sudah disiapkan oleh prepareTextForHighlight
                         if (appConfig.autoHighlight && answerText) {
-                            chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: answerText });
+                            const highlightCandidates = prepareTextForHighlight(answerText);
+                            chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: highlightCandidates });
                         }
                         saveState({ answerHTML: formattedHtml, explanationHTML: '' }).then(() => saveToHistory({ cleanedContent: fullText, answerHTML: formattedHtml, explanationHTML: '' }, 'quiz')); 
 
@@ -398,9 +452,8 @@ Reason: [Your one-sentence reason here]`;
                     }
                 }
             } else {
-                console.error("Popup: Gemini stream update failed for purpose:", purpose, "Error:", payload.error); // Debugging
+                console.error("Popup: Gemini stream update failed for purpose:", purpose, "Error:", payload.error); 
                 hide(loadingSpinner); 
-                // Menggunakan displayToast untuk menampilkan error dari background.js
                 displayToast(`<strong>Error AI:</strong> ${escapeHtml(payload.error || 'Terjadi kesalahan tidak dikenal saat streaming AI.')}`, 'error');
                 if (purpose === 'answer' || purpose === 'quiz_answer') retryAnswerButton.disabled = false;
                 if (purpose === 'explanation') { explanationButton.disabled = false; retryExplanationButton.disabled = false; }
@@ -418,17 +471,52 @@ Reason: [Your one-sentence reason here]`;
         if (!appConfig.geminiApiKey) { showSetupView(); return; }
 
         try {
-            console.log("popup.js: Attempting to inject content.js and highlighter.css...");
-            await chrome.scripting.executeScript({ target: { tabId: currentTab.id }, files: ['js/content.js'] });
+            console.log("popup.js: Attempting to inject Mark.js, content.js and highlighter.css...");
+            // Suntikkan Mark.js terlebih dahulu, lalu content.js
+            await chrome.scripting.executeScript({ target: { tabId: currentTab.id }, files: ['js/mark.min.js', 'js/content.js'] });
             await chrome.scripting.insertCSS({ target: { tabId: currentTab.id }, files: ['assets/highlighter.css'] });
-            console.log("popup.js: Content script and CSS injected successfully.");
+            
+            // --- Handshake mechanism ---
+            const handshakeResponse = await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error("Handshake timeout: Content script did not respond in time."));
+                }, 3000); // 3 detik timeout untuk handshake
+
+                chrome.tabs.sendMessage(currentTab.id, { action: "ping_content_script" }, (response) => {
+                    clearTimeout(timeout);
+                    if (chrome.runtime.lastError) {
+                        const error = chrome.runtime.lastError;
+                        if (error.message.includes("The message channel closed")) {
+                            reject(new Error("Handshake failed: Message channel closed (popup closed or content script not ready)."));
+                        } else if (error.message.includes("Could not establish connection")) {
+                            reject(new Error("Handshake failed: Could not establish connection to content script."));
+                        } else {
+                            reject(new Error(`Handshake failed: ${error.message}`));
+                        }
+                        return;
+                    }
+                    if (response && response.ready) {
+                        resolve(response);
+                    } else {
+                        reject(new Error("Handshake failed: Content script not ready."));
+                    }
+                });
+            });
+            console.log("popup.js: Content script handshake successful.", handshakeResponse);
+            // --- End Handshake mechanism ---
+
+            console.log("popup.js: Mark.js, Content script and CSS injected successfully and ready.");
         } catch (e) {
-            console.error("popup.js: Failed to inject content script or CSS:", e);
+            console.error("popup.js: Failed to inject content script or CSS / Handshake failed:", e);
             let errorMessage = `Ekstensi tidak dapat berjalan di halaman ini. Coba di situs web yang berbeda (misalnya, artikel berita, halaman kuis).`;
             if (e.message.includes("Cannot access a chrome://")) {
                 errorMessage += `<br><br>Ini adalah halaman internal Chrome (seperti chrome://extensions), Anda tidak dapat menjalankan ekstensi di sini.`;
             } else if (e.message.includes("is not allowed to inject script")) {
                  errorMessage += `<br><br>Ekstensi tidak memiliki izin untuk berinteraksi dengan situs ini. Pastikan Anda telah memberikan semua izin yang diminta saat instalasi.`;
+            } else if (e.message.includes("The Tab was closed")) {
+                 errorMessage = `Tab ditutup sebelum ekstensi dapat memuat.`;
+            } else if (e.message.includes("Handshake")) { 
+                errorMessage = e.message + "<br><br>Coba muat ulang halaman dan ekstensi, atau pastikan halaman web tidak dalam mode tidur/beku.";
             }
             displayToast(`<strong>Gagal Memuat Halaman:</strong> ${errorMessage}`, 'error');
             return;
