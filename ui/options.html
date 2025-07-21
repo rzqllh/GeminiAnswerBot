@@ -167,13 +167,16 @@
       <select id="modelSelect" aria-label="Select AI Model">
         <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Fast & Efficient)</option>
         <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (High Accuracy)</option>
-        <option value="gemini-1.0-pro">Gemini 1.0 Pro (Standard)</option> </select>
+        <option value="gemini-1.0-pro">Gemini 1.0 Pro (Standard)</option>
+      </select>
     </div>
 
     <div class="content-section">
-      <label for="responseToneSelect">Response Style/Tone</label> <select id="responseToneSelect">
+      <label for="responseToneSelect">Response Style/Tone</label>
+      <select id="responseToneSelect">
         <option value="normal">Normal (Default)</option>
-        <option value="sederhana">Simple (Seperti untuk pemula)</option> <option value="teknis">Technical & Detailed</option>
+        <option value="sederhana">Simple (Seperti untuk pemula)</option>
+        <option value="teknis">Technical & Detailed</option>
         <option value="analogi">Use Analogies</option>
       </select>
        <p style="font-size: 13px; color: var(--secondary-label-color); margin-top: 5px; line-height: 1.4;">Mengatur gaya jawaban dari AI untuk semua respons yang dihasilkan.</p>
@@ -203,7 +206,10 @@
       </div>
        <p style="font-size: 13px; color: var(--secondary-label-color); margin-top: 5px; line-height: 1.4;">Lower values are more predictable and factual (recommended for quizzes). Higher values are more creative.</p>
       
-      <h3 style="margin-top:20px; margin-bottom: 10px;">Custom Prompts (Overrides System Defaults)</h3> <p style="font-size: 13px; color: var(--secondary-label-color); margin-top: -5px;">Leave blank to use the system's default prompt. Custom prompts here will **replace** the built-in system prompts.</p> <label for="cleaningPrompt">Content Cleaning Prompt:</label>
+      <h3 style="margin-top:20px; margin-bottom: 10px;">Custom Prompts (Overrides System Defaults)</h3>
+      <p style="font-size: 13px; color: var(--secondary-label-color); margin-top: -5px;">Leave blank to use the system's default prompt. Custom prompts here will **replace** the built-in system prompts.</p>
+      
+      <label for="cleaningPrompt">Content Cleaning Prompt:</label>
       <textarea id="cleaningPrompt" rows="4"></textarea>
 
       <label for="answerPrompt">Answering Prompt:</label>
@@ -212,7 +218,8 @@
       <label for="explanationPrompt">Explanation Prompt:</label>
       <textarea id="explanationPrompt" rows="4"></textarea>
 
-      <h3 style="margin-top:20px; margin-bottom: 10px;">Context Menu Prompts (Overrides System Defaults)</h3> <p style="font-size: 13px; color: var(--secondary-label-color); margin-top: -5px;">These prompts are used when you right-click selected text and choose an action. Leave blank to use defaults.</p>
+      <h3 style="margin-top:20px; margin-bottom: 10px;">Context Menu Prompts (Overrides System Defaults)</h3>
+      <p style="font-size: 13px; color: var(--secondary-label-color); margin-top: -5px;">These prompts are used when you right-click selected text and choose an action. Leave blank to use defaults.</p>
 
       <label for="summarizePrompt">Summarize Prompt:</label>
       <textarea id="summarizePrompt" rows="3"></textarea>
@@ -226,6 +233,7 @@
     </div>
 
   </div>
+  <script src="../js/prompts.js"></script>
   <script src="../js/options.js"></script>
 </body>
 </html>

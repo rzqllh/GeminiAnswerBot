@@ -13,7 +13,7 @@ CRITICAL RULES FOR EXTRACTION:
 5.  **Markdown Formatting:** Format the extracted content using standard Markdown. Use CODE_BLOCK_START and CODE_BLOCK_END for any multi-line code blocks found within options (e.g., "CODE_BLOCK_START\\nconsole.log('hello')\\nCODE_BLOCK_END"), and wrap inline code with single backticks (\`inline code\`). If the option text itself is a HTML tag (like <p>), you should also wrap it in CODE_BLOCK_START/END to preserve its literal form.
 6.  **Direct Output:** Return ONLY the cleaned Markdown text. Do NOT add any introductory phrases, summaries, explanations, or conversational text. Your output must be purely the extracted question and its options.
 7.  **CRITICAL LANGUAGE RULE**: Analyze the language of the provided raw webpage text. You MUST respond in the EXACT SAME LANGUAGE as the input text. No translation is allowed unless explicitly requested for a translation task.
-`; // PROMPT DITINGKATKAN LAGI UNTUK BAHASA DAN KEJELASAN
+`;
 
     const ANSWER_PROMPT = `Act as an expert quiz solver. Based on the following cleaned quiz text (containing only the question and its options), your tasks are:
 1. Identify the single, most correct answer *from the provided options*.
@@ -26,7 +26,7 @@ Answer: [The exact text of the chosen option. If it's a multi-line code block, o
 Confidence: [High/Medium/Low]
 Reason: [Your one-sentence reason here]
 CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content you processed. Do NOT translate any part of the answer or reason.
-`; // PROMPT DITINGKATKAN LAGI UNTUK BAHASA
+`;
 
     const EXPLANATION_PROMPT = `Act as an expert tutor. For the following quiz content, provide a clear, step-by-step explanation for why the provided answer is correct and why the other options are incorrect. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting. CODE_BLOCK_START and CODE_BLOCK_END denote multi-line code blocks. Single backticks (\`) denote inline code. CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content you processed. Do NOT translate.`; 
     const SUMMARIZE_PROMPT = `Summarize the following text concisely. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting: CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the input text. Do NOT translate.`; 

@@ -8,7 +8,7 @@ CRITICAL RULES FOR EXTRACTION:
 2.  **Identify All Options:** Locate *all* the multiple-choice or selection options directly associated with that question.
 3.  **Strict Exclusion:** ABSOLUTELY filter out and remove *all other text and elements*. This includes, but is not limited to: menus, sidebars, headers, footers, advertisements, navigation links, contextual instructions not part of the question itself (e.g., "Next", "Previous", "Submit"), scores, category names, general page content unrelated to the specific quiz question and its options.
 4.  **Preserve Original Formatting:** Maintain the exact wording, spelling, and any special characters or code snippets within the question and options.
-5.  **Markdown Formatting:** Format the extracted content using standard Markdown. Use CODE_BLOCK_START and CODE_BLOCK_END for any multi-line code blocks found within options (e.g., "CODE_BLOCK_START\\nconsole.log('hello')\\nCODE_BLOCK_END"), and wrap inline code with single backticks (\`inline code\`). Use list items for options (e.g., "- Option A"). If the option text itself is a HTML tag (like <p>), you should also wrap it in CODE_BLOCK_START/END to preserve it.
+5.  **Markdown Formatting:** Format the extracted content using standard Markdown. Use CODE_BLOCK_START and CODE_BLOCK_END for any multi-line code blocks found within options (e.g., "CODE_BLOCK_START\\nconsole.log('hello')\\nCODE_BLOCK_END"), and wrap inline code with single backticks (\`inline code\`). If the option text itself is a HTML tag (like <p>), you should also wrap it in CODE_BLOCK_START/END to preserve it.
 6.  **Direct Output:** Return ONLY the cleaned Markdown text. Do NOT add any introductory phrases, summaries, explanations, or conversational text. Your output must be purely the extracted question and its options.
 7.  **CRITICAL LANGUAGE RULE**: Analyze the language of the provided raw webpage text. You MUST respond in the EXACT SAME LANGUAGE as the input text. Do NOT translate any part of the quiz content or your response.
 `, 
@@ -66,7 +66,7 @@ CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content y
     responseToneSelect.value = result.responseTone || 'normal'; 
     autoHighlightToggle.checked = result.autoHighlight || false;
     
-    const temperature = result.temperature !== undefined ? temperature : 0.4;
+    const temperature = result.temperature !== undefined ? result.temperature : 0.4;
     temperatureSlider.value = temperature;
     temperatureValueSpan.textContent = parseFloat(temperature).toFixed(1);
 
