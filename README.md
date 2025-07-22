@@ -143,78 +143,62 @@ After any changes, go to `chrome://extensions/` and click **Reload** on GeminiAn
 This version focuses on reliability, feature integration, and final polishing by removing external dependencies and centralizing the user experience.
 
 Added
-Custom Notification System: Implemented a dependency-free, native-style notification system from scratch to provide reliable user feedback and resolve all previous library-related errors.
-
-Integrated History Panel: Merged the full functionality of the History page directly into the options dashboard under a new "History" tab for a unified experience.
-
-Data Management Tab: Added a new "Data" tab to the options sidebar, creating a dedicated space for actions like clearing history.
-
-Sidebar Icons: Added SVG icons to each sidebar item ("General", "Prompts", etc.) to improve visual navigation.
+- Custom Notification System: Implemented a dependency-free, native-style notification system from scratch to provide reliable user feedback and resolve all previous library-related errors.
+- Integrated History Panel: Merged the full functionality of the History page directly into the options dashboard under a new "History" tab for a unified experience.
+- Data Management Tab: Added a new "Data" tab to the options sidebar, creating a dedicated space for actions like clearing history.
+- Sidebar Icons: Added SVG icons to each sidebar item ("General", "Prompts", etc.) to improve visual navigation.
 
 Changed
-Improved History Formatting: "Question Content" in the history panel is now automatically parsed and formatted into a clean, readable question-and-list format.
+- Improved History Formatting: "Question Content" in the history panel is now automatically parsed and formatted into a clean, readable question-and-list format.
 
 Fixed
-Critical JavaScript Error: Permanently resolved the persistent Toastify is not defined error by completely removing the external library dependency.
-
-Missing Prompt Content: Fixed a regression bug where prompt textarea elements appeared empty due to missing variable declarations in options.js.
+- Critical JavaScript Error: Permanently resolved the persistent Toastify is not defined error by completely removing the external library dependency.
+- Missing Prompt Content: Fixed a regression bug where prompt textarea elements appeared empty due to missing variable declarations in options.js.
 
 Removed
-Toastify.js Library: Removed the external toastify.js and toastify.css library files in favor of the new custom notification system.
-
-Standalone History Page: Removed the ui/history.html and js/history.js files, as their functionality is now fully integrated into the options page.
+- Toastify.js Library: Removed the external toastify.js and toastify.css library files in favor of the new custom notification system.
+- Standalone History Page: Removed the ui/history.html and js/history.js files, as their functionality is now fully integrated into the options page.
 
 ### [1.2.0]
 This release focused on a complete visual overhaul of the settings experience, migrating from a basic page to a modern, professional dashboard.
 
 Added
-Dashboard UI: Completely redesigned the options page into a two-column dashboard with sidebar navigation ("General", "Prompts").
-
-macOS-inspired Styling: Implemented a new CSS theme from the ground up to align with Apple's Human Interface Guidelines (HIG), featuring improved typography, spacing, and color palette.
-
-Transparent Blur Effect: Added a "frosted glass" effect to the sidebar using backdrop-filter for a native, modern feel.
-
-Separate Save Buttons: Implemented distinct "Save" buttons for the "General" and "Prompts" sections to improve user clarity.
-
-API Key Reveal Icon: Added an icon to the API key input field to show or hide the key.
+- Dashboard UI: Completely redesigned the options page into a two-column dashboard with sidebar navigation ("General", "Prompts").
+- macOS-inspired Styling: Implemented a new CSS theme from the ground up to align with Apple's Human Interface Guidelines (HIG), featuring improved typography, spacing, and color palette.
+- Transparent Blur Effect: Added a "frosted glass" effect to the sidebar using backdrop-filter for a native, modern feel.
+- Separate Save Buttons: Implemented distinct "Save" buttons for the "General" and "Prompts" sections to improve user clarity.
+- API Key Reveal Icon: Added an icon to the API key input field to show or hide the key.
 
 Changed
-Button Consistency: Refactored all buttons to use a consistent base .button class with modifiers (.button-primary, .button-secondary, .button-danger) for a uniform look and feel.
+- Button Consistency: Refactored all buttons to use a consistent base .button class with modifiers (.button-primary, .button-secondary, .button-danger) for a uniform look and feel.
 
 ### [1.1.0]
 This update focused on refactoring the codebase for better maintainability and enhancing the core context menu features.
 
 Added
-"Rephrase" Context Menu: Added a new "Rephrase this" action to the right-click context menu.
-
-Rephrase Language Setting: Added a setting in the options page to define target languages for the rephrase feature.
+- "Rephrase" Context Menu: Added a new "Rephrase this" action to the right-click context menu.
+- Rephrase Language Setting: Added a setting in the options page to define target languages for the rephrase feature.
 
 Changed
-Centralized Prompts (DRY): Refactored all default system prompts into a single source of truth, js/prompts.js, to eliminate code duplication.
-
-Improved History UI: Relocated the "Clear History" button to the header of the history page for better usability.
+- Centralized Prompts (DRY): Refactored all default system prompts into a single source of truth, js/prompts.js, to eliminate code duplication.
+- Improved History UI: Relocated the "Clear History" button to the header of the history page for better usability.
 
 Fixed
-Corrected an invalid model name (gemin-pro-latest) in options.html.
-
-Fixed an invalid charset declaration in history.html.
+- Corrected an invalid model name (gemin-pro-latest) in options.html.
+- Fixed an invalid charset declaration in history.html.
 
 Removed
-Removed the "Define this" action from the context menu to streamline options.
+- Removed the "Define this" action from the context menu to streamline options.
 
 ### [1.0.0]
 Initial release of the GeminiAnswerBot extension.
 
 Added
-Core quiz-solving functionality with automatic content extraction.
-
-On-page answer highlighting using Mark.js.
-
-Context menu actions: Summarize, Explain, Translate.
-
-Basic UI for the popup, options, and a standalone history page.
-
-State and history management using chrome.storage.
+- Core quiz-solving functionality with automatic content extraction.
+- On-page answer highlighting using Mark.js.
+- Context menu actions: Summarize, Explain, Translate.
+- Basic UI for the popup, options, and a standalone history page.
+- State and history management using chrome.storage.
 
 ---
 
