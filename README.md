@@ -5,25 +5,22 @@
 
 GeminiAnswerBot is an intelligent Chrome extension designed to enhance your web Browse experience. Powered by the Google Gemini API, it analyzes on-page content to automatically solve quizzes, provide contextual actions, and deliver AI-driven insights directly within your browser.
 
-![Screenshot of the extension's options page.](https://i.imgur.com/your-screenshot-url.png)
-*(**Note:** Replace the URL above with a link to a screenshot of your finished options page.)*
-
 ---
 
-## 🚀 Key Features
+## Key Features
 
--   **🧠 Smart Quiz Solver**: Intelligently detects, extracts, and solves quiz questions found on a webpage.
--   ** HIGHLIGHT On-Page Highlighting**: Automatically highlights the correct answer directly on the page for maximum visibility.
--   **🤖 Intelligent Context Menu**: Select any text on a page, then right-click to:
+-   **Smart Quiz Solver**: Intelligently detects, extracts, and solves quiz questions found on a webpage.
+-   **HIGHLIGHT On-Page Highlighting**: Automatically highlights the correct answer directly on the page for maximum visibility.
+-   **Intelligent Context Menu**: Select any text on a page, then right-click to:
     -   **Summarize**: Get a concise summary.
     -   **Explain**: Receive a detailed explanation.
     -   **Translate**: Translate the text.
     -   **Rephrase**: Rephrase the text into different styles.
--   **🖥️ Modern Dashboard UI**: A sleek, macOS-inspired options page with a transparent blur effect to manage all settings.
+-   **Modern Dashboard UI**: A sleek, macOS-inspired options page with a transparent blur effect to manage all settings.
 -   **⚙️ Full Customization**: Set your API Key, choose your preferred AI model (1.5 Flash, 1.5 Pro, etc.), customize system prompts, and configure other preferences.
--   **📜 Integrated History**: Access all your previous AI interactions and answers directly from the history panel within the options dashboard.
+-   **Integrated History**: Access all your previous AI interactions and answers directly from the history panel within the options dashboard.
 
-## 🛠️ Getting Started
+## Getting Started
 
 Follow these instructions to install and configure the extension for development and testing.
 
@@ -43,7 +40,7 @@ Follow these instructions to install and configure the extension for development
 
 This extension requires your personal Gemini API Key to function.
 
-1.  Visit [**Google AI Studio**](https://aistudio.google.com/) and sign in.
+1.  Visit [**Google AI Studio**] (https://aistudio.google.com/) and sign in.
 2.  Click **"Get API key"** and then **"Create API key in new project"**.
 3.  Copy the generated API key.
 4.  Open the GeminiAnswerBot **Options** page (right-click the extension icon > Options).
