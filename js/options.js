@@ -1,16 +1,61 @@
 // js/options.js
-
 document.addEventListener('DOMContentLoaded', function() {
-  // --- DOM Elements ---
-  const saveButton = document.getElementById('saveButton');
+  
+  // --- Custom Notification System ---
+  function showToast(title, message, type = 'info') {
+    const container = document.getElementById('notification-container');
+    if (container.firstChild) {
+      container.firstChild.remove();
+    }
+    const toast = document.createElement('div');
+    toast.className = 'custom-toast';
+    const icon = {
+      success: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+      error: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+      info: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
+    };
+    toast.innerHTML = `
+      <div class="toast-icon toast-icon-${type}">${icon[type] || icon.info}</div>
+      <div class="toast-text-content">
+        <strong>${title}</strong>
+        <div class="toast-message">${message}</div>
+      </div>
+    `;
+    container.appendChild(toast);
+    setTimeout(() => { toast.classList.add('show'); }, 10);
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => { toast.remove(); }, 500);
+    }, 4000);
+  }
+
+  // --- Dashboard Navigation Logic ---
+  const navLinks = document.querySelectorAll('.settings-sidebar a');
+  const contentPanes = document.querySelectorAll('.content-pane');
+  navLinks.forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetId = link.getAttribute('href').substring(1);
+      navLinks.forEach(navLink => navLink.classList.remove('active'));
+      link.classList.add('active');
+      contentPanes.forEach(pane => pane.classList.toggle('active', pane.id === targetId));
+    });
+  });
+
+  // --- Element Selectors ---
+  const saveGeneralButton = document.getElementById('saveGeneralButton');
+  const savePromptsButton = document.getElementById('savePromptsButton');
   const testButton = document.getElementById('testButton');
   const apiKeyInput = document.getElementById('apiKey');
+  const revealApiKey = document.getElementById('revealApiKey');
   const modelSelect = document.getElementById('modelSelect');
   const responseToneSelect = document.getElementById('responseToneSelect'); 
-  const statusDiv = document.getElementById('status');
   const autoHighlightToggle = document.getElementById('autoHighlightToggle');
   const temperatureSlider = document.getElementById('temperatureSlider');
   const temperatureValueSpan = document.getElementById('temperatureValue');
+  const clearHistoryButton = document.getElementById('clearHistoryButton');
+  
+  // FIXED: Added back the missing textarea selectors
   const cleaningPromptTextarea = document.getElementById('cleaningPrompt');
   const answerPromptTextarea = document.getElementById('answerPrompt');
   const explanationPromptTextarea = document.getElementById('explanationPrompt');
@@ -19,29 +64,22 @@ document.addEventListener('DOMContentLoaded', function() {
   const rephrasePromptTextarea = document.getElementById('rephrasePrompt');
   const rephraseLanguagesInput = document.getElementById('rephraseLanguages');
 
-
   // --- Load all saved settings ---
-  // Note: DEFAULT_PROMPTS is now loaded from prompts.js
   chrome.storage.sync.get([
-    'geminiApiKey', 
-    'selectedModel', 
-    'responseTone', 
-    'autoHighlight', 
-    'customPrompts',
-    'temperature',
-    'rephraseLanguages'
-  ], function(result) {
+    'geminiApiKey', 'selectedModel', 'responseTone', 'autoHighlight', 
+    'customPrompts', 'temperature', 'rephraseLanguages'
+  ], (result) => {
     apiKeyInput.value = result.geminiApiKey || '';
     modelSelect.value = result.selectedModel || 'gemini-1.5-flash-latest';
     responseToneSelect.value = result.responseTone || 'normal'; 
     autoHighlightToggle.checked = result.autoHighlight || false;
     rephraseLanguagesInput.value = result.rephraseLanguages || 'English, Indonesian';
-    
     const temperature = result.temperature !== undefined ? result.temperature : 0.4;
     temperatureSlider.value = temperature;
     temperatureValueSpan.textContent = parseFloat(temperature).toFixed(1);
-
-    // Set placeholders with default prompts from the global DEFAULT_PROMPTS object
+    
+    const prompts = result.customPrompts || {};
+    // Set placeholders
     cleaningPromptTextarea.placeholder = DEFAULT_PROMPTS.cleaning;
     answerPromptTextarea.placeholder = DEFAULT_PROMPTS.answer;
     explanationPromptTextarea.placeholder = DEFAULT_PROMPTS.explanation;
@@ -49,8 +87,7 @@ document.addEventListener('DOMContentLoaded', function() {
     translatePromptTextarea.placeholder = DEFAULT_PROMPTS.translate;
     rephrasePromptTextarea.placeholder = DEFAULT_PROMPTS.rephrase;
 
-    // Set saved values if they exist
-    const prompts = result.customPrompts || {};
+    // Set saved values
     cleaningPromptTextarea.value = prompts.cleaning || '';
     answerPromptTextarea.value = prompts.answer || '';
     explanationPromptTextarea.value = prompts.explanation || '';
@@ -59,19 +96,32 @@ document.addEventListener('DOMContentLoaded', function() {
     rephrasePromptTextarea.value = prompts.rephrase || '';
   });
 
-  // --- Event listener for Temperature Slider ---
+  // --- Event Listeners ---
   temperatureSlider.addEventListener('input', function() {
     temperatureValueSpan.textContent = parseFloat(this.value).toFixed(1);
   });
+  
+  revealApiKey.addEventListener('click', function() {
+    const isPassword = apiKeyInput.type === 'password';
+    apiKeyInput.type = isPassword ? 'text' : 'password';
+    revealApiKey.querySelector('.icon-eye').classList.toggle('hidden', isPassword);
+    revealApiKey.querySelector('.icon-eye-slash').classList.toggle('hidden', !isPassword);
+  });
 
-  // --- Event listener for Save button ---
-  saveButton.addEventListener('click', function() {
-    const apiKey = apiKeyInput.value.trim();
-    const selectedModel = modelSelect.value;
-    const responseTone = responseToneSelect.value; 
-    const autoHighlight = autoHighlightToggle.checked;
-    const temperature = parseFloat(temperatureSlider.value);
-    const rephraseLanguages = rephraseLanguagesInput.value.trim();
+  saveGeneralButton.addEventListener('click', function() {
+    const settingsToSave = {
+      'geminiApiKey': apiKeyInput.value.trim(),
+      'selectedModel': modelSelect.value,
+      'responseTone': responseToneSelect.value,
+      'autoHighlight': autoHighlightToggle.checked,
+      'temperature': parseFloat(temperatureSlider.value)
+    };
+    chrome.storage.sync.set(settingsToSave, () => {
+      showToast('Success', 'General settings have been saved!', 'success');
+    });
+  });
+
+  savePromptsButton.addEventListener('click', function() {
     const customPrompts = {
       cleaning: cleaningPromptTextarea.value.trim(),
       answer: answerPromptTextarea.value.trim(),
@@ -80,67 +130,41 @@ document.addEventListener('DOMContentLoaded', function() {
       translate: translatePromptTextarea.value.trim(),
       rephrase: rephrasePromptTextarea.value.trim()
     };
-    
-    if (apiKey) {
-      chrome.storage.sync.set({ 
-        'geminiApiKey': apiKey,
-        'selectedModel': selectedModel,
-        'responseTone': responseTone, 
-        'autoHighlight': autoHighlight,
-        'temperature': temperature,
-        'customPrompts': customPrompts,
-        'rephraseLanguages': rephraseLanguages
-      }, function() {
-        showStatus('Settings saved successfully!', 'success');
-      });
-    } else {
-      showStatus('API key field cannot be empty.', 'error');
-    }
+    chrome.storage.sync.set({ 
+      'customPrompts': customPrompts,
+      'rephraseLanguages': rephraseLanguagesInput.value.trim()
+    }, () => {
+      showToast('Success', 'Custom prompts have been saved!', 'success');
+    });
   });
 
-  // --- Event listener for Test Connection button ---
   testButton.addEventListener('click', function() {
     const apiKey = apiKeyInput.value.trim();
     if (!apiKey) {
-      showStatus('Please enter an API key to test.', 'error');
+      showToast('API Key Missing', 'Please enter an API key to test.', 'error');
       return;
     }
-
-    showStatus('Testing connection...', 'normal');
+    showToast('Testing', 'Testing connection, please wait...', 'info');
     testButton.disabled = true;
-
-    chrome.runtime.sendMessage(
-      { action: 'testApiConnection', payload: { apiKey } },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          showStatus(`Error: ${chrome.runtime.lastError.message}`, 'error');
-          testButton.disabled = false;
-          return;
-        }
-        
-        if (response && response.success) {
-          showStatus(response.text, 'success');
-        } else {
-          const errorMessage = response.error || 'An unknown error occurred.';
-          showStatus(errorMessage, 'error');
-        }
-        testButton.disabled = false;
+    chrome.runtime.sendMessage({ action: 'testApiConnection', payload: { apiKey } }, (response) => {
+      testButton.disabled = false;
+      if (chrome.runtime.lastError) {
+        showToast('Connection Error', `Error: ${chrome.runtime.lastError.message}`, 'error');
+        return;
       }
-    );
+      if (response && response.success) {
+        showToast('Connection Successful', response.text, 'success');
+      } else {
+        showToast('Connection Failed', response.error || 'An unknown error occurred.', 'error');
+      }
+    });
   });
 
-  // --- Utility function ---
-  function showStatus(message, type) {
-    statusDiv.textContent = message;
-    statusDiv.className = type; 
-    
-    if (type !== 'error') {
-        setTimeout(() => {
-            if (statusDiv.textContent === message) {
-                statusDiv.textContent = '';
-                statusDiv.className = '';
-            }
-        }, 4000);
+  clearHistoryButton.addEventListener('click', function() {
+    if (confirm('Are you sure you want to delete all history? This action cannot be undone.')) {
+        chrome.storage.local.remove('history', () => {
+            showToast('Success', 'All history has been cleared.', 'success');
+        });
     }
-  }
+  });
 });

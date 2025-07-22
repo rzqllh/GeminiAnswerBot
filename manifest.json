@@ -1,17 +1,17 @@
 {
   "manifest_version": 3,
   "name": "GeminiAnswerBot",
-  "version": "18.2",
+  "version": "18.3",
   "description": "Your Gemini-powered Chrome extension.",
   "permissions": [
     "activeTab",
     "scripting",
     "storage",
-    "contextMenus" 
+    "contextMenus"
   ],
   "host_permissions": [
     "https://generativelanguage.googleapis.com/*",
-    "<all_urls>" 
+    "<all_urls>"
   ],
   "action": {
     "default_popup": "ui/popup.html",
@@ -28,8 +28,12 @@
   "options_page": "ui/options.html",
   "web_accessible_resources": [
     {
-      "resources": ["assets/highlighter.css"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "assets/highlighter.css"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }
