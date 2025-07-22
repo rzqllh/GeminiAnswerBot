@@ -62,11 +62,17 @@ This extension requires your personal Gemini API Key to function.
 
 ## Advanced Configuration (Optional)
 
-You can customize system prompts, default behavior, and UI themes by editing the `prompts.js` or using the hidden "Advanced" tab on the Options page.
+You can customize system prompts, default behavior, and UI themes by editing the `prompts.js` file or using the hidden **"Advanced"** tab on the Options page.
 
+Key features available under Advanced Settings:
 - Custom AI Prompt Templates
-- Auto-answer Delay (for dynamic pages)
 - Quiz Tolerance Level (strict/lenient matching)
+- Toggle verbose mode, logging, and auto-answer delay
+- Theme control and UI preferences
+
+| Advanced Tab (Overview) | Prompt Template Editor |
+|-------------------------|------------------------|
+| ![Advanced Options](https://i.imgur.com/kcafLc9.png) | ![Prompt Editor](https://i.imgur.com/4KubPAL.png) |
 
 
 ## Project Structure
