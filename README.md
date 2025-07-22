@@ -72,7 +72,7 @@ Key features available under Advanced Settings:
 
 | Advanced Tab (Overview) | Prompt Template Editor |
 |-------------------------|------------------------|
-| ![Advanced Options](https://i.imgur.com/kcafLc9.png) | ![Prompt Editor](https://i.imgur.com/4KubPAL.png) |
+| ![GeminiAnswerBot - Setting Prompt 1](https://i.imgur.com/kcafLc9.png) | ![GeminiAnswerBot - Setting Prompt 2](https://i.imgur.com/4KubPAL.png) |
 
 
 ## Project Structure
@@ -110,6 +110,18 @@ GeminiAnswerBot/
 ## Privacy & Security
 
 GeminiAnswerBot **does not collect any personal data**. All processing happens locally in your browser. Your Gemini API key is stored only in your local browser storage and never transmitted externally.
+
+## Troubleshooting
+
+### My API Key isn’t working
+- Make sure you copied the key from the **Google AI Studio**, not from OAuth credentials.
+- Test your key using the **"Test Connection"** button in the Options panel.
+- If still not working, try generating a new key from a different project.
+
+### Quizzes are not being detected
+- Make sure the quiz is visible on the page (not inside iframes or lazy-loaded).
+- Reload the page after enabling the extension for the first time.
+
 
 ## Known Issues
 
