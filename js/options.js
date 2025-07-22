@@ -1,7 +1,6 @@
 // js/options.js
 document.addEventListener('DOMContentLoaded', function() {
   
-  // --- Custom Notification System ---
   function showToast(title, message, type = 'info') {
     const container = document.getElementById('notification-container');
     if (container.firstChild) {
@@ -29,7 +28,70 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 4000);
   }
 
-  // --- Dashboard Navigation Logic ---
+  const historyListContainer = document.getElementById('history-list-container');
+
+  function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+
+  function formatQuestionContent(content) {
+    if (!content) return '';
+    const lines = content.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) return '';
+    const question = escapeHtml(lines.shift().replace(/^Question:\s*/i, ''));
+    const optionsHtml = lines.map(option => {
+        const cleanedOption = option.trim().replace(/^[\*\-]\s*Options:\s*|^\s*[\*\-]\s*/, '');
+        return `<li>${escapeHtml(cleanedOption)}</li>`;
+    }).join('');
+    return `
+      <p class="history-question">${question}</p>
+      <ul class="history-options">${optionsHtml}</ul>
+    `;
+  }
+
+  async function loadHistory() {
+    historyListContainer.innerHTML = `<div class="loading-message">Loading history...</div>`;
+    const { history = [] } = await chrome.storage.local.get('history');
+    if (history.length === 0) {
+      historyListContainer.innerHTML = `<div class="empty-state">No history found.</div>`;
+      return;
+    }
+    historyListContainer.innerHTML = '';
+    history.forEach(item => {
+      const itemElement = document.createElement('div');
+      itemElement.className = 'history-item';
+      const formattedDate = new Date(item.timestamp).toLocaleString();
+      const actionLabel = item.actionType.charAt(0).toUpperCase() + item.actionType.slice(1);
+      const contentSource = item.actionType === 'quiz' ? 'Question Content' : 'Selected Text';
+      const contentDisplay = item.cleanedContent ? `
+        <h3>${contentSource}</h3>
+        <div class="answer-block">
+            ${formatQuestionContent(item.cleanedContent)}
+        </div>
+      ` : '';
+      const responseTitle = item.explanationHTML ? 'AI Answer' : 'AI Response';
+      itemElement.innerHTML = `
+        <div class="history-item-header">
+          <div class="history-item-title">
+            <a href="${item.url}" target="_blank" title="${item.title}">${item.title}</a>
+          </div>
+          <div class="history-item-meta">${actionLabel} &bull; ${formattedDate}</div>
+        </div>
+        <div class="history-item-content">
+          ${contentDisplay}
+          <h3>${responseTitle}</h3>
+          <div class="answer-block">${item.answerHTML}</div>
+          ${item.explanationHTML ? `
+            <h3>Explanation</h3>
+            <div class="answer-block">${item.explanationHTML}</div>
+          ` : ''}
+        </div>
+      `;
+      historyListContainer.appendChild(itemElement);
+    });
+  }
+
   const navLinks = document.querySelectorAll('.settings-sidebar a');
   const contentPanes = document.querySelectorAll('.content-pane');
   navLinks.forEach(link => {
@@ -39,10 +101,12 @@ document.addEventListener('DOMContentLoaded', function() {
       navLinks.forEach(navLink => navLink.classList.remove('active'));
       link.classList.add('active');
       contentPanes.forEach(pane => pane.classList.toggle('active', pane.id === targetId));
+      if (targetId === 'history') {
+        loadHistory();
+      }
     });
   });
 
-  // --- Element Selectors ---
   const saveGeneralButton = document.getElementById('saveGeneralButton');
   const savePromptsButton = document.getElementById('savePromptsButton');
   const testButton = document.getElementById('testButton');
@@ -54,8 +118,6 @@ document.addEventListener('DOMContentLoaded', function() {
   const temperatureSlider = document.getElementById('temperatureSlider');
   const temperatureValueSpan = document.getElementById('temperatureValue');
   const clearHistoryButton = document.getElementById('clearHistoryButton');
-  
-  // FIXED: Added back the missing textarea selectors
   const cleaningPromptTextarea = document.getElementById('cleaningPrompt');
   const answerPromptTextarea = document.getElementById('answerPrompt');
   const explanationPromptTextarea = document.getElementById('explanationPrompt');
@@ -64,7 +126,6 @@ document.addEventListener('DOMContentLoaded', function() {
   const rephrasePromptTextarea = document.getElementById('rephrasePrompt');
   const rephraseLanguagesInput = document.getElementById('rephraseLanguages');
 
-  // --- Load all saved settings ---
   chrome.storage.sync.get([
     'geminiApiKey', 'selectedModel', 'responseTone', 'autoHighlight', 
     'customPrompts', 'temperature', 'rephraseLanguages'
@@ -77,17 +138,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const temperature = result.temperature !== undefined ? result.temperature : 0.4;
     temperatureSlider.value = temperature;
     temperatureValueSpan.textContent = parseFloat(temperature).toFixed(1);
-    
     const prompts = result.customPrompts || {};
-    // Set placeholders
     cleaningPromptTextarea.placeholder = DEFAULT_PROMPTS.cleaning;
     answerPromptTextarea.placeholder = DEFAULT_PROMPTS.answer;
     explanationPromptTextarea.placeholder = DEFAULT_PROMPTS.explanation;
     summarizePromptTextarea.placeholder = DEFAULT_PROMPTS.summarize; 
     translatePromptTextarea.placeholder = DEFAULT_PROMPTS.translate;
     rephrasePromptTextarea.placeholder = DEFAULT_PROMPTS.rephrase;
-
-    // Set saved values
     cleaningPromptTextarea.value = prompts.cleaning || '';
     answerPromptTextarea.value = prompts.answer || '';
     explanationPromptTextarea.value = prompts.explanation || '';
@@ -96,7 +153,6 @@ document.addEventListener('DOMContentLoaded', function() {
     rephrasePromptTextarea.value = prompts.rephrase || '';
   });
 
-  // --- Event Listeners ---
   temperatureSlider.addEventListener('input', function() {
     temperatureValueSpan.textContent = parseFloat(this.value).toFixed(1);
   });
@@ -130,9 +186,10 @@ document.addEventListener('DOMContentLoaded', function() {
       translate: translatePromptTextarea.value.trim(),
       rephrase: rephrasePromptTextarea.value.trim()
     };
+    const rephraseLanguages = rephraseLanguagesInput.value.trim();
     chrome.storage.sync.set({ 
       'customPrompts': customPrompts,
-      'rephraseLanguages': rephraseLanguagesInput.value.trim()
+      'rephraseLanguages': rephraseLanguages
     }, () => {
       showToast('Success', 'Custom prompts have been saved!', 'success');
     });
@@ -164,6 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (confirm('Are you sure you want to delete all history? This action cannot be undone.')) {
         chrome.storage.local.remove('history', () => {
             showToast('Success', 'All history has been cleared.', 'success');
+            loadHistory();
         });
     }
   });

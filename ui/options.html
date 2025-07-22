@@ -3,6 +3,7 @@
 <head>
   <title>GeminiAIAnswer - Settings</title>
   <meta charset="UTF-8">
+  <link rel="stylesheet" href="../assets/libs/toastify.css">
   <link rel="stylesheet" href="../assets/options.css">
 </head>
 <body>
@@ -19,6 +20,12 @@
           <a href="#prompts">
             <span class="sidebar-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg></span>
             Prompts
+          </a>
+        </li>
+        <li>
+          <a href="#history">
+            <span class="sidebar-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg></span>
+            History
           </a>
         </li>
         <li>
@@ -87,6 +94,7 @@
             <button id="saveGeneralButton" class="button button-primary">Save General Settings</button>
         </div>
       </section>
+
       <section id="prompts" class="content-pane">
         <h1>Prompts</h1>
         <p class="section-description">Customize the system instructions sent to the AI. Leave blank to use the system default.</p>
@@ -124,6 +132,15 @@
             <button id="savePromptsButton" class="button button-primary">Save Prompts</button>
         </div>
       </section>
+
+      <section id="history" class="content-pane">
+        <h1>History</h1>
+        <p class="section-description">Showing recent activity from your extension.</p>
+        <div id="history-list-container">
+          <div class="loading-message">Loading history...</div>
+        </div>
+      </section>
+
       <section id="data" class="content-pane">
         <h1>Data & History</h1>
         <p class="section-description">Manage your extension's stored data.</p>
@@ -139,7 +156,6 @@
   </div>
 
   <div id="notification-container"></div>
-
   <script src="../js/prompts.js"></script>
   <script src="../js/options.js"></script>
 </body>

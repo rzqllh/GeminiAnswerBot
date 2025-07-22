@@ -1,21 +1,35 @@
-# Sistem dan editor
-.DS_Store
-Thumbs.db
-*.log
+# Dependencies
+/node_modules
 
-# VSCode / JetBrains
-.vscode/
-.idea/
+# Build artifacts
+/build
+/dist
+/out
 
-# Backup / temp file
-*.bak
-*.tmp
-*~
-
-# API key lokal / config sensitif (kalau kamu simpan di file, misal)
-config.json
-secrets.js
-.env
-
-# Zipped file
+# Packaged extension files
+*.crx
 *.zip
+
+# Log files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS-generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

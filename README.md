@@ -1,100 +1,85 @@
+# ✨ GeminiAnswerBot
 
-# Gemini Answer Bot ✨🧠 (Chrome Extension)
+**GeminiAnswerBot** adalah sebuah ekstensi Chrome cerdas yang didesain untuk meningkatkan produktivitas dan pemahaman Anda saat menjelajahi web. Dengan memanfaatkan kekuatan Google Gemini API, ekstensi ini mampu menganalisis konten halaman, menjawab kuis secara otomatis, dan menyediakan berbagai aksi kontekstual langsung dari browser Anda.
 
-**Gemini Answer Bot** adalah ekstensi Chrome yang dirancang untuk membantu Anda membaca, memahami, dan mengekstrak informasi dari halaman web dengan lebih efisien. Dengan memanfaatkan Gemini API, ekstensi ini memungkinkan Anda untuk mendapatkan rangkuman, penjelasan, hingga insight AI dari konten halaman web langsung dari popup di browser Anda.
+![Screenshot of Options Page](https://i.imgur.com/your-screenshot-url.png)
+*(Tips: Ganti URL di atas dengan link screenshot halaman Opsi Anda yang sudah jadi untuk tampilan yang lebih menarik)*
 
 ---
 
 ## 🚀 Fitur Utama
 
-- 🔍 **Baca halaman secara cerdas**: Ekstensi men-scan konten aktif dari halaman web.
-- 💬 **Tanya Jawab AI langsung**: Ajukan pertanyaan dan dapatkan jawaban instan berbasis Gemini.
-- 📜 **Riwayat Chat**: Akses kembali percakapan sebelumnya.
-- ⚙️ **Opsi Kustomisasi**: Atur API key, preferensi tampilan, dan lainnya.
+-   **🧠 Penjawab Kuis Otomatis**: Secara cerdas mendeteksi, mengekstrak, dan menjawab pertanyaan kuis di halaman web.
+-   ** HIGHLIGHT Jawaban**: Secara otomatis menyorot jawaban yang benar langsung di halaman untuk visibilitas maksimal.
+-   ** Menu Konteks Cerdas**: Pilih teks apa pun di halaman, lalu klik kanan untuk:
+    -   **Summarize**: Membuat ringkasan.
+    -   **Explain**: Mendapatkan penjelasan.
+    -   **Translate**: Menerjemahkan teks.
+    -   **Rephrase**: Mengubah gaya bahasa teks.
+-   ** UI Dashboard Modern**: Halaman Opsi dengan desain modern ala macOS, lengkap dengan efek *transparent blur*, untuk mengelola semua pengaturan.
+-   ** Kustomisasi Penuh**: Atur API Key, pilih model AI (1.5 Flash, 1.5 Pro, dll.), sesuaikan *prompt* sistem, dan atur preferensi lainnya.
+-   **📜 Riwayat Terintegrasi**: Akses kembali semua aktivitas dan jawaban AI sebelumnya langsung dari panel riwayat di halaman Opsi.
 
----
+## 🛠️ Instalasi (Mode Developer)
 
-## 🛠️ Cara Instalasi Manual
+Karena ekstensi ini belum dipublikasikan, ikuti langkah berikut untuk instalasi manual:
 
-> Karena ekstensi ini belum dipublikasikan di Chrome Web Store, Anda dapat memasangnya secara manual untuk pengujian.
-
-1. **Clone / unduh** project ini, lalu ekstrak jika berupa zip.
-2. Buka `chrome://extensions/` di browser Chrome Anda.
-3. Aktifkan **Developer Mode** di kanan atas.
-4. Klik **"Load unpacked"** dan pilih folder hasil ekstrak (`GeminiAnswerBot`).
-5. Ekstensi akan muncul dan siap digunakan.
-
----
-
-## 🧪 Cara Menggunakan
-
-1.  Buka halaman web apa pun.
-2.  Klik ikon ekstensi **Gemini Answer** Bot di toolbar Chrome.
-3.  Gemini Answer Bot akan otomatis memindai halaman dan menjawab soal yang tertera pada tab yang sedang dibuka.
-4.  Jawaban AI akan muncul langsung di popup.
-5.  Anda juga bisa melihat riwayat percakapan sebelumnya melalui tab **Riwayat**.
-
-💡 Anda juga bisa melihat riwayat percakapan sebelumnya melalui tab **Riwayat**.
-
----
+1.  **Unduh atau Clone:** Unduh proyek ini sebagai file ZIP dan ekstrak, atau `git clone` repositori ini.
+2.  **Buka Halaman Ekstensi:** Buka `chrome://extensions/` di browser Chrome Anda.
+3.  **Aktifkan Mode Developer:** Aktifkan sakelar **"Developer mode"** di pojok kanan atas.
+4.  **Muat Ekstensi:** Klik tombol **"Load unpacked"** dan pilih folder proyek yang telah Anda ekstrak.
+5.  **Selesai!** Ikon GeminiAnswerBot akan muncul di *toolbar* Anda dan siap digunakan.
 
 ## 🔐 Konfigurasi API Key
 
-Agar ekstensi dapat berfungsi, Anda memerlukan **API key Gemini dari Google AI**. Ikuti langkah-langkah berikut untuk mendapatkannya:
+Ekstensi ini memerlukan **Gemini API Key** Anda untuk berfungsi.
 
-1.  **Akses Google AI Studio:** Buka [Google AI Studio](https://aistudio.google.com/).
-2.  **Masuk dengan Akun Google Anda:** Gunakan akun Google yang biasa Anda gunakan.
-3.  **Buat atau Pilih Proyek Google Cloud:**
-    *   Jika Anda belum memiliki proyek, Anda perlu membuatnya. Di Google AI Studio, Anda akan diarahkan untuk membuat proyek baru atau memilih proyek yang sudah ada.
-    *   **Untuk membuat proyek baru:**
-        a. Cari opsi "New Project" di konsol Google Cloud (Anda mungkin perlu membuat akun Google Cloud jika belum punya).
-        b. Berikan **Nama Proyek** yang deskriptif (misalnya, `Quiz Assistant Project`).
-        c. Tentukan **Project ID** yang unik (misalnya, `quiz-assistant-gemini-xyz`). ID ini tidak bisa diubah setelah dibuat.
-        d. Jika Anda bagian dari organisasi, pilih organisasi Anda.
-        e. Anda **perlu menghubungkan akun penagihan (billing account)**. Jika belum punya, Anda akan diminta untuk membuatnya. Google Cloud menawarkan kredit gratis untuk pengguna baru, yang sangat berguna untuk mencoba.
-        f. Klik "Create" untuk menyelesaikan pembuatan proyek.
-4.  **Hasilkan API Key:**
-    *   Setelah proyek Anda siap, kembali ke Google AI Studio (atau navigasikan ke "APIs & Services" > "Credentials" di Google Cloud Console).
-    *   Cari tombol "Get API key" atau "Create API key".
-    *   Pilih proyek yang baru saja Anda buat.
-    *   Klik "Create" untuk menghasilkan kunci API.
-    *   **Salin dan simpan API key Anda dengan aman.** Perlakukan kunci ini seperti kata sandi.
-5.  **Masukkan API Key ke Ekstensi:**
-    *   Buka halaman **Opsi** ekstensi (biasanya dengan mengklik kanan ikon ekstensi di toolbar Chrome lalu pilih "Options").
-    *   Masukkan API key Gemini Anda ke dalam kolom yang tersedia.
-    *   Klik **"Save"**, lalu **refresh popup** ekstensi (jika ada tombol refresh) atau refresh tab tempat Anda menggunakan ekstensi.
-
----
+1.  Buka [**Google AI Studio**](https://aistudio.google.com/) dan masuk dengan akun Google Anda.
+2.  Klik tombol **"Get API key"** lalu **"Create API key in new project"**.
+3.  Salin API key yang dihasilkan.
+4.  Buka halaman **Opsi** GeminiAnswerBot (klik kanan ikon ekstensi > Opsi).
+5.  Masuk ke tab **General**, tempel API key Anda, lalu klik **"Save General Settings"**.
+6.  Gunakan tombol **"Test Connection"** untuk memastikan kunci API Anda valid.
 
 ## 📁 Struktur Proyek
 
+Struktur proyek ini dirancang untuk keterbacaan dan skalabilitas.
+
 ```
 GeminiAnswerBot/
-├── manifest.json           # Konfigurasi utama ekstensi
-├── js/                     # Logika utama (background.js, content.js, prompts.js)
-├── ui/                     # Tampilan pengguna (popup, options, history)
-├── assets/                 # Ikon & CSS
+├── assets/
+│   ├── libs/
+│   │   ├── toastify.css      # Library notifikasi
+│   │   └── (dihapus)
+│   ├── options.css         # Gaya untuk halaman Opsi
+│   ├── popup.css           # Gaya untuk popup utama
+│   └── ...
+├── js/
+│   ├── background.js       # Service worker (event & API calls)
+│   ├── content.js          # Skrip yang diinjeksi ke halaman
+│   ├── options.js          # Logika untuk halaman Opsi & Riwayat
+│   └── prompts.js          # Kumpulan prompt default untuk AI
+├── ui/
+│   ├── options.html        # Halaman Opsi, Data, dan Riwayat
+│   └── popup.html          # Halaman popup utama
+├── manifest.json           # File konfigurasi inti ekstensi
 └── README.md               # Dokumentasi ini
 ```
 
----
-
 ## 🧩 Teknologi yang Digunakan
 
-- HTML, CSS, JavaScript (Vanilla)
-- Chrome Extension API
-- Gemini AI API
+-   **HTML5**
+-   **CSS3** (Flexbox, Variables, Backdrop Filter)
+-   **JavaScript (Vanilla JS)**
+-   **Chrome Extension Manifest V3 API**
+-   **Google Gemini API**
 
 ---
 
-## 🤝 Kontribusi
+## 🤝 Berkontribusi
 
-Pull request sangat diterima! Jika Anda memiliki ide peningkatan, perbaikan bug, atau fitur baru, silakan buat issue atau PR.
-
----
+Kontribusi, isu, dan permintaan fitur sangat diterima! Jangan ragu untuk membuat *fork*, *issue*, atau *pull request*.
 
 ## 📃 Lisensi
 
-Project ini berada di bawah lisensi [MIT License](LICENSE). Silakan gunakan dan modifikasi sesuai kebutuhan Anda.
-
----
+Proyek ini dilisensikan di bawah **MIT License**.
