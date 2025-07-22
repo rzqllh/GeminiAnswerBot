@@ -2,8 +2,21 @@
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 ![Version](https://img.shields.io/badge/version-18.3-brightgreen)
+![Chrome Web Store](https://img.shields.io/chrome-web-store/v/your-extension-id?label=Chrome%20Store)
+![Code Style: Prettier](https://img.shields.io/badge/code%20style-prettier-ff69b4.svg)
+![Maintained](https://img.shields.io/maintenance/yes/2025)
 
 GeminiAnswerBot is an intelligent Chrome extension designed to enhance your web Browse experience. Powered by the Google Gemini API, it analyzes on-page content to automatically solve quizzes, provide contextual actions, and deliver AI-driven insights directly within your browser.
+
+## 🌐 Browser Compatibility
+
+| Browser        | Supported | Notes                      |
+|----------------|-----------|----------------------------|
+| Chrome         | ✅         | Full support               |
+| Microsoft Edge | ✅         | Tested & stable            |
+| Brave          | ✅         | Fully supported            |
+| Firefox        | ❌         | Not supported (MV3-only)   |
+
 
 ---
 
@@ -17,7 +30,7 @@ GeminiAnswerBot is an intelligent Chrome extension designed to enhance your web 
     -   **Translate**: Translate the text.
     -   **Rephrase**: Rephrase the text into different styles.
 -   **Modern Dashboard UI**: A sleek, macOS-inspired options page with a transparent blur effect to manage all settings.
--   **⚙️ Full Customization**: Set your API Key, choose your preferred AI model (1.5 Flash, 1.5 Pro, etc.), customize system prompts, and configure other preferences.
+-   **Full Customization**: Set your API Key, choose your preferred AI model (1.5 Flash, 1.5 Pro, etc.), customize system prompts, and configure other preferences.
 -   **Integrated History**: Access all your previous AI interactions and answers directly from the history panel within the options dashboard.
 
 ## Getting Started
@@ -47,7 +60,16 @@ This extension requires your personal Gemini API Key to function.
 5.  Navigate to the **General** tab, paste your API key into the designated field, and click **"Save General Settings"**.
 6.  Use the **"Test Connection"** button to validate your key.
 
-## 📂 Project Structure
+## Advanced Configuration (Optional)
+
+You can customize system prompts, default behavior, and UI themes by editing the `prompts.js` or using the hidden "Advanced" tab on the Options page.
+
+- Custom AI Prompt Templates
+- Auto-answer Delay (for dynamic pages)
+- Quiz Tolerance Level (strict/lenient matching)
+
+
+## Project Structure
 
 The project is organized with a clear separation of concerns for scalability and maintenance.
 
@@ -71,7 +93,7 @@ GeminiAnswerBot/
 └── README.md               # This documentation
 ```
 
-## 💻 Tech Stack
+## Tech Stack
 
 -   **HTML5**
 -   **CSS3** (Flexbox, CSS Variables, Backdrop Filter)
@@ -79,12 +101,35 @@ GeminiAnswerBot/
 -   **Chrome Extension APIs (Manifest V3)**
 -   **Google Gemini API**
 
+## Privacy & Security
+
+GeminiAnswerBot **does not collect any personal data**. All processing happens locally in your browser. Your Gemini API key is stored only in your local browser storage and never transmitted externally.
+
+## Known Issues
+
+- On some dynamic websites (e.g., using React or Shadow DOM), quiz extraction may be delayed.
+- Google Gemini API may return slightly inconsistent results depending on model latency.
+
+## Planned Improvements
+
+- Shadow DOM support for better page parsing
+- Multi-language UI support
+- Built-in Gemini Vision API for image-based quiz solving
+
+
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions, issues, and feature requests are welcome! Feel free to fork the repository, open an issue, or submit a pull request.
 
-## 📃 License
+## License
 
 This project is licensed under the **MIT License**.
+
+## Contact & Credits
+
+Made with 💡 by [Hafizh Rizqullah](https://github.com/rzqllh18)  
+Inspired by tools like ChatGPT Sidebar, Gemini Studio, and more.
+
+For feedback, reach out via GitHub Issues or open a PR 🙌
