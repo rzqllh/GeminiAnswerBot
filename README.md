@@ -70,11 +70,11 @@ Agar ekstensi dapat berfungsi, Anda memerlukan **API key Gemini dari Google AI**
 
 ```
 GeminiAnswerBot/
-├── manifest.json         # Konfigurasi utama ekstensi
-├── src/                  # Logika utama (background.js, content.js, prompts.js)
-├── ui/                   # Tampilan pengguna (popup, options, history)
-├── assets/               # Ikon & CSS
-└── README.md             # Dokumentasi ini
+├── manifest.json           # Konfigurasi utama ekstensi
+├── js/                     # Logika utama (background.js, content.js, prompts.js)
+├── ui/                     # Tampilan pengguna (popup, options, history)
+├── assets/                 # Ikon & CSS
+└── README.md               # Dokumentasi ini
 ```
 
 ---

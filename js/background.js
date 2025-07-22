@@ -33,16 +33,16 @@ chrome.runtime.onInstalled.addListener((details) => {
     contexts: ["selection"]
   });
   chrome.contextMenus.create({
-    id: "gemini-answer-define",
+    id: "gemini-answer-rephrase",
     parentId: "gemini-answer-selection-parent",
-    title: "Define this",
+    title: "Rephrase this",
     contexts: ["selection"]
   });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.selectionText && info.menuItemId.startsWith("gemini-answer-")) {
-    const actionType = info.menuItemId.replace("gemini-answer-", ""); // e.g., "summarize", "explain"
+    const actionType = info.menuItemId.replace("gemini-answer-", ""); // e.g., "summarize", "rephrase"
     const storageKeySelection = `contextSelection_${tab.id}`;
     const storageKeyAction = `contextAction_${tab.id}`; // Simpan jenis aksi
 

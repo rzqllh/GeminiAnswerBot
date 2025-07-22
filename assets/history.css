@@ -1,3 +1,5 @@
+/* assets/history.css */
+
 :root {
   --bg-color: #f2f2f7;
   --card-bg-color: #ffffff;
@@ -23,16 +25,34 @@ body {
 
 header {
   margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-h1 {
+.header-title h1 {
   font-size: 32px;
   margin: 0 0 4px 0;
 }
 
-header p {
+.header-title p {
   color: var(--secondary-text-color);
   margin: 0;
+}
+
+#clearHistory {
+    background: var(--apple-red);
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+    flex-shrink: 0; /* Mencegah tombol menyusut */
+}
+#clearHistory:hover {
+    background-color: #d93025; /* Warna hover yang sedikit lebih gelap */
 }
 
 .history-item {
@@ -98,22 +118,4 @@ header p {
     text-align: center;
     padding: 40px;
     color: var(--secondary-text-color);
-}
-
-footer {
-    text-align: center;
-    margin-top: 32px;
-}
-
-#clearHistory {
-    background: var(--apple-red);
-    color: white;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 500;
-}
-#clearHistory:hover {
-    opacity: 0.9;
 }

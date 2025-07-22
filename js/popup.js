@@ -1,41 +1,8 @@
 // js/popup.js
 
 document.addEventListener('DOMContentLoaded', async function () {
-    // --- PROMPTS ---
-    const CLEANING_PROMPT = `You are an extremely meticulous text cleaner and quiz content extractor. Your SOLE purpose is to identify and extract ONLY the quiz question and its exact provided options from the raw, potentially noisy webpage text provided.
-
-CRITICAL RULES FOR EXTRACTION:
-1.  **Identify The Single Question:** Locate the main quiz question.
-2.  **Identify All Options:** Locate *all* the multiple-choice or selection options directly associated with that question.
-3.  **Strict Exclusion:** ABSOLUTELY filter out and remove *all other text and elements*. This includes, but is not limited to: menus, sidebars, headers, footers, advertisements, navigation links, contextual instructions not part of the question itself (e.g., "Next", "Previous", "Submit"), scores, category names, general page content unrelated to the specific quiz question and its options.
-4.  **Preserve Original Formatting:** Maintain the exact wording, spelling, and any special characters or code snippets within the question and options.
-5.  **Markdown Formatting:** Format the extracted content using standard Markdown. Use CODE_BLOCK_START and CODE_BLOCK_END for any multi-line code blocks found within options (e.g., "CODE_BLOCK_START\\nconsole.log('hello')\\nCODE_BLOCK_END"), and wrap inline code with single backticks (\`inline code\`). If the option text itself is a HTML tag (like <p>), you should also wrap it in CODE_BLOCK_START/END to preserve its literal form.
-6.  **Direct Output:** Return ONLY the cleaned Markdown text. Do NOT add any introductory phrases, summaries, explanations, or conversational text. Your output must be purely the extracted question and its options.
-7.  **CRITICAL LANGUAGE RULE**: Analyze the language of the provided raw webpage text. You MUST respond in the EXACT SAME LANGUAGE as the input text. No translation is allowed unless explicitly requested for a translation task.
-`;
-
-    const ANSWER_PROMPT = `Act as an expert quiz solver. Based on the following cleaned quiz text (containing only the question and its options), your tasks are:
-1. Identify the single, most correct answer *from the provided options*.
-2. Provide a confidence score (High, Medium, or Low).
-3. Provide a brief, one-sentence reason for your confidence level.
-
-Respond in the exact format below, without any extra words or explanations.
-FORMAT:
-Answer: [The exact text of the chosen option. If it's a multi-line code block, output it as CODE_BLOCK_START...CODE_BLOCK_END. If it's inline code, output it as \`inline code\`.]
-Confidence: [High/Medium/Low]
-Reason: [Your one-sentence reason here]
-CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content you processed. Do NOT translate any part of the answer or reason.
-`;
-
-    const EXPLANATION_PROMPT = `Act as an expert tutor. For the following quiz content, provide a clear, step-by-step explanation for why the provided answer is correct and why the other options are incorrect. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting. CODE_BLOCK_START and CODE_BLOCK_END denote multi-line code blocks. Single backticks (\`) denote inline code. CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content you processed. Do NOT translate.`; 
-    const SUMMARIZE_PROMPT = `Summarize the following text concisely. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting: CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the input text. Do NOT translate.`; 
-    const TRANSLATE_PROMPT = `Translate the following text into 
-    1. English
-    2. Indonesian
+    // --- PROMPTS are now loaded from prompts.js and accessed via the global DEFAULT_PROMPTS object ---
     
-    Importnant: if the default language is english, no need to translate to english. vice versa:`; 
-    const DEFINE_PROMPT = `Provide a clear and concise definition for the following term or concept found in the text. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting: CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the input text. Do NOT translate.`; 
-
     // --- DOM Elements ---
     const container = document.querySelector('.container');
     const settingsButton = document.getElementById('settingsButton');
@@ -155,12 +122,18 @@ CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content y
             if (contentFromContextMenu && contextActionType) {
                 textToProcess = contentFromContextMenu;
                 const customPrompts = appConfig.customPrompts || {};
+                
                 switch (contextActionType) {
-                    case 'summarize': selectedPrompt = customPrompts.summarize || SUMMARIZE_PROMPT; purpose = 'summarize_action'; break;
-                    case 'explain': selectedPrompt = customPrompts.explain_context || EXPLANATION_PROMPT; purpose = 'explain_action'; break;
-                    case 'translate': selectedPrompt = customPrompts.translate || TRANSLATE_PROMPT; purpose = 'translate_action'; break;
-                    case 'define': selectedPrompt = customPrompts.define || DEFINE_PROMPT; purpose = 'define_action'; break;
-                    default: selectedPrompt = customPrompts.answer || ANSWER_PROMPT; purpose = 'quiz_answer';
+                    case 'summarize': selectedPrompt = customPrompts.summarize || DEFAULT_PROMPTS.summarize; purpose = 'summarize_action'; break;
+                    case 'explain': selectedPrompt = customPrompts.explain_context || DEFAULT_PROMPTS.explanation; purpose = 'explain_action'; break;
+                    case 'translate': selectedPrompt = customPrompts.translate || DEFAULT_PROMPTS.translate; purpose = 'translate_action'; break;
+                    case 'rephrase':
+                        selectedPrompt = customPrompts.rephrase || DEFAULT_PROMPTS.rephrase;
+                        purpose = 'rephrase_action';
+                        const targetLanguages = appConfig.rephraseLanguages || 'English, Indonesian';
+                        textToProcess = `Target languages: ${targetLanguages}\n\nText to rephrase:\n${contentFromContextMenu}`;
+                        break;
+                    default: selectedPrompt = customPrompts.answer || DEFAULT_PROMPTS.answer; purpose = 'quiz_answer';
                 }
                 messageArea.innerHTML = `<div class="loading-message">Getting ${contextActionType} for selected text...</div>`;
             } else {
@@ -174,7 +147,7 @@ CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content y
                 if (!response || !response.content) throw new Error("Tidak ada konten yang dapat dibaca ditemukan di halaman.");
                 textToProcess = response.content;
                 if (!textToProcess.trim()) throw new Error("Tidak ada konten yang dapat dibaca ditemukan di halaman.");
-                selectedPrompt = appConfig.customPrompts?.cleaning || CLEANING_PROMPT;
+                selectedPrompt = appConfig.customPrompts?.cleaning || DEFAULT_PROMPTS.cleaning;
                 purpose = 'cleaning';
             }
             if (appConfig.responseTone && appConfig.responseTone !== 'normal' && purpose !== 'cleaning') {
@@ -192,7 +165,7 @@ CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content y
             const cleanedContent = result[currentTab.id.toString()]?.cleanedContent;
             if (!cleanedContent) { displayToast(`<strong>Error:</strong> Konten yang dibersihkan tidak ditemukan.`, 'error'); retryAnswerButton.disabled = false; return; }
             retryAnswerButton.disabled = true;
-            let prompt = appConfig.customPrompts?.answer || ANSWER_PROMPT;
+            let prompt = appConfig.customPrompts?.answer || DEFAULT_PROMPTS.answer;
             if (appConfig.responseTone && appConfig.responseTone !== 'normal') {
                 const toneInstructions = { sederhana: "\n\nExplain it simply.", teknis: "\n\nProvide a technical explanation.", analogi: "\n\nUse Analogies." };
                 prompt += toneInstructions[appConfig.responseTone] || '';
@@ -209,7 +182,7 @@ CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content y
             explanationButton.disabled = true; retryExplanationButton.disabled = true;
             show(explanationContainer);
             explanationDisplay.innerHTML = `<div class="loading-message">The AI is thinking...</div>`;
-            let prompt = appConfig.customPrompts?.explanation || EXPLANATION_PROMPT;
+            let prompt = appConfig.customPrompts?.explanation || DEFAULT_PROMPTS.explanation;
             if (appConfig.responseTone && appConfig.responseTone !== 'normal') {
                 const toneInstructions = { sederhana: "\n\nExplain it simply.", teknis: "\n\nProvide a technical explanation.", analogi: "\n\nUse Analogies." };
                 prompt += toneInstructions[appConfig.responseTone] || '';
@@ -254,7 +227,7 @@ CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content y
             const highlightCandidates = prepareTextForHighlight(answerText);
             chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: highlightCandidates });
         }
-        saveState({ answerHTML: formattedHtml, explanationHTML: '' }).then(() => saveToHistory({ cleanedContent: fullText, answerHTML: formattedHtml, explanationHTML: '' }, 'quiz'));
+        saveState({ answerHTML: formattedHtml, explanationHTML: '' }).then((state) => saveToHistory(state, 'quiz'));
     }
 
     function _handleExplanationResult(fullText) {
@@ -262,7 +235,7 @@ CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content y
         explanationDisplay.innerHTML = formattedHtml;
         explanationButton.disabled = false;
         retryExplanationButton.disabled = false;
-        saveState({ explanationHTML: formattedHtml }).then(() => saveToHistory({ cleanedContent: 'N/A', answerHTML: formattedHtml, explanationHTML: '' }, 'explanation'));
+        saveState({ explanationHTML: formattedHtml }).then((state) => saveToHistory(state, 'explanation'));
     }
 
     function _handleContextMenuResult(fullText, originalUserContent, purpose) {
@@ -280,7 +253,7 @@ CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content y
             if (purpose === 'cleaning') targetDisplay = contentDisplay;
             else if (purpose === 'answer' || purpose === 'quiz_answer') targetDisplay = answerDisplay;
             else if (purpose === 'explanation') targetDisplay = explanationDisplay;
-            else if (['summarize_action', 'explain_action', 'translate_action', 'define_action'].includes(purpose)) {
+            else if (['summarize_action', 'explain_action', 'translate_action', 'rephrase_action'].includes(purpose)) {
                 targetDisplay = answerDisplay;
                 if (payload.chunk && !contentDisplay.dataset.contextTextSet) {
                     show(contentDisplayWrapper); show(answerContainer);
@@ -309,7 +282,7 @@ CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content y
                         case 'summarize_action':
                         case 'explain_action':
                         case 'translate_action':
-                        case 'define_action':
+                        case 'rephrase_action':
                             _handleContextMenuResult(fullText, request.payload.originalUserContent, purpose);
                             break;
                     }
@@ -329,8 +302,11 @@ CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content y
         if (!tab) { displayToast(`Tidak dapat menemukan tab aktif.`, 'error'); return; }
         currentTab = tab;
 
-        appConfig = await chrome.storage.sync.get(['geminiApiKey', 'responseTone', 'temperature', 'customPrompts', 'autoHighlight']);
-        if (!appConfig.geminiApiKey) { showSetupView(); return; }
+        appConfig = await chrome.storage.sync.get(['geminiApiKey', 'responseTone', 'temperature', 'customPrompts', 'autoHighlight', 'rephraseLanguages']);
+        if (!appConfig.geminiApiKey) { 
+            displayToast('Kunci API Gemini belum diatur. Buka halaman pengaturan.', 'error');
+            return; 
+        }
 
         try {
             await chrome.scripting.executeScript({ target: { tabId: currentTab.id }, files: ['js/mark.min.js', 'js/content.js'] });

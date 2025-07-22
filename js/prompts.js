@@ -1,7 +1,5 @@
 // js/prompts.js
 
-// It is loaded globally in options.html to be accessible by options.js.
-
 const DEFAULT_PROMPTS = {
   cleaning: `You are an extremely meticulous text cleaner and quiz content extractor. Your SOLE purpose is to identify and extract ONLY the quiz question and its exact provided options from the raw, potentially noisy webpage text provided.
 
@@ -32,6 +30,6 @@ CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content y
     1. English
     2. Indonesian
     
-    Importnant: if the default language is english, no need to translate to english. vice versa:`, 
-  define: `Provide a clear and concise definition for the following term or concept found in the text. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting: CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the input text. Do NOT translate.`, 
+    Important: if the default language is english, no need to translate to english. vice versa.`, 
+  rephrase: `Rephrase the following text into the specified languages. Present each rephrased version clearly under a heading for that language. For example: "Indonesian Version:", "English Version:", etc. IMPORTANT: Analyze the language of the provided text. Your response, including headings, should be in the *exact same language* as the input text. Do NOT translate anything other than the core text as requested.`, 
 };
