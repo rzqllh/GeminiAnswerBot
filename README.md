@@ -1,79 +1,93 @@
-# ✨ GeminiAnswerBot
+# GeminiAnswerBot
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 ![Version](https://img.shields.io/badge/version-18.3-brightgreen)
-![Chrome Web Store](https://img.shields.io/chrome-web-store/v/your-extension-id?label=Chrome%20Store)
-![Code Style: Prettier](https://img.shields.io/badge/code%20style-prettier-ff69b4.svg)
-![Maintained](https://img.shields.io/maintenance/yes/2025)
 
-GeminiAnswerBot is an intelligent Chrome extension designed to enhance your web Browse experience. Powered by the Google Gemini API, it analyzes on-page content to automatically solve quizzes, provide contextual actions, and deliver AI-driven insights directly within your browser.
-
-## 🌐 Browser Compatibility
-
-| Browser        | Supported | Notes                      |
-|----------------|-----------|----------------------------|
-| Chrome         | ✅         | Full support               |
-| Microsoft Edge | ✅         | Tested & stable            |
-| Brave          | ✅         | Fully supported            |
-| Firefox        | ❌         | Not supported (MV3-only)   |
-
+**GeminiAnswerBot** is a smart, privacy-first Chrome extension powered by the Google Gemini API. It analyzes on-page content to intelligently solve quizzes, enhance selected text, and provide AI-powered context tools — all directly in your browser.
 
 ---
 
 ## Key Features
 
--   **Smart Quiz Solver**: Intelligently detects, extracts, and solves quiz questions found on a webpage.
--   **HIGHLIGHT On-Page Highlighting**: Automatically highlights the correct answer directly on the page for maximum visibility.
--   **Intelligent Context Menu**: Select any text on a page, then right-click to:
-    -   **Summarize**: Get a concise summary.
-    -   **Explain**: Receive a detailed explanation.
-    -   **Translate**: Translate the text.
-    -   **Rephrase**: Rephrase the text into different styles.
--   **Modern Dashboard UI**: A sleek, macOS-inspired options page with a transparent blur effect to manage all settings.
--   **Full Customization**: Set your API Key, choose your preferred AI model (1.5 Flash, 1.5 Pro, etc.), customize system prompts, and configure other preferences.
--   **Integrated History**: Access all your previous AI interactions and answers directly from the history panel within the options dashboard.
+- **Smart Quiz Solver**: Detects and solves quiz questions automatically on supported pages.
+- **Answer Highlighting**: Highlights the correct answers inline, directly in the DOM.
+- **Contextual Text Actions**: Right-click on selected text to:
+  - Summarize
+  - Explain
+  - Translate
+  - Rephrase
+- **Modern Settings Dashboard**: A macOS-inspired options interface with a blur-glass aesthetic.
+- **Customizable AI**: Set your Gemini API key, select models (1.5 Flash, Pro, etc.), customize system prompts, and tweak behavior.
+- **Local History Panel**: View all past AI interactions within the dashboard, stored securely in local storage.
+
+---
+
+## Use Case Scenarios
+
+- Instantly solve and highlight quiz answers on e-learning platforms.
+- Summarize or explain dense documentation while reading.
+- Translate or rephrase selected text in real-time without leaving the page.
+- Build your own prompt system and agent behaviors for Gemini through prompt injection.
+
+---
 
 ## Getting Started
 
-Follow these instructions to install and configure the extension for development and testing.
-
 ### Prerequisites
 
--   A Chromium-based browser (Google Chrome, Brave, Microsoft Edge).
+- A Chromium-based browser (Chrome, Edge, Brave, etc.)
+- A valid Google Gemini API key
 
 ### Installation
 
-1.  **Download/Clone:** Download this project as a ZIP file and extract it, or clone the repository using `git clone`.
-2.  **Open Extensions Page:** Navigate to `chrome://extensions/` in your browser.
-3.  **Enable Developer Mode:** Toggle on the **"Developer mode"** switch, usually found in the top-right corner.
-4.  **Load the Extension:** Click the **"Load unpacked"** button and select the extracted project folder.
-5.  **Done!** The GeminiAnswerBot icon will now appear in your browser's toolbar.
+1. Download or clone this repository.
+2. Go to `chrome://extensions/` in your browser.
+3. Enable **Developer Mode**.
+4. Click **Load Unpacked** and select the extracted project folder.
+5. The extension icon should now appear in your toolbar.
 
-### Configuration
+---
 
-This extension requires your personal Gemini API Key to function.
+## Configuration
 
-1.  Visit [**Google AI Studio**] (https://aistudio.google.com/) and sign in.
-2.  Click **"Get API key"** and then **"Create API key in new project"**.
-3.  Copy the generated API key.
-4.  Open the GeminiAnswerBot **Options** page (right-click the extension icon > Options).
-5.  Navigate to the **General** tab, paste your API key into the designated field, and click **"Save General Settings"**.
-6.  Use the **"Test Connection"** button to validate your key.
+1. Go to [Google AI Studio](https://aistudio.google.com/).
+2. Click **"Get API key"** → **"Create API key in new project"**.
+3. Copy the key.
+4. Open GeminiAnswerBot Options (right-click icon > Options).
+5. Paste your API key in the **General** tab, then click **Save**.
+6. Use the **"Test Connection"** button to validate your key.
 
-## Advanced Configuration (Optional)
+---
 
-You can customize system prompts, default behavior, and UI themes by editing the `prompts.js` file or using the hidden **"Advanced"** tab on the Options page.
+## Advanced Configuration
 
-Key features available under Advanced Settings:
-- Custom AI Prompt Templates
-- Quiz Tolerance Level (strict/lenient matching)
-- Toggle verbose mode, logging, and auto-answer delay
-- Theme control and UI preferences
+GeminiAnswerBot includes an Advanced tab within the Options page, offering additional customization features:
 
-| Advanced Tab (Overview) | Prompt Template Editor |
-|-------------------------|------------------------|
-| ![GeminiAnswerBot - Setting Prompt 1](https://i.imgur.com/kcafLc9.png) | ![GeminiAnswerBot - Setting Prompt 2](https://i.imgur.com/4KubPAL.png) |
+- Define custom system prompts and templates.
+- Adjust quiz tolerance level (strict vs lenient).
+- Toggle logging, clipboard behavior, or auto-answer delay.
+- UI theme preferences (light/dark/auto).
 
+### UI Previews
+
+| Advanced Settings Overview | Prompt Template Editor |
+|----------------------------|------------------------|
+| ![Advanced Tab](https://i.imgur.com/kcafLc9.png) | ![Prompt Editor](https://i.imgur.com/4KubPAL.png) |
+
+---
+
+## Troubleshooting
+
+**API Key not working?**
+- Ensure the key comes from AI Studio, not OAuth credentials.
+- Use the "Test Connection" button to validate the key.
+- Try regenerating a new key from a fresh project if needed.
+
+**Quiz detection not working?**
+- The page might use shadow DOM or iframes (partial support).
+- Refresh the page after installing or enabling the extension.
+
+---
 
 ## Project Structure
 
@@ -99,41 +113,49 @@ GeminiAnswerBot/
 └── README.md               # This documentation
 ```
 
-## Tech Stack
-
--   **HTML5**
--   **CSS3** (Flexbox, CSS Variables, Backdrop Filter)
--   **Vanilla JavaScript**
--   **Chrome Extension APIs (Manifest V3)**
--   **Google Gemini API**
 
 ## Privacy & Security
 
 GeminiAnswerBot **does not collect any personal data**. All processing happens locally in your browser. Your Gemini API key is stored only in your local browser storage and never transmitted externally.
-
-## Troubleshooting
-
-### My API Key isn’t working
-- Make sure you copied the key from the **Google AI Studio**, not from OAuth credentials.
-- Test your key using the **"Test Connection"** button in the Options panel.
-- If still not working, try generating a new key from a different project.
-
-### Quizzes are not being detected
-- Make sure the quiz is visible on the page (not inside iframes or lazy-loaded).
-- Reload the page after enabling the extension for the first time.
-
 
 ## Known Issues
 
 - On some dynamic websites (e.g., using React or Shadow DOM), quiz extraction may be delayed.
 - Google Gemini API may return slightly inconsistent results depending on model latency.
 
-## Planned Improvements
 
-- Shadow DOM support for better page parsing
-- Multi-language UI support
-- Built-in Gemini Vision API for image-based quiz solving
+---
 
+## Development Notes
+
+- Use `content.js` to inject quiz logic and page scanning.
+- `background.js` handles Gemini API communication.
+- All UI logic for settings is handled in `options.js`.
+- Prompts can be edited directly via `prompts.js`.
+
+After any changes, go to `chrome://extensions/` and click **Reload** on GeminiAnswerBot.
+
+---
+
+## Changelog
+
+### v18.3
+- Added Advanced Configuration tab with Prompt Editor
+- Improved answer detection on dynamic sites
+- UI refinements in Options dashboard
+- Gemini 1.5 Pro model support
+
+---
+
+## License
+
+This project is licensed under the MIT License — see the `LICENSE` file for details.
+
+---
+
+## Contributing
+
+Pull requests are welcome! If you have suggestions or bug reports, please open an issue or fork and contribute.
 
 ---
 
