@@ -1,331 +1,175 @@
+/* assets/popup.css */
 :root {
-  --apple-blue: #007aff;
-  --apple-blue-hover: #006ee6;
-  --bg-color: #f2f2f7;
+  --bg-color: #f6f6f7;
   --card-bg-color: #ffffff;
-  --primary-text-color: #1d1d1f;
-  --secondary-text-color: #8a8a8e;
-  --separator-color: #e5e5ea;
-  --primary-button-bg: #e5e5ea;
-  --primary-button-text: #000000;
-  --primary-button-hover: #dcdce1;
-  --code-block-bg: #eef1f4;
-  --apple-green: #34c759;
-  --apple-yellow: #ffcc00;
-  --apple-red: #ff3b30;
-  --selected-text-bg: #e0f2f7; /* Warna latar belakang baru untuk teks terpilih */
-  --selected-text-border: #b3e5fc; /* Warna border baru untuk teks terpilih */
+  --primary-text: #1d1d1f;
+  --secondary-text: #6e6e73;
+  --border-color: #e5e5ea;
+  --accent-blue: #007aff;
+  --accent-blue-hover: #006ee6;
+  --accent-green: #34c759;
+  --accent-yellow: #ffcc00;
+  --accent-red: #ff3b30;
 }
+* { box-sizing: border-box; }
 
-/* === Base & Layout === */
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
-  width: 380px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  width: 400px;
   margin: 0;
   background-color: var(--bg-color);
-  color: var(--primary-text-color);
-  border-radius: 24px;
+  color: var(--primary-text);
+  -webkit-font-smoothing: antialiased;
 }
-.container {
+.hidden { display: none !important; }
+
+.container { display: flex; flex-direction: column; max-height: 600px; }
+
+header.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px 12px 18px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--card-bg-color);
+  flex-shrink: 0;
+}
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 16px;
+}
+.header-actions { display: flex; gap: 8px; }
+.icon-button {
+  background: none; border: none; padding: 6px; border-radius: 50%;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--secondary-text); transition: background-color 0.2s, color 0.2s;
+}
+.icon-button:hover { background-color: #f0f0f0; color: var(--primary-text); }
+.icon-button.copied { color: var(--accent-green) !important; }
+
+.content-area {
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-.header-bar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: -8px; 
-  order: -4;
-}
-
-/* === Animation & Utility === */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.hidden { display: none !important; }
-.fade-in { animation: fadeIn 0.4s ease-out forwards; }
-
-/* === Content & Message Area === */
-#contentDisplayWrapper {
-  order: -3;
-  background-color: var(--card-bg-color); /* Ubah ke warna kartu */
-  border-radius: 14px;
-  padding: 16px;
-  max-height: 280px;
   overflow-y: auto;
-  position: relative;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Lebih menonjol */
-  border: 1px solid var(--separator-color); /* Border yang jelas */
 }
-#contentDisplay {
-  font-size: 14px;
-  line-height: 1.6;
-  word-wrap: break-word;
-  color: var(--primary-text-color); /* Pastikan warna teks kontras */
-}
-/* Style untuk teks yang dipilih (context menu) */
-#contentDisplay .selected-text-preview {
-    background-color: var(--selected-text-bg);
-    border: 1px solid var(--selected-text-border);
-    border-radius: 8px;
-    padding: 12px;
-    margin-top: 8px;
-    margin-bottom: 12px;
-    font-size: 13px;
-    color: var(--primary-text-color);
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
-}
+.content-area::-webkit-scrollbar { width: 5px; }
+.content-area::-webkit-scrollbar-thumb { background: #dcdcdc; border-radius: 5px; }
 
-#messageArea {
-  order: -3;
+#messageArea.loading-state {
   display: flex;
-  flex-direction: column; 
-  align-items: center;
+  flex-direction: column;
   justify-content: center;
-  min-height: 150px;
-  text-align: center;
-  color: var(--secondary-text-color);
+  align-items: center;
+  min-height: 250px;
+  color: var(--secondary-text);
 }
-/* Basic Toast Notification Styles */
-.toast-notification {
-    background-color: var(--apple-red); /* Default for error */
-    color: white;
-    padding: 12px 20px;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    font-size: 14px;
-    font-weight: 500;
-    max-width: 90%;
-    word-wrap: break-word;
-    text-align: center;
-    line-height: 1.4;
-    transition: all 0.3s ease-in-out;
-}
-
-.toast-notification.toast-error {
-    background-color: var(--apple-red);
-}
-.toast-notification.toast-success {
-    background-color: var(--apple-green);
-}
-.toast-notification.toast-info {
-    background-color: var(--apple-blue);
-}
-
-.initial-icon { color: #c7c7cc; }
-.initial-view p { margin-top: 8px; font-size: 14px; }
-.manual-selection-notice {
-  font-size: 12px;
-  font-style: italic;
-  color: var(--secondary-text-color);
-  margin-top: -8px;
-  margin-bottom: 8px;
-  text-align: center;
-}
-
-/* Loading Spinner */
-.loading-spinner {
-  border: 4px solid #f3f3f3; /* Light grey */
-  border-top: 4px solid var(--apple-blue); /* Blue */
-  border-radius: 50%;
-  width: 30px;
-  height: 30px;
+.spinner {
+  width: 28px; height: 28px; border-radius: 50%; margin-bottom: 16px;
+  border: 4px solid rgba(0, 0, 0, 0.1); border-top-color: var(--accent-blue);
   animation: spin 1s linear infinite;
-  margin-top: 15px; /* Jarak dari teks */
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#resultsWrapper {
+    margin-bottom: 12px; /* Adds 15px of whitespace below the element */
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.card {
+  background-color: var(--card-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  margin-bottom: 8px;
+  margin-top: 8px;
 }
-
-
-/* === Buttons === */
-button {
-  border: none;
-  font-weight: 600;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: background-color 0.2s ease, transform 0.1s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: none;
-}
-button:active { transform: scale(0.96); }
-
-/* Tombol header baru */
-#rescanButton, #historyButton, #settingsButton {
-  padding: 4px;
-  opacity: 0.6;
-  transition: opacity 0.2s, background-color 0.2s;
-  border-radius: 50%;
-}
-#rescanButton:hover, #historyButton:hover, #settingsButton:hover {
-  opacity: 1;
-  background-color: rgba(0,0,0,0.05);
-}
-#rescanButton svg, #historyButton svg, #settingsButton svg { stroke: var(--secondary-text-color); }
-
-#aiActionsWrapper { order: 1; }
-.button-group { display: flex; gap: 12px; }
-.ai-button {
-  width: 100%;
-  background-color: var(--apple-blue);
-  color: white;
-  padding: 12px;
-  font-size: 15px;
-}
-.ai-button:hover { background-color: var(--apple-blue-hover); }
-.ai-button:disabled { background-color: #a9a9a9; cursor: not-allowed; }
-
-/* === AI Result Containers & Code === */
-.result-header {
+.card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 0 0 10px 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
 }
-.result-header h2 {
-  font-size: 16px;
+.card-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--secondary-text);
+  text-transform: uppercase;
   margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--primary-text-color); /* Pastikan judul terlihat jelas */
+  letter-spacing: 0.5px;
 }
-.retry-button {
-  padding: 4px;
-  opacity: 0.5;
-  border-radius: 50%;
-}
-.retry-button:hover {
-  opacity: 1;
-  background-color: rgba(0,0,0,0.05);
-}
-.retry-button svg {
-  stroke: var(--secondary-text-color);
-}
-.retry-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.2;
-}
+.header-controls { display: flex; gap: 8px; }
 
-#answerContainer,
-#explanationContainer {
-  order: 2;
-  background-color: var(--card-bg-color);
-  border-radius: 14px;
+.card-body {
   padding: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-#answerDisplay,
-#explanationDisplay {
-  font-size: 14px;
-  line-height: 1.6;
-  color: #3c3c43;
-}
-#answerDisplay ul, #explanationDisplay ul,
-#answerDisplay ol, #explanationDisplay ol {
-  padding-left: 20px;
-  margin: 10px 0;
-}
-#answerDisplay li, #explanationDisplay li { margin-bottom: 8px; }
-
-/* === Confidence Score Badge === */
-.confidence-wrapper {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--separator-color);
-  font-size: 13px;
-}
-.confidence-badge {
-  display: inline-block;
-  padding: 3px 8px;
-  border-radius: 20px;
-  font-weight: 600;
-  font-size: 12px;
-  color: white;
-  margin-left: 6px;
-}
-.confidence-high { background-color: var(--apple-green); }
-.confidence-medium { background-color: var(--apple-yellow); color: #333; }
-.confidence-low { background-color: var(--apple-red); }
-.confidence-reason {
-  margin-top: 6px;
-  color: var(--secondary-text-color);
-  font-style: italic;
-}
-
-/* === Code Block Styles === */
-.code-block-wrapper { position: relative; margin: 10px 0; }
-pre {
-  background-color: var(--code-block-bg);
-  padding: 12px;
-  padding-top: 36px;
-  border-radius: 8px;
-  overflow-x: auto;
-  white-space: pre;
-}
-code {
-  font-family: "SF Mono", "Menlo", "Monaco", "Courier New", monospace;
-  font-size: 13px;
-  color: #333;
-}
-.copy-code-button {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background-color: rgba(0, 0, 0, 0.1);
-  color: #333;
-  padding: 4px 8px;
-  font-size: 12px;
-  border-radius: 6px;
-  opacity: 0;
-  transition: opacity 0.2s, background-color 0.2s;
-}
-.code-block-wrapper:hover .copy-code-button { opacity: 1; }
-.copy-code-button.copied { background-color: var(--apple-green); color: white; }
-
-/* === Loading & Setup === */
-.loading-message {
-  font-size: 14px;
-  animation: none; /* Hapus animasi pulse dari Sprint 1, diganti dengan spinner */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-@keyframes pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
-.setup-button {
-  margin-top: 15px;
-  width: 100%;
-  padding: 12px;
   font-size: 15px;
-  background-color: var(--apple-blue);
-  color: white;
-  border-radius: 12px;
-}
-.setup-button:hover { background-color: var(--apple-blue-hover); }
-
-/* Removed .error-message because it's replaced by toast-notification for user-facing errors */
-/* .error-message {
-  background-color: #ffebee;
-  color: #c62828;
-  border: 1px solid #ef9a9a;
-  padding: 12px;
-  border-radius: 8px;
-  font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.6;
   word-wrap: break-word;
 }
-.error-message a { color: #c62828; font-weight: bold; } */
+.card-body ul {
+  list-style-type: none;
+  padding-left: 0;
+  margin: 12px 0 0 0;
+}
+.card-body li {
+  margin-bottom: 10px;
+  padding-left: 22px;
+  position: relative;
+}
+.card-body li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  top: -1px;
+  color: var(--accent-blue);
+  font-size: 20px;
+}
+.question-text {
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0 0 16px 0;
+}
+
+#aiActionsWrapper { margin-top: 0; }
+.button-primary {
+  width: 100%; padding: 12px; font-size: 16px; font-weight: 500;
+  border: none; border-radius: 12px; cursor: pointer;
+  background-color: var(--accent-blue); color: white;
+  transition: background-color 0.2s;
+}
+.button-primary:hover { background-color: var(--accent-blue-hover); }
+
+.confidence-wrapper {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.confidence-level {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.confidence-level-label { font-size: 14px; font-weight: 500; color: var(--secondary-text); }
+.confidence-badge {
+  padding: 4px 12px; border-radius: 20px; font-weight: 600; font-size: 13px; color: white;
+}
+.confidence-high { background-color: var(--accent-green); }
+.confidence-medium { background-color: var(--accent-yellow); color: #333; }
+.confidence-low { background-color: var(--accent-red); }
+.confidence-reason { color: var(--secondary-text); font-size: 14px; line-height: 1.5; }
+
+.error-message {
+  padding: 16px;
+  background-color: #fff2f2;
+  border: 1px solid var(--accent-red);
+  color: var(--accent-red);
+  border-radius: 12px;
+  font-weight: 500;
+}

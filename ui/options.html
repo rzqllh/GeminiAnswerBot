@@ -3,7 +3,6 @@
 <head>
   <title>GeminiAIAnswer - Settings</title>
   <meta charset="UTF-8">
-  <link rel="stylesheet" href="../assets/libs/toastify.css">
   <link rel="stylesheet" href="../assets/options.css">
 </head>
 <body>
@@ -136,9 +135,7 @@
       <section id="history" class="content-pane">
         <h1>History</h1>
         <p class="section-description">Showing recent activity from your extension.</p>
-        <div id="history-list-container">
-          <div class="loading-message">Loading history...</div>
-        </div>
+        <div id="history-list-container"></div>
       </section>
 
       <section id="data" class="content-pane">
@@ -149,6 +146,13 @@
           <p class="form-hint">Permanently delete all of your saved answer history. This action cannot be undone.</p>
           <div class="form-actions" style="justify-content: flex-start; margin-top: 10px;">
               <button id="clearHistoryButton" class="button button-danger">Clear All History</button>
+          </div>
+        </div>
+         <div class="form-group">
+          <label>Export History</label>
+          <p class="form-hint">Download a copy of your entire history as a JSON file.</p>
+          <div class="form-actions" style="justify-content: flex-start; margin-top: 10px;">
+              <button id="exportHistoryButton" class="button button-secondary">Export Data</button>
           </div>
         </div>
       </section>
