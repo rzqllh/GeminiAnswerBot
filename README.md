@@ -70,8 +70,8 @@ GeminiAnswerBot includes an Advanced tab within the Options page, offering addit
 
 ### UI Previews
 
-| Advanced Settings Overview | Prompt Template Editor |
-|----------------------------|------------------------|
+| Advanced Settings Overview                       | Prompt Template Editor                            |
+| ------------------------------------------------ | ------------------------------------------------- |
 | ![Advanced Tab](https://i.imgur.com/kcafLc9.png) | ![Prompt Editor](https://i.imgur.com/4KubPAL.png) |
 
 ---
@@ -79,11 +79,13 @@ GeminiAnswerBot includes an Advanced tab within the Options page, offering addit
 ## Troubleshooting
 
 **API Key not working?**
+
 - Ensure the key comes from AI Studio, not OAuth credentials.
 - Use the "Test Connection" button to validate the key.
 - Try regenerating a new key from a fresh project if needed.
 
 **Quiz detection not working?**
+
 - The page might use shadow DOM or iframes (partial support).
 - Refresh the page after installing or enabling the extension.
 
@@ -92,6 +94,7 @@ GeminiAnswerBot includes an Advanced tab within the Options page, offering addit
 ## Project Structure
 
 The project is organized with a clear separation of concerns for scalability and maintenance.
+
 ```
 GeminiAnswerBot/
 ├── assets/
@@ -121,7 +124,6 @@ GeminiAnswerBot **does not collect any personal data**. All processing happens l
 - On some dynamic websites (e.g., using React or Shadow DOM), quiz extraction may be delayed.
 - Google Gemini API may return slightly inconsistent results depending on model latency.
 
-
 ---
 
 ## Development Notes
@@ -137,18 +139,30 @@ After any changes, go to `chrome://extensions/` and click **Reload** on GeminiAn
 
 ## Changelog
 
+### [1.4.1] - 2025-07-24
+
+Fixed
+
+- Resolved a startup error on the Options page (`TypeError: Cannot set properties of null`) caused by JavaScript logic referencing HTML elements that were removed in the recent UI rework.
+
 ### [1.4.0] - 2025-07-24
+
 Added
+
 - Automatic Dark Mode support for the popup UI, adapting to the user's system theme for enhanced visual comfort.
 
 Changed
+
 - **Major UI Rework**: Completely redesigned the popup interface to align with Apple's Human Interface Guidelines. The new design features significantly improved readability, color contrast, and a more spacious, modern layout.
 
 ### [1.3.1] - 2025-07-24
+
 Fixed
+
 - Improved API stability by adding robust error handling for empty or invalid streams from the Gemini API, preventing the extension from hanging and providing clearer error messages to the user.
 
 ### [1.3.0] - 2025-07-22
+
 This version focuses on reliability, feature integration, and final polishing by removing external dependencies and centralizing the user experience.
 
 ---

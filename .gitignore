@@ -33,3 +33,6 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# NPM dependency lock file
+package-lock.json
