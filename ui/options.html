@@ -1,35 +1,65 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>GeminiAIAnswer - Settings</title>
   <meta charset="UTF-8">
   <link rel="stylesheet" href="../assets/options.css">
 </head>
+
 <body>
   <div class="settings-container">
     <nav class="settings-sidebar">
       <ul>
         <li>
           <a href="#general" class="active">
-            <span class="sidebar-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg></span>
+            <span class="sidebar-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <line x1="4" y1="21" x2="4" y2="14"></line>
+                <line x1="4" y1="10" x2="4" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12" y2="3"></line>
+                <line x1="20" y1="21" x2="20" y2="16"></line>
+                <line x1="20" y1="12" x2="20" y2="3"></line>
+                <line x1="1" y1="14" x2="7" y2="14"></line>
+                <line x1="9" y1="8" x2="15" y2="8"></line>
+                <line x1="17" y1="16" x2="23" y2="16"></line>
+              </svg></span>
             General
           </a>
         </li>
         <li>
           <a href="#prompts">
-            <span class="sidebar-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg></span>
+            <span class="sidebar-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <polyline points="4 17 10 11 4 5"></polyline>
+                <line x1="12" y1="19" x2="20" y2="19"></line>
+              </svg></span>
             Prompts
           </a>
         </li>
         <li>
           <a href="#history">
-            <span class="sidebar-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg></span>
+            <span class="sidebar-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M1 4v6h6"></path>
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+              </svg></span>
             History
           </a>
         </li>
         <li>
           <a href="#data">
-            <span class="sidebar-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg></span>
+            <span class="sidebar-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+              </svg></span>
             Data
           </a>
         </li>
@@ -44,8 +74,19 @@
           <div class="input-wrapper">
             <input type="password" id="apiKey" placeholder="Paste your Gemini API key here">
             <span class="reveal-icon" id="revealApiKey" title="Show/Hide API Key">
-              <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-              <svg class="icon-eye-slash hidden" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+              <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <svg class="icon-eye-slash hidden" xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path
+                  d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24">
+                </path>
+                <line x1="1" y1="1" x2="23" y2="23"></line>
+              </svg>
             </span>
           </div>
         </div>
@@ -66,7 +107,7 @@
             <option value="teknis">Technical & Detailed</option>
             <option value="analogi">Use Analogies</option>
           </select>
-           <p class="form-hint">Sets the AI's personality for all generated responses.</p>
+          <p class="form-hint">Sets the AI's personality for all generated responses.</p>
         </div>
         <div class="form-group toggle-group">
           <label for="autoHighlightToggle">Quick Mode</label>
@@ -78,57 +119,71 @@
             </label>
           </div>
         </div>
+        <div class="form-group toggle-group">
+          <label for="darkModeToggle">Dark Mode</label>
+          <div class="toggle-wrapper">
+            <p class="form-hint">⚠️ Currently unavailable. Will be fixed soon.</p>
+            <label class="toggle-switch">
+              <input type="checkbox" id="darkModeToggle" disabled>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
         <div class="form-group">
           <label for="temperatureSlider">AI Temperature</label>
           <div class="slider-container">
-              <span>More Factual</span>
-              <input type="range" id="temperatureSlider" min="0.0" max="1.0" step="0.1">
-              <span>More Creative</span>
-              <span id="temperatureValue" class="slider-value-display">0.4</span>
+            <span>More Factual</span>
+            <input type="range" id="temperatureSlider" min="0.0" max="1.0" step="0.1">
+            <span>More Creative</span>
+            <span id="temperatureValue" class="slider-value-display">0.4</span>
           </div>
-          <p class="form-hint">Lower values are more predictable (recommended for quizzes). Higher values are more creative.</p>
+          <p class="form-hint">Lower values are more predictable (recommended for quizzes). Higher values are more
+            creative.</p>
         </div>
         <div class="form-actions">
-            <button id="testButton" class="button button-secondary">Test Connection</button>
-            <button id="saveGeneralButton" class="button button-primary">Save General Settings</button>
+          <button id="testButton" class="button button-secondary">Test Connection</button>
+
+
+          <button id="saveGeneralButton" class="button button-primary">Save Settings</button>
         </div>
       </section>
 
       <section id="prompts" class="content-pane">
         <h1>Prompts</h1>
-        <p class="section-description">Customize the system instructions sent to the AI. Leave blank to use the system default.</p>
+        <p class="section-description">Customize the system instructions sent to the AI. Leave blank to use the system
+          default.</p>
         <div class="form-group">
-            <label for="cleaningPrompt">Content Cleaning Prompt</label>
-            <textarea id="cleaningPrompt" rows="5"></textarea>
+          <label for="cleaningPrompt">Content Cleaning Prompt</label>
+          <textarea id="cleaningPrompt" rows="5"></textarea>
         </div>
         <div class="form-group">
-            <label for="answerPrompt">Answering Prompt</label>
-            <textarea id="answerPrompt" rows="5"></textarea>
+          <label for="answerPrompt">Answering Prompt</label>
+          <textarea id="answerPrompt" rows="5"></textarea>
         </div>
         <div class="form-group">
-            <label for="explanationPrompt">Explanation Prompt</label>
-            <textarea id="explanationPrompt" rows="5"></textarea>
+          <label for="explanationPrompt">Explanation Prompt</label>
+          <textarea id="explanationPrompt" rows="5"></textarea>
         </div>
         <h2 class="subsection-title">Context Menu Prompts</h2>
         <div class="form-group">
-            <label for="summarizePrompt">Summarize Prompt</label>
-            <textarea id="summarizePrompt" rows="5"></textarea>
+          <label for="summarizePrompt">Summarize Prompt</label>
+          <textarea id="summarizePrompt" rows="5"></textarea>
         </div>
         <div class="form-group">
-            <label for="translatePrompt">Translate Prompt</label>
-            <textarea id="translatePrompt" rows="5"></textarea>
+          <label for="translatePrompt">Translate Prompt</label>
+          <textarea id="translatePrompt" rows="5"></textarea>
         </div>
         <div class="form-group">
-            <label for="rephrasePrompt">Rephrase Prompt</label>
-            <textarea id="rephrasePrompt" rows="5"></textarea>
+          <label for="rephrasePrompt">Rephrase Prompt</label>
+          <textarea id="rephrasePrompt" rows="5"></textarea>
         </div>
         <div class="form-group">
-            <label for="rephraseLanguages">Rephrase Languages</label>
-            <input type="text" id="rephraseLanguages" placeholder="e.g., English, Indonesian, Japanese">
-            <p class="form-hint">Define the target languages for the rephrase feature, separated by commas.</p>
+          <label for="rephraseLanguages">Rephrase Languages</label>
+          <input type="text" id="rephraseLanguages" placeholder="e.g., English, Indonesian, Japanese">
+          <p class="form-hint">Define the target languages for the rephrase feature, separated by commas.</p>
         </div>
         <div class="form-actions">
-            <button id="savePromptsButton" class="button button-primary">Save Prompts</button>
+          <button id="savePromptsButton" class="button button-primary">Save Prompts</button>
         </div>
       </section>
 
@@ -145,14 +200,14 @@
           <label>Clear History</label>
           <p class="form-hint">Permanently delete all of your saved answer history. This action cannot be undone.</p>
           <div class="form-actions" style="justify-content: flex-start; margin-top: 10px;">
-              <button id="clearHistoryButton" class="button button-danger">Clear All History</button>
+            <button id="clearHistoryButton" class="button button-danger">Clear All History</button>
           </div>
         </div>
-         <div class="form-group">
+        <div class="form-group">
           <label>Export History</label>
           <p class="form-hint">Download a copy of your entire history as a JSON file.</p>
           <div class="form-actions" style="justify-content: flex-start; margin-top: 10px;">
-              <button id="exportHistoryButton" class="button button-secondary">Export Data</button>
+            <button id="exportHistoryButton" class="button button-secondary">Export Data</button>
           </div>
         </div>
       </section>
@@ -163,4 +218,5 @@
   <script src="../js/prompts.js"></script>
   <script src="../js/options.js"></script>
 </body>
+
 </html>

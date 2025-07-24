@@ -137,6 +137,10 @@ After any changes, go to `chrome://extensions/` and click **Reload** on GeminiAn
 
 ## Changelog
 
+### [1.3.1] - 2025-07-24
+Fixed
+- Improved API stability by adding robust error handling for empty or invalid streams from the Gemini API, preventing the extension from hanging and providing clearer error messages to the user.
+
 ### [1.3.0] - 2025-07-22
 This version focuses on reliability, feature integration, and final polishing by removing external dependencies and centralizing the user experience.
 

@@ -21,25 +21,25 @@ document.addEventListener('DOMContentLoaded', async function () {
     let currentTab = null;
     let appConfig = {};
 
-    function show(element) { if (element) element.classList.remove('hidden'); }
-    function hide(element) { if (element) element.classList.add('hidden'); }
-    function escapeHtml(unsafe) { return String(unsafe).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+    function show(el) { if (el) el.classList.remove('hidden'); }
+    function hide(el) { if (el) el.classList.add('hidden'); }
+    function escapeHtml(unsafe) {
+        return String(unsafe).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;");
+    }
 
     function displayMessage(htmlContent, isError = false) {
         hide(resultsWrapper);
         messageArea.innerHTML = isError ? `<div class="error-message">${htmlContent}</div>` : htmlContent;
         show(messageArea);
     }
-    
+
     function formatQuestionContent(content) {
         if (!content) return '';
         let question = '';
         let options = [];
 
-        // Try to find a clear question-options boundary
         const optionMarkers = ['\n- ', '\n* ', '\n• ', '\n1. ', '\na) ', '\nA. '];
         let splitIndex = -1;
-
         for (const marker of optionMarkers) {
             const index = content.indexOf(marker);
             if (index !== -1 && (splitIndex === -1 || index < splitIndex)) {
@@ -54,12 +54,10 @@ document.addEventListener('DOMContentLoaded', async function () {
                 .map(opt => opt.trim().replace(/^[\*\-•]\s*|\d+\.\s*|[a-zA-Z]\)\s*/, ''))
                 .filter(opt => opt);
         } else if (content.includes('*')) {
-            // Handle options separated by '*' on the same or multiple lines
             const parts = content.split('*').map(p => p.trim()).filter(p => p);
             question = parts.shift() || '';
             options = parts;
         } else {
-            // Fallback for simple newline separation
             const lines = content.split('\n').filter(line => line.trim() !== '');
             question = lines.shift() || '';
             options = lines;
@@ -67,10 +65,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         question = escapeHtml(question.replace(/^Question:\s*/i, '').trim());
         const optionsHtml = options.map(option => `<li>${escapeHtml(option.trim())}</li>`).join('');
-
         return `<div class="question-text">${question}</div><ul>${optionsHtml}</ul>`;
     }
-
 
     function _handleCleaningResult(fullText) {
         contentDisplay.innerHTML = formatQuestionContent(fullText);
@@ -84,9 +80,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         const answerMatch = fullText.match(/Answer:(.*?)(Confidence:|Reason:|$)/is);
         const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
         const reasonMatch = fullText.match(/Reason:(.*)/is);
-        
+
         const answerText = answerMatch ? answerMatch[1].trim() : fullText.trim();
-        let formattedHtml = `<p>${escapeHtml(answerText).replace(/\n/g, '<br>')}</p>`;
+        let formattedHtml = `<p class="answer-highlight">${escapeHtml(answerText).replace(/\n/g, '<br>')}</p>`;
 
         if (confidenceMatch) {
             const confidence = confidenceMatch[1].toLowerCase();
@@ -106,14 +102,14 @@ document.addEventListener('DOMContentLoaded', async function () {
         retryAnswerButton.disabled = false;
         show(aiActionsWrapper);
         hide(explanationContainer);
-        
+
         if (appConfig.autoHighlight) {
             chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: [answerText] });
         }
-        
+
         saveState({ answerHTML: fullText }).then(state => saveToHistory(state, 'quiz'));
     }
-    
+
     function _handleExplanationResult(fullText) {
         explanationDisplay.innerHTML = escapeHtml(fullText).replace(/\n/g, '<br>');
         copyExplanationButton.dataset.copyText = fullText;
@@ -127,7 +123,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         show(contentDisplayWrapper);
         show(answerContainer);
         contentDisplay.innerHTML = `<div class="question-text">${escapeHtml(originalUserContent)}</div>`;
-        answerDisplay.innerHTML = `<p>${escapeHtml(fullText).replace(/\n/g, '<br>')}</p>`;
+        answerDisplay.innerHTML = `<p class="answer-highlight">${escapeHtml(fullText).replace(/\n/g, '<br>')}</p>`;
         copyAnswerButton.dataset.copyText = fullText;
         hide(aiActionsWrapper);
         hide(explanationContainer);

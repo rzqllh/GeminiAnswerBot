@@ -229,3 +229,11 @@ document.addEventListener('DOMContentLoaded', function() {
         showToast('Success', 'History has been exported!', 'success');
     });
 });
+
+// Dark Mode Toggle (Disabled)
+const darkToggle = document.getElementById('darkModeToggle');
+if (darkToggle) {
+  darkToggle.disabled = true;
+  darkToggle.checked = false;
+}
+
