@@ -1,7 +1,7 @@
 # GeminiAnswerBot
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-20.0-brightgreen)
+![Version](https://img.shields.io/badge/version-1.5.0-brightgreen)
 
 **GeminiAnswerBot** adalah ekstensi Chrome cerdas yang mengutamakan privasi, didukung oleh Google Gemini API. Ekstensi ini menganalisis konten pada halaman untuk secara cerdas menyelesaikan kuis, menyempurnakan teks yang dipilih, dan menyediakan alat konteks bertenaga AI—semuanya langsung di browser Anda.
 
@@ -10,15 +10,15 @@
 ## Fitur Utama
 
 - **Penyelesai Kuis Cerdas**: Mendeteksi dan menyelesaikan soal kuis secara otomatis pada halaman yang didukung.
-- **Penyorotan Jawaban**: Menyorot jawaban yang benar secara langsung di dalam halaman web (DOM).
+- **Penyorotan Jawaban**: Menyorot jawaban yang benar secara langsung di dalam halaman web (DOM) dengan gaya yang konsisten dengan tema.
 - **Tindakan Teks Kontekstual**: Klik kanan pada teks yang dipilih untuk:
   - Meringkas
   - Menjelaskan
   - Menerjemahkan
   - Memparafrasekan
 - **Dasbor Pengaturan Modern**: Antarmuka opsi yang terinspirasi dari antarmuka modern dengan tab yang jelas.
-- **AI yang Dapat Disesuaikan**: Atur kunci API Gemini Anda, pilih model (misalnya, 1.5 Flash, 1.5 Pro), sesuaikan prompt sistem, dan ubah perilaku ekstensi.
-- **Panel Riwayat Lokal**: Lihat semua interaksi AI sebelumnya di dalam dasbor, disimpan dengan aman di penyimpanan lokal browser Anda.
+- **AI yang Dapat Disesuaikan**: Atur kunci API Gemini Anda, pilih model, sesuaikan prompt sistem, dan ubah perilaku ekstensi.
+- **Panel Riwayat Lokal**: Lihat semua interaksi AI sebelumnya di dalam dasbor, yang sekarang menampilkan format Markdown dengan benar untuk keterbacaan yang lebih baik.
 
 ---
 
@@ -75,3 +75,73 @@
 ## Struktur Proyek
 
 Proyek ini diatur dengan pemisahan tugas yang jelas untuk skalabilitas dan pemeliharaan.
+```
+GeminiAnswerBot/
+├── assets/
+│   ├── options.css
+│   └── popup.css
+│   └── icon.png
+├── js/
+│   ├── vendor/
+│   │   └── marked.min.js   # Library untuk render Markdown
+│   ├── background.js       # Service worker untuk event & panggilan API
+│   ├── content.js          # Script konten yang diinjeksi
+│   ├── options.js          # Logika untuk dasbor opsi
+│   ├── prompts.js          # Prompt default untuk AI
+│   └── mark.min.js         # Library untuk menyorot teks
+├── ui/
+│   ├── options.html        # UI untuk Opsi, Riwayat, dan Data
+│   └── popup.html          # UI popup utama ekstensi
+├── .gitignore              # File yang diabaikan oleh Git
+├── LICENSE                 # Lisensi proyek
+├── manifest.json           # File konfigurasi inti ekstensi
+└── README.md               # Dokumentasi ini
+```
+---
+
+## Privasi & Keamanan
+
+GeminiAnswerBot **tidak mengumpulkan data pribadi apa pun**. Semua pemrosesan terjadi secara lokal di browser Anda. Kunci API Gemini Anda hanya disimpan di penyimpanan lokal browser Anda dan tidak pernah dikirim ke pihak eksternal.
+
+## Masalah yang Diketahui
+
+- Di beberapa situs web dinamis (misalnya, yang menggunakan React atau Shadow DOM), ekstraksi kuis mungkin tertunda.
+- Google Gemini API dapat mengembalikan hasil yang sedikit tidak konsisten tergantung pada latensi model.
+
+---
+
+## Catatan Pengembangan
+
+- `content.js` digunakan untuk logika pemindaian halaman dan penyorotan.
+- `background.js` menangani komunikasi dengan Gemini API.
+- Semua logika UI untuk pengaturan ditangani di `options.js`.
+- Prompt dapat diedit langsung melalui `prompts.js` atau halaman Opsi.
+
+Setelah melakukan perubahan, buka `chrome://extensions/` dan klik **Reload** pada GeminiAnswerBot.
+
+---
+
+## Changelog
+
+### [1.5.0] - 2025-07-25
+#### Added
+- **Markdown Rendering**: AI responses in the history tab now render full Markdown formatting, including lists, bold/italics, and code blocks, for improved readability.
+
+#### Changed
+- **UI Consistency**: The on-page answer highlighter style has been updated to use the blue accent color, matching the overall theme of the extension.
+- **Icon Format**: The extension icon has been converted from JPG to PNG to support transparency and improve its appearance in the browser toolbar.
+
+---
+
+## Lisensi
+
+Proyek ini dilisensikan di bawah Lisensi MIT — lihat file `LICENSE` untuk detailnya.
+
+---
+
+## Kontak & Kredit
+
+Dibuat dengan 💡 oleh [Hafizh Rizqullah](https://github.com/rzqllh18)
+Terinspirasi oleh alat seperti ChatGPT Sidebar, Gemini Studio, dan lainnya.
+
+Untuk masukan, hubungi melalui GitHub Issues atau buka PR 🙌
