@@ -1,32 +1,5 @@
 // js/options.js
 
-// --- LIBRARY TOASTIFY.JS DIGABUNG DI SINI UNTUK MENGHINDARI ERROR ---
-(function(root,factory){if(typeof module==="object"&&module.exports){module.exports=factory()}else{root.Toastify=factory()}}(this,function(global){var Toastify=function(options){return new Toastify.lib.init(options)},methods={},lib={};function ToastifyObject(options){this.options={};this.options.text=options.text||"Hi there!";this.options.node=options.node;this.options.duration=typeof options.duration==="undefined"?3000:options.duration;this.options.selector=options.selector;this.options.callback=options.callback||function(){};this.options.destination=options.destination;this.options.newWindow=options.newWindow||false;this.options.close=options.close||false;this.options.gravity=options.gravity==="bottom"?"toastify-bottom":"toastify-top";this.options.positionLeft=options.positionLeft||false;this.options.position=options.position||"right";this.options.backgroundColor=options.backgroundColor;this.options.avatar=options.avatar||"";this.options.className=options.className||"";this.options.stopOnFocus=typeof options.stopOnFocus==="undefined"?true:options.stopOnFocus;this.options.onClick=options.onClick;this.options.offset=options.offset||{x:0,y:0};this.options.escapeMarkup=typeof options.escapeMarkup==="undefined"?true:options.escapeMarkup;this.options.style=options.style||{};this.options.oldestFirst=typeof options.oldestFirst==="undefined"?true:options.oldestFirst;return this}
-ToastifyObject.prototype.buildToast=function(){if(!this.options){return}
-var R=document.body;if(this.options.selector){R=document.getElementById(this.options.selector)}
-if(!R){return}
-var _toastElement=document.createElement("div");_toastElement.className="toastify on "+this.options.className;if(!!this.options.positionLeft===true){_toastElement.className+=" toastify-left"}else{_toastElement.className+=" toastify-right"}
-_toastElement.className+=" "+this.options.gravity;if(this.options.backgroundColor){console.warn('DEPRECATION NOTICE: "backgroundColor" is being deprecated. Please use the "style.background" property.')}
-var toastText;if(this.options.node&&this.options.node.nodeType===Node.ELEMENT_NODE){toastText=this.options.node.outerHTML}else{if(this.options.escapeMarkup){toastText=new DOMParser().parseFromString(this.options.text,"text/html").body.textContent}else{toastText=this.options.text}}
-_toastElement.dataset.originalText=toastText;if(this.options.avatar!==""){var _avatarElement=document.createElement("img");_avatarElement.src=this.options.avatar;_avatarElement.className="toastify-avatar";if(this.options.positionLeft===true){_toastElement.appendChild(_avatarElement)}else{_toastElement.insertAdjacentHTML("afterbegin",_avatarElement.outerHTML)}}
-var _textElement=document.createElement("span");if(this.options.node){_textElement.appendChild(this.options.node)}else{if(this.options.escapeMarkup){_textElement.innerText=this.options.text}else{_textElement.innerHTML=this.options.text}}
-_toastElement.appendChild(_textElement);if(this.options.close===true){var _closeElement=document.createElement("button");_closeElement.type="button";_closeElement.setAttribute("aria-label","Close");_closeElement.className="toastify-close";_closeElement.innerHTML="&#10006;";_closeElement.addEventListener("click",function(event){event.stopPropagation();this.removeElement(_toastElement);window.clearTimeout(_toastElement.timeOutValue)}.bind(this));_toastElement.appendChild(_closeElement)}
-if(typeof this.options.destination!=="undefined"){_toastElement.addEventListener("click",function(event){event.stopPropagation();if(this.options.newWindow===true){window.open(this.options.destination,"_blank")}else{window.location=this.options.destination}}.bind(this))}
-if(typeof this.options.onClick==="function"&&typeof this.options.destination==="undefined"){_toastElement.addEventListener("click",function(event){event.stopPropagation();this.options.onClick()}.bind(this))}
-for(var property in this.options.style){_toastElement.style[property]=this.options.style[property]}
-if(this.options.oldestFirst){R.insertBefore(_toastElement,R.firstChild)}else{R.appendChild(_toastElement)}
-return _toastElement};ToastifyObject.prototype.showToast=function(){this.toastElement=this.buildToast();if(!this.toastElement){return}
-var _this=this;var _offsetHeight=this.toastElement.offsetHeight;var _clientWidth=this.toastElement.clientWidth;var _x=this.options.offset.x;var _y=this.options.offset.y;var _offset={x:this.options.positionLeft?_x:_clientWidth+_x*-1,y:_y,};_offset.x=this.options.positionLeft?_offset.x+20:_offset.x-20;_offset.y=_offset.y+20;var _gravity={x:0,y:_offsetHeight,};switch(this.options.gravity){case"toastify-top":break;case"toastify-bottom":_gravity.y=_gravity.y*-1;break}
-this.toastElement.style.transform="translate("+_offset.x+"px, "+_gravity.y+"px)";setTimeout(function(){_this.toastElement.style.transform="translate("+_offset.x+"px, "+_y+"px)"},50);if(this.options.duration>0){this.toastElement.timeOutValue=window.setTimeout(function(){this.removeElement(this.toastElement)}.bind(this),this.options.duration)}
-if(this.options.stopOnFocus===true){this.toastElement.addEventListener("mouseover",function(event){window.clearTimeout(this.toastElement.timeOutValue)}.bind(this));this.toastElement.addEventListener("mouseleave",function(){if(this.options.duration>0){this.toastElement.timeOutValue=window.setTimeout(function(){this.removeElement(this.toastElement)}.bind(this),this.options.duration)}}.bind(this))}
-return this};ToastifyObject.prototype.removeElement=function(toastElement){toastElement.style.transform="translate(500px, "+(toastElement.offsetTop+toastElement.offsetHeight)+"px)";toastElement.style.opacity=0;setTimeout(function(){if(toastElement.parentNode){toastElement.parentNode.removeChild(toastElement)}
-this.options.callback.call(toastElement)}.bind(this),400)};lib.init=function(options){var t=new ToastifyObject(options||{});return t.showToast()};for(var method in methods){lib.init[method]=methods[method]}
-return lib.init}));
-
-// ============================================================================
-// LOGIKA EKSTENSI ANDA DIMULAI DI SINI
-// ============================================================================
-
 document.addEventListener('DOMContentLoaded', function() {
     let activeToast = null;
     const notificationContainer = document.getElementById('notification-container');
@@ -157,7 +130,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const prompts = result.customPrompts || {};
 
-        // FIXED: Added back the placeholder logic
         cleaningPromptTextarea.placeholder = DEFAULT_PROMPTS.cleaning;
         answerPromptTextarea.placeholder = DEFAULT_PROMPTS.answer;
         explanationPromptTextarea.placeholder = DEFAULT_PROMPTS.explanation;
