@@ -92,6 +92,7 @@ GeminiAnswerBot includes an Advanced tab within the Options page, offering addit
 ## Project Structure
 
 The project is organized with a clear separation of concerns for scalability and maintenance.
+```
 GeminiAnswerBot/
 ├── assets/
 │   ├── libs/
@@ -109,6 +110,7 @@ GeminiAnswerBot/
 ├── .gitignore              # Files to be ignored by Git
 ├── manifest.json           # Core extension configuration file
 └── README.md               # This documentation
+```
 
 ## Privacy & Security
 
