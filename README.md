@@ -137,6 +137,13 @@ After any changes, go to `chrome://extensions/` and click **Reload** on GeminiAn
 
 ## Changelog
 
+### [1.4.0] - 2025-07-24
+Added
+- Automatic Dark Mode support for the popup UI, adapting to the user's system theme for enhanced visual comfort.
+
+Changed
+- **Major UI Rework**: Completely redesigned the popup interface to align with Apple's Human Interface Guidelines. The new design features significantly improved readability, color contrast, and a more spacious, modern layout.
+
 ### [1.3.1] - 2025-07-24
 Fixed
 - Improved API stability by adding robust error handling for empty or invalid streams from the Gemini API, preventing the extension from hanging and providing clearer error messages to the user.

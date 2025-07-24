@@ -9,7 +9,7 @@
   <div class="container">
     <header class="header">
       <div class="header-title">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="header-icon"><path d="M12 2L14.472 9.528L22 12L14.472 14.472L12 22L9.528 14.472L2 12L9.528 9.528L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="header-icon"><path d="M12 2L14.472 9.528L22 12L14.472 14.472L12 22L9.528 14.472L2 12L9.528 9.528L12 2Z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg>
         <span>GeminiAnswerBot</span>
       </div>
       <div class="header-actions">
@@ -29,39 +29,40 @@
       </div>
 
       <div id="resultsWrapper" class="hidden">
-        <div id="contentDisplayWrapper" class="card">
-          <div class="card-header">
-            <h2 class="card-title">Page Content</h2>
-          </div>
+        <div id="contentDisplayWrapper" class="card question-card">
           <div id="contentDisplay" class="card-body"></div>
         </div>
 
-        <div id="answerContainer" class="card">
-          <div class="card-header">
-            <h2 class="card-title">Answer</h2>
-            <div class="card-controls">
-              <button id="copyAnswer" class="icon-button" title="Copy"></button>
-              <button id="retryAnswer" class="icon-button" title="Retry"></button>
-            </div>
-          </div>
-          <div id="answerDisplay" class="card-body"></div>
-        </div>
-        
         <div id="aiActionsWrapper" class="hidden">
           <button id="explanationButton" class="button-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L14.472 9.528L22 12L14.472 14.472L12 22L9.528 14.472L2 12L9.528 9.528L12 2Z"/></svg>
             Get Explanation
           </button>
         </div>
 
-        <div id="explanationContainer" class="card hidden">
-          <div class="card-header">
-            <h2 class="card-title">Explanation</h2>
-             <div class="card-controls">
-                <button id="copyExplanation" class="icon-button" title="Copy"></button>
-                <button id="retryExplanation" class="icon-button" title="Retry"></button>
+        <div id="answerContainer" class="card answer-card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L14.472 9.528L22 12L14.472 14.472L12 22L9.528 14.472L2 12L9.528 9.528L12 2Z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg>
+                    Quick Answer
+                </h2>
+                <div class="card-controls">
+                    <button id="copyAnswer" class="icon-button" title="Copy"></button>
+                    <button id="retryAnswer" class="icon-button" title="Retry"></button>
+                </div>
             </div>
-          </div>
-          <div id="explanationDisplay" class="card-body"></div>
+            <div id="answerDisplay" class="card-body"></div>
+        </div>
+
+        <div id="explanationContainer" class="card explanation-card hidden">
+            <div class="card-header">
+                <h2 class="card-title">Explanation</h2>
+                <div class="card-controls">
+                    <button id="copyExplanation" class="icon-button" title="Copy"></button>
+                    <button id="retryExplanation" class="icon-button" title="Retry"></button>
+                </div>
+            </div>
+            <div id="explanationDisplay" class="card-body"></div>
         </div>
       </div>
     </main>
