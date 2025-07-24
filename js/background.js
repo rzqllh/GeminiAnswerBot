@@ -63,7 +63,6 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 async function performApiCall(apiKey, model, systemPrompt, userContent, generationConfig = {}, streamCallback) {
-  console.log("Background Script: performApiCall started."); // Debugging
   const endpoint = 'streamGenerateContent';
   const resolvedModel = model || 'gemini-1.5-flash-latest';
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${resolvedModel}:${endpoint}?key=${apiKey}&alt=sse`;
@@ -80,23 +79,21 @@ async function performApiCall(apiKey, model, systemPrompt, userContent, generati
   };
 
   const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), 60000); // Timeout setelah 60 detik (1 menit)
+  const id = setTimeout(() => controller.abort(), 60000); // Timeout setelah 60 detik
 
   try {
-    console.log("Background Script: Fetching API URL:", apiUrl); // Debugging
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      signal: controller.signal // Kaitkan signal controller dengan fetch
+      signal: controller.signal
     });
 
-    clearTimeout(id); // Bersihkan timeout jika fetch berhasil
+    clearTimeout(id);
 
     if (!response.ok) {
       const errorBody = await response.json();
-      console.error("Background Script: API error response:", errorBody); // Debugging
-      // Handle specific API errors for better user feedback
+      console.error("Background Script: API error response:", errorBody);
       let errorMessage = errorBody.error?.message || `Request failed with status ${response.status}`;
       if (errorMessage.includes("API key not valid")) {
           errorMessage = "Kunci API tidak valid. Periksa pengaturan Anda.";
@@ -109,68 +106,91 @@ async function performApiCall(apiKey, model, systemPrompt, userContent, generati
       }
       throw new Error(errorMessage);
     }
+    
+    // **IMPROVEMENT**: Check if the response body is available for reading
+    if (!response.body) {
+        throw new Error("Respons dari API tidak valid (body kosong).");
+    }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let fullText = "";
+    let streamBegun = false;
 
     while (true) {
       const { value, done } = await reader.read();
-      if (done) break;
-
+      if (done) {
+        // **IMPROVEMENT**: If the stream ends without sending any actual content
+        if (!streamBegun) {
+            throw new Error("AI tidak memberikan respons yang valid atau koneksi terputus.");
+        }
+        break;
+      }
+      
+      streamBegun = true;
       const chunk = decoder.decode(value);
       const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
+      
       for (const line of lines) {
         try {
           const jsonStr = line.substring(6);
           const data = JSON.parse(jsonStr);
+          // Check for specific API errors within the stream
+          if (data.candidates === undefined && data.promptFeedback) {
+            const blockReason = data.promptFeedback?.blockReason;
+            if (blockReason) {
+              throw new Error(`Permintaan diblokir oleh AI karena alasan keamanan: ${blockReason}.`);
+            }
+          }
           const textPart = data.candidates?.[0]?.content?.parts?.[0]?.text;
           if (textPart) {
             fullText += textPart;
             streamCallback({ success: true, chunk: textPart });
-            // console.log("Background Script: Received chunk."); // Debugging: terlalu banyak log jika diaktifkan
           }
         } catch (e) {
-          // Ignore parsing errors for malformed stream chunks or partial data
-          console.warn("Background Script: Error parsing stream chunk:", e); // Debugging
+          // If a specific error was thrown, propagate it
+          if (e.message.includes("Permintaan diblokir")) {
+            throw e;
+          }
+          console.warn("Background Script: Error parsing stream chunk:", e);
         }
       }
     }
 
     if (!fullText.trim()) {
-      throw new Error("The AI returned an empty response. (Mungkin tidak ada jawaban yang relevan)");
+      throw new Error("AI memberikan respons kosong. Coba ajukan pertanyaan yang berbeda.");
     }
     
-    console.log("Background Script: Stream completed successfully."); // Debugging
     streamCallback({ success: true, done: true, fullText: fullText });
 
   } catch (error) {
-    clearTimeout(id); // Bersihkan timeout jika terjadi error
-    console.error("Background Script: Error during API call:", error); // Debugging
-    if (error.name === 'AbortError') {
-      streamCallback({ success: false, error: 'Permintaan API dibatalkan karena timeout (lebih dari 60 detik). Mungkin masalah jaringan atau AI terlalu sibuk.' });
-    } else {
-      streamCallback({ success: false, error: error.message });
-    }
+    clearTimeout(id);
+    console.error("Background Script: Error during API call:", error);
+    const errorMessage = error.name === 'AbortError' 
+      ? 'Permintaan API dibatalkan karena timeout (lebih dari 60 detik). Mungkin masalah jaringan atau AI terlalu sibuk.'
+      : error.message;
+    streamCallback({ success: false, error: errorMessage });
   }
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'callGeminiStream') {
-    console.log("Background Script: Received 'callGeminiStream' request."); // Debugging
     const { systemPrompt, userContent, generationConfig, originalUserContent } = request.payload; 
     
     chrome.storage.sync.get(['geminiApiKey', 'selectedModel'], async (config) => {
       if (!config.geminiApiKey) {
-        console.error("Background Script: API Key not set."); // Debugging
-        sendResponse({ success: false, error: 'API Key has not been set.' });
+        // This case is handled in popup.js, but as a fallback:
+        chrome.runtime.sendMessage({
+           action: 'geminiStreamUpdate',
+           payload: { success: false, error: 'API Key has not been set.' }, 
+           purpose: request.purpose 
+        });
         return;
       }
       
       const model = config.selectedModel || 'gemini-1.5-flash-latest';
       
       const streamCallback = (streamData) => {
-        // console.log("Background Script: Sending stream update to popup."); // Debugging: terlalu banyak log jika diaktifkan
         chrome.runtime.sendMessage({
            action: 'geminiStreamUpdate',
            payload: { ...streamData, originalUserContent: originalUserContent }, 
@@ -185,7 +205,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   
   if (request.action === 'testApiConnection') {
-    console.log("Background Script: Received 'testApiConnection' request."); // Debugging
     const { apiKey } = request.payload;
     const testModel = 'gemini-1.5-flash-latest'; 
     const testContent = "Please reply with only the word 'OK' and nothing else.";
@@ -200,7 +219,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     .then(res => {
         if (!res.ok) {
             return res.json().then(err => {
-                // Handle specific test API errors
                 let errorMessage = err.error?.message || `HTTP Error: ${res.status}`;
                 if (errorMessage.includes("API key not valid")) {
                     errorMessage = "Kunci API tidak valid. Periksa kembali kunci Anda.";
