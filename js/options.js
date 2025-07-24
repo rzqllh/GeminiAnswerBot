@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function loadHistory() {
+        if (!historyListContainer) return;
         historyListContainer.innerHTML = `<div class="loading-message">Loading history...</div>`;
         const { history = [] } = await chrome.storage.local.get('history');
         if (history.length === 0) {
@@ -62,20 +63,26 @@ document.addEventListener('DOMContentLoaded', function() {
         historyListContainer.innerHTML = '';
         history.forEach(item => {
             const itemElement = document.createElement('div');
-            itemElement.className = 'history-item';
+            itemElement.className = 'card';
             const formattedDate = new Date(item.timestamp).toLocaleString();
             const actionLabel = item.actionType.charAt(0).toUpperCase() + item.actionType.slice(1);
-            const contentSource = item.actionType === 'quiz' ? 'Question Content' : 'Selected Text';
-            const contentDisplay = item.cleanedContent ? `<h3>${contentSource}</h3><div class="answer-block">${formatQuestionContent(item.cleanedContent)}</div>` : '';
+            
+            const contentDisplay = item.cleanedContent ? `
+                <div class="history-item-content">
+                    <h3>Question Content</h3>
+                    <div class="answer-block">${formatQuestionContent(item.cleanedContent)}</div>
+                </div>
+            ` : '';
+
             itemElement.innerHTML = `
                 <div class="history-item-header">
                     <div class="history-item-title"><a href="${item.url}" target="_blank" title="${item.title}">${item.title}</a></div>
                     <div class="history-item-meta">${actionLabel} &bull; ${formattedDate}</div>
                 </div>
+                ${contentDisplay}
                 <div class="history-item-content">
-                    ${contentDisplay}
                     <h3>AI Response</h3>
-                    <div class="answer-block">${item.answerHTML}</div>
+                    <div class="answer-block">${item.answerHTML || 'No response captured.'}</div>
                 </div>
             `;
             historyListContainer.appendChild(itemElement);
@@ -91,149 +98,143 @@ document.addEventListener('DOMContentLoaded', function() {
             navLinks.forEach(navLink => navLink.classList.remove('active'));
             link.classList.add('active');
             contentPanes.forEach(pane => pane.classList.toggle('active', pane.id === targetId));
-            if (targetId === 'history') { loadHistory(); }
+            if (targetId === 'history') {
+                loadHistory();
+            }
         });
     });
 
+    // --- Element Selectors ---
     const saveGeneralButton = document.getElementById('saveGeneralButton');
     const savePromptsButton = document.getElementById('savePromptsButton');
     const testButton = document.getElementById('testButton');
     const apiKeyInput = document.getElementById('apiKey');
     const revealApiKey = document.getElementById('revealApiKey');
     const modelSelect = document.getElementById('modelSelect');
-    const responseToneSelect = document.getElementById('responseToneSelect'); 
     const autoHighlightToggle = document.getElementById('autoHighlightToggle');
     const temperatureSlider = document.getElementById('temperatureSlider');
-    const temperatureValueSpan = document.getElementById('temperatureValue');
     const clearHistoryButton = document.getElementById('clearHistoryButton');
     const exportHistoryButton = document.getElementById('exportHistoryButton');
+    
     const cleaningPromptTextarea = document.getElementById('cleaningPrompt');
-    const answerPromptTextarea = document.getElementById('answerPrompt');
-    const explanationPromptTextarea = document.getElementById('explanationPrompt');
     const summarizePromptTextarea = document.getElementById('summarizePrompt');
-    const translatePromptTextarea = document.getElementById('translatePrompt');
     const rephrasePromptTextarea = document.getElementById('rephrasePrompt');
     const rephraseLanguagesInput = document.getElementById('rephraseLanguages');
 
+    // --- Load Initial Settings ---
     chrome.storage.sync.get([
-        'geminiApiKey', 'selectedModel', 'responseTone', 'autoHighlight', 
+        'geminiApiKey', 'selectedModel', 'autoHighlight', 
         'customPrompts', 'temperature', 'rephraseLanguages'
     ], (result) => {
-        apiKeyInput.value = result.geminiApiKey || '';
-        modelSelect.value = result.selectedModel || 'gemini-1.5-flash-latest';
-        responseToneSelect.value = result.responseTone || 'normal'; 
-        autoHighlightToggle.checked = result.autoHighlight || false;
-        rephraseLanguagesInput.value = result.rephraseLanguages || 'English, Indonesian';
-        const temperature = result.temperature !== undefined ? result.temperature : 0.4;
-        temperatureSlider.value = temperature;
-        temperatureValueSpan.textContent = parseFloat(temperature).toFixed(1);
+        if (apiKeyInput) apiKeyInput.value = result.geminiApiKey || '';
+        if (modelSelect) modelSelect.value = result.selectedModel || 'gemini-1.5-flash-latest';
+        if (autoHighlightToggle) autoHighlightToggle.checked = result.autoHighlight || false;
+        if (rephraseLanguagesInput) rephraseLanguagesInput.value = result.rephraseLanguages || 'English, Indonesian';
+        if (temperatureSlider) {
+            temperatureSlider.value = result.temperature !== undefined ? result.temperature : 0.4;
+        }
         
         const prompts = result.customPrompts || {};
+        if (cleaningPromptTextarea) cleaningPromptTextarea.placeholder = DEFAULT_PROMPTS.cleaning;
+        if (summarizePromptTextarea) summarizePromptTextarea.placeholder = DEFAULT_PROMPTS.summarize; 
+        if (rephrasePromptTextarea) rephrasePromptTextarea.placeholder = DEFAULT_PROMPTS.rephrase;
 
-        cleaningPromptTextarea.placeholder = DEFAULT_PROMPTS.cleaning;
-        answerPromptTextarea.placeholder = DEFAULT_PROMPTS.answer;
-        explanationPromptTextarea.placeholder = DEFAULT_PROMPTS.explanation;
-        summarizePromptTextarea.placeholder = DEFAULT_PROMPTS.summarize; 
-        translatePromptTextarea.placeholder = DEFAULT_PROMPTS.translate;
-        rephrasePromptTextarea.placeholder = DEFAULT_PROMPTS.rephrase;
-
-        cleaningPromptTextarea.value = prompts.cleaning || '';
-        answerPromptTextarea.value = prompts.answer || '';
-        explanationPromptTextarea.value = prompts.explanation || '';
-        summarizePromptTextarea.value = prompts.summarize || ''; 
-        translatePromptTextarea.value = prompts.translate || '';
-        rephrasePromptTextarea.value = prompts.rephrase || '';
+        if (cleaningPromptTextarea) cleaningPromptTextarea.value = prompts.cleaning || '';
+        if (summarizePromptTextarea) summarizePromptTextarea.value = prompts.summarize || ''; 
+        if (rephrasePromptTextarea) rephrasePromptTextarea.value = prompts.rephrase || '';
     });
 
-    temperatureSlider.addEventListener('input', function() {
-        temperatureValueSpan.textContent = parseFloat(this.value).toFixed(1);
-    });
+    // --- Event Listeners ---
+    if (revealApiKey) {
+        revealApiKey.addEventListener('click', function() {
+            const isPassword = apiKeyInput.type === 'password';
+            apiKeyInput.type = isPassword ? 'text' : 'password';
+            revealApiKey.querySelector('.icon-eye').classList.toggle('hidden', isPassword);
+            revealApiKey.querySelector('.icon-eye-slash').classList.toggle('hidden', !isPassword);
+        });
+    }
+
+    if (saveGeneralButton) {
+        saveGeneralButton.addEventListener('click', function() {
+            const settingsToSave = {
+                'geminiApiKey': apiKeyInput.value.trim(),
+                'selectedModel': modelSelect.value,
+                'autoHighlight': autoHighlightToggle.checked,
+                'temperature': parseFloat(temperatureSlider.value)
+            };
+            chrome.storage.sync.set(settingsToSave, () => {
+                showToast('Success', 'General settings have been saved!', 'success');
+            });
+        });
+    }
+
+    if (savePromptsButton) {
+        savePromptsButton.addEventListener('click', function() {
+            const customPrompts = {
+                cleaning: cleaningPromptTextarea.value.trim(),
+                summarize: summarizePromptTextarea.value.trim(),
+                rephrase: rephrasePromptTextarea.value.trim(),
+            };
+            const rephraseLanguages = rephraseLanguagesInput.value.trim();
+            chrome.storage.sync.set({ 'customPrompts': customPrompts, 'rephraseLanguages': rephraseLanguages }, () => {
+                showToast('Success', 'Custom prompts have been saved!', 'success');
+            });
+        });
+    }
     
-    revealApiKey.addEventListener('click', function() {
-        const isPassword = apiKeyInput.type === 'password';
-        apiKeyInput.type = isPassword ? 'text' : 'password';
-        revealApiKey.querySelector('.icon-eye').classList.toggle('hidden', isPassword);
-        revealApiKey.querySelector('.icon-eye-slash').classList.toggle('hidden', !isPassword);
-    });
-
-    saveGeneralButton.addEventListener('click', function() {
-        const settingsToSave = {
-            'geminiApiKey': apiKeyInput.value.trim(), 'selectedModel': modelSelect.value,
-            'responseTone': responseToneSelect.value, 'autoHighlight': autoHighlightToggle.checked,
-            'temperature': parseFloat(temperatureSlider.value)
-        };
-        chrome.storage.sync.set(settingsToSave, () => {
-            showToast('Success', 'General settings have been saved!', 'success');
-        });
-    });
-
-    savePromptsButton.addEventListener('click', function() {
-        const customPrompts = {
-            cleaning: cleaningPromptTextarea.value.trim(), answer: answerPromptTextarea.value.trim(),
-            explanation: explanationPromptTextarea.value.trim(), summarize: summarizePromptTextarea.value.trim(), 
-            translate: translatePromptTextarea.value.trim(), rephrase: rephrasePromptTextarea.value.trim()
-        };
-        const rephraseLanguages = rephraseLanguagesInput.value.trim();
-        chrome.storage.sync.set({ 'customPrompts': customPrompts, 'rephraseLanguages': rephraseLanguages }, () => {
-            showToast('Success', 'Custom prompts have been saved!', 'success');
-        });
-    });
-
-    testButton.addEventListener('click', function() {
-        const apiKey = apiKeyInput.value.trim();
-        if (!apiKey) {
-            showToast('API Key Missing', 'Please enter an API key to test.', 'error');
-            return;
-        }
-        showToast('Testing', 'Testing connection, please wait...', 'info');
-        testButton.disabled = true;
-        chrome.runtime.sendMessage({ action: 'testApiConnection', payload: { apiKey } }, (response) => {
-            testButton.disabled = false;
-            if (chrome.runtime.lastError) {
-                showToast('Connection Error', `Error: ${chrome.runtime.lastError.message}`, 'error');
+    if (testButton) {
+        testButton.addEventListener('click', function() {
+            const apiKey = apiKeyInput.value.trim();
+            if (!apiKey) {
+                showToast('API Key Missing', 'Please enter an API key to test.', 'error');
                 return;
             }
-            if (response && response.success) {
-                showToast('Connection Successful', response.text, 'success');
-            } else {
-                showToast('Connection Failed', response.error || 'An unknown error occurred.', 'error');
+            showToast('Testing', 'Testing connection, please wait...', 'info');
+            testButton.disabled = true;
+            chrome.runtime.sendMessage({ action: 'testApiConnection', payload: { apiKey } }, (response) => {
+                testButton.disabled = false;
+                if (chrome.runtime.lastError) {
+                    showToast('Connection Error', `Error: ${chrome.runtime.lastError.message}`, 'error');
+                    return;
+                }
+                if (response && response.success) {
+                    showToast('Connection Successful', response.text, 'success');
+                } else {
+                    showToast('Connection Failed', response.error || 'An unknown error occurred.', 'error');
+                }
+            });
+        });
+    }
+
+    if (clearHistoryButton) {
+        clearHistoryButton.addEventListener('click', function() {
+            if (confirm('Are you sure you want to delete all history? This action cannot be undone.')) {
+                chrome.storage.local.remove('history', () => {
+                    showToast('Success', 'All history has been cleared.', 'success');
+                    loadHistory();
+                });
             }
         });
-    });
+    }
 
-    clearHistoryButton.addEventListener('click', function() {
-        if (confirm('Are you sure you want to delete all history? This action cannot be undone.')) {
-            chrome.storage.local.remove('history', () => {
-                showToast('Success', 'All history has been cleared.', 'success');
-                loadHistory();
-            });
-        }
-    });
-
-    exportHistoryButton.addEventListener('click', async function() {
-        const { history = [] } = await chrome.storage.local.get('history');
-        if (history.length === 0) {
-            showToast('No History', 'There is no history to export.', 'info');
-            return;
-        }
-        const dataStr = JSON.stringify(history, null, 2);
-        const dataBlob = new Blob([dataStr], {type: "application/json"});
-        const url = URL.createObjectURL(dataBlob);
-        const downloadLink = document.createElement('a');
-        downloadLink.href = url;
-        downloadLink.download = `gemini-answer-bot-history-${new Date().toISOString().slice(0,10)}.json`;
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-        URL.revokeObjectURL(url);
-        showToast('Success', 'History has been exported!', 'success');
-    });
+    if (exportHistoryButton) {
+        exportHistoryButton.addEventListener('click', async function() {
+            const { history = [] } = await chrome.storage.local.get('history');
+            if (history.length === 0) {
+                showToast('No History', 'There is no history to export.', 'info');
+                return;
+            }
+            const dataStr = JSON.stringify(history, null, 2);
+            const dataBlob = new Blob([dataStr], {type: "application/json"});
+            const url = URL.createObjectURL(dataBlob);
+            const downloadLink = document.createElement('a');
+            downloadLink.href = url;
+            downloadLink.download = `gemini-answer-bot-history-${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            URL.revokeObjectURL(url);
+            showToast('Success', 'History has been exported!', 'success');
+        });
+    }
 });
-
-// Dark Mode Toggle (Disabled)
-const darkToggle = document.getElementById('darkModeToggle');
-if (darkToggle) {
-  darkToggle.disabled = true;
-  darkToggle.checked = false;
-}
-
