@@ -1,4 +1,22 @@
 // js/popup.js
+
+/**
+ * Fungsi hashing sederhana untuk membuat kunci cache yang unik dan pendek.
+ * Ini bukan untuk kriptografi, hanya untuk membuat ID unik dari sebuah string.
+ * @param {string} str String yang akan di-hash.
+ * @returns {string} Hash heksadesimal.
+ */
+function simpleHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = (hash << 5) - hash + char;
+        hash &= hash; // Convert to 32bit integer
+    }
+    return 'cache_' + new Uint32Array([hash])[0].toString(16);
+}
+
+
 document.addEventListener('DOMContentLoaded', async function () {
     const container = document.querySelector('.container');
     const settingsButton = document.getElementById('settingsButton');
@@ -20,6 +38,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     let currentTab = null;
     let appConfig = {};
+    let currentCacheKey = null; // Menyimpan kunci cache untuk sesi ini
 
     function show(el) { if (el) el.classList.remove('hidden'); }
     function hide(el) { if (el) el.classList.add('hidden'); }
@@ -67,6 +86,16 @@ document.addEventListener('DOMContentLoaded', async function () {
         const optionsHtml = options.map(option => `<li>${escapeHtml(option.trim())}</li>`).join('');
         return `<div class="question-text">${question}</div><ul>${optionsHtml}</ul>`;
     }
+    
+    // Fungsi untuk membuat "sidik jari" unik dari konten kuis
+    function createQuizFingerprint(cleanedContent) {
+        const lines = cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
+        if (lines.length < 3) return null; // Butuh setidaknya pertanyaan dan 2 pilihan
+
+        const question = lines[0];
+        const options = lines.slice(1).sort(); // Urutkan pilihan untuk konsistensi
+        return question + options.join('');
+    }
 
     function _handleCleaningResult(fullText) {
         contentDisplay.innerHTML = formatQuestionContent(fullText);
@@ -76,7 +105,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         saveState({ cleanedContent: fullText }).then(getAnswer);
     }
 
-    function _handleAnswerResult(fullText) {
+    async function _handleAnswerResult(fullText, fromCache = false) {
         const answerMatch = fullText.match(/Answer:(.*?)(Confidence:|Reason:|$)/is);
         const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
         const reasonMatch = fullText.match(/Reason:(.*)/is);
@@ -90,11 +119,13 @@ document.addEventListener('DOMContentLoaded', async function () {
             formattedHtml += `
                 <div class="confidence-wrapper">
                     <div class="confidence-level">
-                        <span class="confidence-level-label">Confidence</span> 
+                        <span class="confidence-level-label">Confidence ${fromCache ? '<span>⚡️ Cached</span>' : ''}</span> 
                         <span class="confidence-badge confidence-${confidence}">${confidence.charAt(0).toUpperCase() + confidence.slice(1)}</span>
                     </div>
                     ${reason ? `<div class="confidence-reason">${escapeHtml(reason)}</div>` : ''}
                 </div>`;
+        } else if(fromCache) {
+             formattedHtml += `<div class="confidence-wrapper"><span class="confidence-level-label">⚡️ From Cache</span></div>`;
         }
 
         answerDisplay.innerHTML = formattedHtml;
@@ -106,8 +137,18 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (appConfig.autoHighlight) {
             chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: [answerText] });
         }
+        
+        // Simpan ke cache jika belum ada
+        if (!fromCache && currentCacheKey) {
+            await chrome.storage.local.set({ [currentCacheKey]: { answerHTML: fullText, timestamp: Date.now() } });
+            console.log("Result saved to cache with key:", currentCacheKey);
+        }
 
-        saveState({ answerHTML: fullText }).then(state => saveToHistory(state, 'quiz'));
+        await saveState({ answerHTML: fullText });
+        // Hanya simpan ke riwayat jika bukan dari cache, untuk menghindari duplikat
+        if (!fromCache) {
+            saveToHistory({ cleanedContent: (await chrome.storage.local.get(currentTab.id.toString()))[currentTab.id.toString()].cleanedContent, answerHTML: fullText }, 'quiz');
+        }
     }
 
     function _handleExplanationResult(fullText) {
@@ -202,14 +243,35 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
     }
 
-    function getAnswer() {
-        chrome.storage.local.get(currentTab.id.toString(), (result) => {
-            const cleanedContent = result[currentTab.id.toString()]?.cleanedContent;
-            retryAnswerButton.disabled = true;
-            answerDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`;
-            callGeminiStream(appConfig.customPrompts?.answer || DEFAULT_PROMPTS.answer, cleanedContent, 'answer');
-        });
+    async function getAnswer() {
+        const state = (await chrome.storage.local.get(currentTab.id.toString()))[currentTab.id.toString()];
+        const cleanedContent = state?.cleanedContent;
+        if (!cleanedContent) return;
+
+        // --- LOGIKA CACHING DIMULAI DI SINI ---
+        const fingerprint = createQuizFingerprint(cleanedContent);
+        if (fingerprint) {
+            currentCacheKey = simpleHash(fingerprint);
+            const cachedResult = (await chrome.storage.local.get(currentCacheKey))[currentCacheKey];
+
+            if (cachedResult && cachedResult.answerHTML) {
+                console.log("Found result in cache!", cachedResult);
+                hide(messageArea);
+                show(resultsWrapper);
+                contentDisplay.innerHTML = formatQuestionContent(cleanedContent);
+                show(contentDisplayWrapper);
+                show(answerContainer);
+                _handleAnswerResult(cachedResult.answerHTML, true); // true menandakan dari cache
+                return; // Berhenti di sini, tidak perlu panggil API
+            }
+        }
+        // --- LOGIKA CACHING BERAKHIR ---
+
+        retryAnswerButton.disabled = true;
+        answerDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`;
+        callGeminiStream(appConfig.customPrompts?.answer || DEFAULT_PROMPTS.answer, cleanedContent, 'answer');
     }
+
 
     function getExplanation() {
         chrome.storage.local.get(currentTab.id.toString(), (result) => {

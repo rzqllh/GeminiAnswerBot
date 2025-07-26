@@ -123,10 +123,18 @@ Setelah melakukan perubahan, buka `chrome://extensions/` dan klik **Reload** pad
 
 ## Changelog
 
+### [1.7.0] - 2025-07-26
+#### Added
+- **Smart Caching:** The extension now caches quiz results locally. If the same quiz is encountered again, the answer is provided instantly without using the Gemini API, saving API quota and speeding up response time.
+
+### [1.6.0] - 2025-07-26
+#### Changed
+- **UI Standardization:** The layout of the "General" and "Data" tabs in the options page has been refactored to use fieldsets, creating a consistent, card-based design across all sections.
+- **History UI:** The appearance of history entries has been updated to match the overall visual theme, incorporating a blurred background effect.
+
 ### [1.5.0] - 2025-07-25
 #### Added
 - **Markdown Rendering**: AI responses in the history tab now render full Markdown formatting, including lists, bold/italics, and code blocks, for improved readability.
-
 #### Changed
 - **UI Consistency**: The on-page answer highlighter style has been updated to use the blue accent color, matching the overall theme of the extension.
 - **Icon Format**: The extension icon has been converted from JPG to PNG to support transparency and improve its appearance in the browser toolbar.
