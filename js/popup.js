@@ -87,13 +87,12 @@ document.addEventListener('DOMContentLoaded', async function () {
         return `<div class="question-text">${question}</div><ul>${optionsHtml}</ul>`;
     }
     
-    // Fungsi untuk membuat "sidik jari" unik dari konten kuis
     function createQuizFingerprint(cleanedContent) {
         const lines = cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
-        if (lines.length < 3) return null; // Butuh setidaknya pertanyaan dan 2 pilihan
+        if (lines.length < 3) return null;
 
         const question = lines[0];
-        const options = lines.slice(1).sort(); // Urutkan pilihan untuk konsistensi
+        const options = lines.slice(1).sort();
         return question + options.join('');
     }
 
@@ -110,7 +109,11 @@ document.addEventListener('DOMContentLoaded', async function () {
         const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
         const reasonMatch = fullText.match(/Reason:(.*)/is);
 
-        const answerText = answerMatch ? answerMatch[1].trim() : fullText.trim();
+        let answerText = answerMatch ? answerMatch[1].trim() : fullText.trim();
+        
+        // PERBAIKAN: Hapus backtick dari jawaban AI sebelum ditampilkan
+        answerText = answerText.replace(/`/g, '');
+
         let formattedHtml = `<p class="answer-highlight">${escapeHtml(answerText).replace(/\n/g, '<br>')}</p>`;
 
         if (confidenceMatch) {
@@ -138,14 +141,13 @@ document.addEventListener('DOMContentLoaded', async function () {
             chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: [answerText] });
         }
         
-        // Simpan ke cache jika belum ada
         if (!fromCache && currentCacheKey) {
+            // Simpan respons ASLI (dengan backtick) ke cache, agar konsisten
             await chrome.storage.local.set({ [currentCacheKey]: { answerHTML: fullText, timestamp: Date.now() } });
             console.log("Result saved to cache with key:", currentCacheKey);
         }
 
         await saveState({ answerHTML: fullText });
-        // Hanya simpan ke riwayat jika bukan dari cache, untuk menghindari duplikat
         if (!fromCache) {
             saveToHistory({ cleanedContent: (await chrome.storage.local.get(currentTab.id.toString()))[currentTab.id.toString()].cleanedContent, answerHTML: fullText }, 'quiz');
         }
@@ -248,7 +250,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         const cleanedContent = state?.cleanedContent;
         if (!cleanedContent) return;
 
-        // --- LOGIKA CACHING DIMULAI DI SINI ---
         const fingerprint = createQuizFingerprint(cleanedContent);
         if (fingerprint) {
             currentCacheKey = simpleHash(fingerprint);
@@ -261,11 +262,10 @@ document.addEventListener('DOMContentLoaded', async function () {
                 contentDisplay.innerHTML = formatQuestionContent(cleanedContent);
                 show(contentDisplayWrapper);
                 show(answerContainer);
-                _handleAnswerResult(cachedResult.answerHTML, true); // true menandakan dari cache
-                return; // Berhenti di sini, tidak perlu panggil API
+                _handleAnswerResult(cachedResult.answerHTML, true);
+                return;
             }
         }
-        // --- LOGIKA CACHING BERAKHIR ---
 
         retryAnswerButton.disabled = true;
         answerDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`;

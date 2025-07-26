@@ -111,15 +111,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const revealApiKey = document.getElementById('revealApiKey');
     const modelSelect = document.getElementById('modelSelect');
     const autoHighlightToggle = document.getElementById('autoHighlightToggle');
+    const preSubmissionCheckToggle = document.getElementById('preSubmissionCheckToggle'); // Tambahkan ini
     const temperatureSlider = document.getElementById('temperatureSlider');
     const clearHistoryButton = document.getElementById('clearHistoryButton');
     const exportHistoryButton = document.getElementById('exportHistoryButton');
 
     // --- Load General Settings ---
-    chrome.storage.sync.get(['geminiApiKey', 'selectedModel', 'autoHighlight', 'temperature'], (result) => {
+    chrome.storage.sync.get(['geminiApiKey', 'selectedModel', 'autoHighlight', 'temperature', 'preSubmissionCheck'], (result) => {
         if (apiKeyInput) apiKeyInput.value = result.geminiApiKey || '';
         if (modelSelect) modelSelect.value = result.selectedModel || 'gemini-1.5-flash-latest';
-        if (autoHighlightToggle) autoHighlightToggle.checked = result.autoHighlight || false;
+        if (autoHighlightToggle) autoHighlightToggle.checked = result.autoHighlight ?? false; // Gunakan ?? untuk default false
+        if (preSubmissionCheckToggle) preSubmissionCheckToggle.checked = result.preSubmissionCheck ?? true; // Defaultnya aktif
         if (temperatureSlider) {
             temperatureSlider.value = result.temperature !== undefined ? result.temperature : 0.4;
         }
@@ -140,6 +142,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'geminiApiKey': apiKeyInput.value.trim(),
                 'selectedModel': modelSelect.value,
                 'autoHighlight': autoHighlightToggle.checked,
+                'preSubmissionCheck': preSubmissionCheckToggle.checked, // Simpan statusnya
                 'temperature': parseFloat(temperatureSlider.value)
             };
             chrome.storage.sync.set(settingsToSave, () => {
@@ -215,7 +218,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         for (const key in promptTextareas) {
             if (promptTextareas[key]) {
-                // Gunakan nilai tersimpan, ATAU jika tidak ada, gunakan nilai default dari DEFAULT_PROMPTS
                 promptTextareas[key].value = activeProfileData[key] || DEFAULT_PROMPTS[key] || '';
                 promptTextareas[key].placeholder = DEFAULT_PROMPTS[key] || '';
             }
@@ -249,13 +251,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const currentProfileData = promptProfiles[activeProfile] || {};
         for (const key in promptTextareas) {
-            // Simpan nilai jika berbeda dari placeholder, atau jika sudah ada nilainya
             const currentValue = promptTextareas[key].value.trim();
             const defaultValue = DEFAULT_PROMPTS[key] || '';
             if (currentValue !== defaultValue) {
                 currentProfileData[key] = currentValue;
             } else {
-                delete currentProfileData[key]; // Hapus jika kembali ke default untuk menghemat storage
+                delete currentProfileData[key];
             }
         }
         const currentLangValue = rephraseLanguagesInput.value.trim();
@@ -278,7 +279,6 @@ document.addEventListener('DOMContentLoaded', function() {
             showToast('Error', 'A profile with that name already exists.', 'error');
             return;
         }
-        // Profil baru dibuat sebagai salinan dari profil yang aktif saat ini
         promptProfiles[newName] = { ...promptProfiles[activeProfile] };
         await chrome.storage.sync.set({ promptProfiles, activeProfile: newName });
         await initializePromptManager();
@@ -304,7 +304,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
         if (confirm(`Are you sure you want to delete the "${activeProfile}" profile? This cannot be undone.`)) {
             delete promptProfiles[activeProfile];
-            const newActiveProfile = 'Default'; // Selalu kembali ke Default setelah hapus
+            const newActiveProfile = 'Default';
             await chrome.storage.sync.set({ promptProfiles, activeProfile: newActiveProfile });
             await initializePromptManager();
             showToast('Success', `Profile "${activeProfile}" has been deleted.`, 'success');

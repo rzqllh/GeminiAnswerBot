@@ -123,6 +123,10 @@ Setelah melakukan perubahan, buka `chrome://extensions/` dan klik **Reload** pad
 
 ## Changelog
 
+### [1.8.0] - 2025-07-26
+#### Added
+- **Pre-Submission Check:** Added a new feature that displays a custom confirmation dialog to warn the user if their selected quiz answer is different from the AI's suggestion. This feature can be toggled on or off in the General settings tab.
+
 ### [1.7.0] - 2025-07-26
 #### Added
 - **Smart Caching:** The extension now caches quiz results locally. If the same quiz is encountered again, the answer is provided instantly without using the Gemini API, saving API quota and speeding up response time.
