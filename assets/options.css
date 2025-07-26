@@ -171,27 +171,22 @@ h1 {
   font-size: 26px;
   font-weight: 600;
   margin-top: 0;
-  margin-bottom: 32px;
-}
-
-h2.subsection-title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-top: 40px;
-  margin-bottom: 20px;
-  border-top: 1px solid var(--border-color);
-  padding-top: 24px;
+  margin-bottom: 24px;
 }
 
 .section-description {
   font-size: 14px;
   color: var(--secondary-text);
-  margin-top: -24px;
+  margin-top: -16px;
   margin-bottom: 24px;
 }
 
 .form-group {
   margin-bottom: 28px;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
 }
 
 .form-group label {
@@ -484,12 +479,11 @@ input[type="range"] {
   gap: 16px;
 }
 
-.history-item {
+.card {
   background-color: var(--history-item-bg);
-  border: 1px solid var(--history-item-border);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 16px;
-  backdrop-filter: blur(1px);
 }
 
 .history-item-header {
@@ -535,10 +529,8 @@ input[type="range"] {
 
 .history-item-content .answer-block {
   font-size: 14px;
-  line-height: 1.6;
   background: var(--history-answer-bg);
-  backdrop-filter: blur(1px);
-  padding: 12px;
+  padding: 6px;
   border-radius: 8px;
   margin-top: 1px;
 }
@@ -565,56 +557,56 @@ input[type="range"] {
   color: var(--secondary-text);
 }
 
-/* Auth Section Styles */
-.auth-section-logged-out {
-  padding: 20px;
-  background-color: var(--input-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  margin-bottom: 32px;
-}
-
-.auth-container {
+.profile-manager {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 16px;
+    background-color: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    margin-bottom: 32px;
 }
-
-.auth-info {
+.form-group-inline {
     display: flex;
     align-items: center;
     gap: 12px;
 }
-
-.auth-info h2 {
-    font-size: 18px;
-    margin: 0 0 4px 0;
+.form-group-inline label {
+    margin-bottom: 0;
+    font-weight: 500;
+    white-space: nowrap;
 }
-
-.auth-info p {
-    font-size: 14px;
-    color: var(--secondary-text);
-    margin: 0;
-}
-
-.avatar {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    border: 2px solid var(--border-color);
-}
-
-.user-details {
+.profile-actions {
     display: flex;
-    flex-direction: column;
+    gap: 8px;
 }
 
-.user-name {
-    font-weight: 600;
-    font-size: 15px;
+fieldset {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
+  margin-top: 0; /* Dihapus margin atas */
+  margin-bottom: 32px; /* Ditambah margin bawah */
+  background-color: var(--input-bg);
 }
 
-.user-email {
-    font-size: 13px;
-    color: var(--secondary-text);
+fieldset:last-of-type {
+  margin-bottom: 0;
+}
+
+legend {
+  font-size: 16px;
+  font-weight: 600;
+  padding: 0 12px;
+  margin-left: -12px;
+  color: var(--primary-text);
+}
+
+.fieldset-description {
+  font-size: 13px;
+  color: var(--secondary-text);
+  margin-top: -8px;
+  margin-bottom: 24px;
+  max-width: 90%;
 }

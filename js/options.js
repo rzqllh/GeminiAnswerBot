@@ -73,10 +73,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="answer-block">${formatQuestionContent(item.cleanedContent)}</div>
                 </div>
             ` : '';
-
-            // Gunakan marked.parse() untuk mengubah Markdown menjadi HTML
             const aiResponseHtml = item.answerHTML ? marked.parse(item.answerHTML) : 'No response captured.';
-
             itemElement.innerHTML = `
                 <div class="history-item-header">
                     <div class="history-item-title"><a href="${item.url}" target="_blank" title="${item.title}">${item.title}</a></div>
@@ -107,9 +104,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // --- Element Selectors ---
+    // --- Element Selectors (General) ---
     const saveGeneralButton = document.getElementById('saveGeneralButton');
-    const savePromptsButton = document.getElementById('savePromptsButton');
     const testButton = document.getElementById('testButton');
     const apiKeyInput = document.getElementById('apiKey');
     const revealApiKey = document.getElementById('revealApiKey');
@@ -118,45 +114,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const temperatureSlider = document.getElementById('temperatureSlider');
     const clearHistoryButton = document.getElementById('clearHistoryButton');
     const exportHistoryButton = document.getElementById('exportHistoryButton');
-    
-    const cleaningPromptTextarea = document.getElementById('cleaningPrompt');
-    const answerPromptTextarea = document.getElementById('answerPrompt');
-    const explanationPromptTextarea = document.getElementById('explanationPrompt');
-    const summarizePromptTextarea = document.getElementById('summarizePrompt');
-    const translatePromptTextarea = document.getElementById('translatePrompt');
-    const rephrasePromptTextarea = document.getElementById('rephrasePrompt');
-    const rephraseLanguagesInput = document.getElementById('rephraseLanguages');
 
-    // --- Load Initial Settings ---
-    chrome.storage.sync.get([
-        'geminiApiKey', 'selectedModel', 'autoHighlight', 
-        'customPrompts', 'temperature', 'rephraseLanguages'
-    ], (result) => {
+    // --- Load General Settings ---
+    chrome.storage.sync.get(['geminiApiKey', 'selectedModel', 'autoHighlight', 'temperature'], (result) => {
         if (apiKeyInput) apiKeyInput.value = result.geminiApiKey || '';
         if (modelSelect) modelSelect.value = result.selectedModel || 'gemini-1.5-flash-latest';
         if (autoHighlightToggle) autoHighlightToggle.checked = result.autoHighlight || false;
-        if (rephraseLanguagesInput) rephraseLanguagesInput.value = result.rephraseLanguages || 'English, Indonesian';
         if (temperatureSlider) {
             temperatureSlider.value = result.temperature !== undefined ? result.temperature : 0.4;
         }
-        
-        const prompts = result.customPrompts || {};
-        if (cleaningPromptTextarea) cleaningPromptTextarea.placeholder = DEFAULT_PROMPTS.cleaning;
-        if (answerPromptTextarea) answerPromptTextarea.placeholder = DEFAULT_PROMPTS.answer;
-        if (explanationPromptTextarea) explanationPromptTextarea.placeholder = DEFAULT_PROMPTS.explanation;
-        if (summarizePromptTextarea) summarizePromptTextarea.placeholder = DEFAULT_PROMPTS.summarize;
-        if (translatePromptTextarea) translatePromptTextarea.placeholder = DEFAULT_PROMPTS.translate;
-        if (rephrasePromptTextarea) rephrasePromptTextarea.placeholder = DEFAULT_PROMPTS.rephrase;
-
-        if (cleaningPromptTextarea) cleaningPromptTextarea.value = prompts.cleaning || '';
-        if (answerPromptTextarea) answerPromptTextarea.value = prompts.answer || '';
-        if (explanationPromptTextarea) explanationPromptTextarea.value = prompts.explanation || '';
-        if (summarizePromptTextarea) summarizePromptTextarea.value = prompts.summarize || ''; 
-        if (translatePromptTextarea) translatePromptTextarea.value = prompts.translate || ''; 
-        if (rephrasePromptTextarea) rephrasePromptTextarea.value = prompts.rephrase || '';
     });
-
-    // --- Event Listeners ---
+    
+    // --- Event Listeners (General) ---
     if (revealApiKey) {
         revealApiKey.addEventListener('click', function() {
             const isPassword = apiKeyInput.type === 'password';
@@ -165,7 +134,6 @@ document.addEventListener('DOMContentLoaded', function() {
             revealApiKey.querySelector('.icon-eye-slash').classList.toggle('hidden', !isPassword);
         });
     }
-
     if (saveGeneralButton) {
         saveGeneralButton.addEventListener('click', function() {
             const settingsToSave = {
@@ -179,24 +147,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-
-    if (savePromptsButton) {
-        savePromptsButton.addEventListener('click', function() {
-            const customPrompts = {
-                cleaning: cleaningPromptTextarea.value.trim(),
-                answer: answerPromptTextarea.value.trim(),
-                explanation: explanationPromptTextarea.value.trim(),
-                summarize: summarizePromptTextarea.value.trim(),
-                translate: translatePromptTextarea.value.trim(),
-                rephrase: rephrasePromptTextarea.value.trim(),
-            };
-            const rephraseLanguages = rephraseLanguagesInput.value.trim();
-            chrome.storage.sync.set({ 'customPrompts': customPrompts, 'rephraseLanguages': rephraseLanguages }, () => {
-                showToast('Success', 'Custom prompts have been saved!', 'success');
-            });
-        });
-    }
-    
     if (testButton) {
         testButton.addEventListener('click', function() {
             const apiKey = apiKeyInput.value.trim();
@@ -208,10 +158,7 @@ document.addEventListener('DOMContentLoaded', function() {
             testButton.disabled = true;
             chrome.runtime.sendMessage({ action: 'testApiConnection', payload: { apiKey } }, (response) => {
                 testButton.disabled = false;
-                if (chrome.runtime.lastError) {
-                    showToast('Connection Error', `Error: ${chrome.runtime.lastError.message}`, 'error');
-                    return;
-                }
+                if (chrome.runtime.lastError) { showToast('Connection Error', `Error: ${chrome.runtime.lastError.message}`, 'error'); return; }
                 if (response && response.success) {
                     showToast('Connection Successful', response.text, 'success');
                 } else {
@@ -221,6 +168,155 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // =================================================================
+    // =========== ADVANCED PROMPT MANAGEMENT LOGIC START ==============
+    // =================================================================
+
+    const profileSelect = document.getElementById('profileSelect');
+    const newProfileBtn = document.getElementById('newProfileBtn');
+    const renameProfileBtn = document.getElementById('renameProfileBtn');
+    const deleteProfileBtn = document.getElementById('deleteProfileBtn');
+    const savePromptsButton = document.getElementById('savePromptsButton');
+    const promptTextareas = {
+        cleaning: document.getElementById('cleaningPrompt'),
+        answer: document.getElementById('answerPrompt'),
+        explanation: document.getElementById('explanationPrompt'),
+        summarize: document.getElementById('summarizePrompt'),
+        translate: document.getElementById('translatePrompt'),
+        rephrase: document.getElementById('rephrasePrompt')
+    };
+    const rephraseLanguagesInput = document.getElementById('rephraseLanguages');
+
+    function updateButtonStates() {
+        const selectedProfile = profileSelect.value;
+        const isDefault = selectedProfile === 'Default';
+        const isLastProfile = profileSelect.options.length <= 1;
+
+        renameProfileBtn.disabled = isDefault;
+        deleteProfileBtn.disabled = isDefault || isLastProfile;
+    }
+
+    async function populateProfileSelector() {
+        const { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+        profileSelect.innerHTML = '';
+        for (const profileName in promptProfiles) {
+            const option = document.createElement('option');
+            option.value = profileName;
+            option.textContent = profileName;
+            profileSelect.appendChild(option);
+        }
+        profileSelect.value = activeProfile;
+        updateButtonStates();
+    }
+
+    async function loadPromptsForActiveProfile() {
+        const { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+        const activeProfileData = promptProfiles[activeProfile] || {};
+        
+        for (const key in promptTextareas) {
+            if (promptTextareas[key]) {
+                // Gunakan nilai tersimpan, ATAU jika tidak ada, gunakan nilai default dari DEFAULT_PROMPTS
+                promptTextareas[key].value = activeProfileData[key] || DEFAULT_PROMPTS[key] || '';
+                promptTextareas[key].placeholder = DEFAULT_PROMPTS[key] || '';
+            }
+        }
+        rephraseLanguagesInput.value = activeProfileData.rephraseLanguages || 'English, Indonesian';
+    }
+
+    async function initializePromptManager() {
+        let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+        if (!promptProfiles || Object.keys(promptProfiles).length === 0) {
+            promptProfiles = {
+                'Default': { ...DEFAULT_PROMPTS, rephraseLanguages: 'English, Indonesian' }
+            };
+            activeProfile = 'Default';
+            await chrome.storage.sync.set({ promptProfiles, activeProfile });
+        }
+        await populateProfileSelector();
+        await loadPromptsForActiveProfile();
+    }
+
+    profileSelect.addEventListener('change', async () => {
+        const newActiveProfile = profileSelect.value;
+        await chrome.storage.sync.set({ activeProfile: newActiveProfile });
+        await loadPromptsForActiveProfile();
+        updateButtonStates();
+        showToast('Profile Changed', `Active profile is now "${newActiveProfile}".`, 'info');
+    });
+
+    savePromptsButton.addEventListener('click', async () => {
+        let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+        
+        const currentProfileData = promptProfiles[activeProfile] || {};
+        for (const key in promptTextareas) {
+            // Simpan nilai jika berbeda dari placeholder, atau jika sudah ada nilainya
+            const currentValue = promptTextareas[key].value.trim();
+            const defaultValue = DEFAULT_PROMPTS[key] || '';
+            if (currentValue !== defaultValue) {
+                currentProfileData[key] = currentValue;
+            } else {
+                delete currentProfileData[key]; // Hapus jika kembali ke default untuk menghemat storage
+            }
+        }
+        const currentLangValue = rephraseLanguagesInput.value.trim();
+        if (currentLangValue !== 'English, Indonesian') {
+             currentProfileData.rephraseLanguages = currentLangValue;
+        } else {
+             delete currentProfileData.rephraseLanguages;
+        }
+
+        promptProfiles[activeProfile] = currentProfileData;
+        await chrome.storage.sync.set({ promptProfiles });
+        showToast('Success', `Prompts for "${activeProfile}" have been saved!`, 'success');
+    });
+
+    newProfileBtn.addEventListener('click', async () => {
+        const newName = prompt("Enter a name for the new profile:", "My New Profile");
+        if (!newName || newName.trim() === '') return;
+        let { promptProfiles, activeProfile } = await chrome.storage.sync.get('promptProfiles');
+        if (promptProfiles[newName]) {
+            showToast('Error', 'A profile with that name already exists.', 'error');
+            return;
+        }
+        // Profil baru dibuat sebagai salinan dari profil yang aktif saat ini
+        promptProfiles[newName] = { ...promptProfiles[activeProfile] };
+        await chrome.storage.sync.set({ promptProfiles, activeProfile: newName });
+        await initializePromptManager();
+        showToast('Success', `Profile "${newName}" created.`, 'success');
+    });
+
+    renameProfileBtn.addEventListener('click', async () => {
+        let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+        const newName = prompt(`Enter a new name for the "${activeProfile}" profile:`, activeProfile);
+        if (!newName || newName.trim() === '' || newName === activeProfile) return;
+        if (promptProfiles[newName]) {
+            showToast('Error', 'A profile with that name already exists.', 'error');
+            return;
+        }
+        promptProfiles[newName] = promptProfiles[activeProfile];
+        delete promptProfiles[activeProfile];
+        await chrome.storage.sync.set({ promptProfiles, activeProfile: newName });
+        await initializePromptManager();
+        showToast('Success', `Profile renamed to "${newName}".`, 'success');
+    });
+
+    deleteProfileBtn.addEventListener('click', async () => {
+        let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+        if (confirm(`Are you sure you want to delete the "${activeProfile}" profile? This cannot be undone.`)) {
+            delete promptProfiles[activeProfile];
+            const newActiveProfile = 'Default'; // Selalu kembali ke Default setelah hapus
+            await chrome.storage.sync.set({ promptProfiles, activeProfile: newActiveProfile });
+            await initializePromptManager();
+            showToast('Success', `Profile "${activeProfile}" has been deleted.`, 'success');
+        }
+    });
+
+    initializePromptManager();
+    // =================================================================
+    // =========== ADVANCED PROMPT MANAGEMENT LOGIC END ================
+    // =================================================================
+
+    // --- Data & History Tab Logic (tetap sama) ---
     if (clearHistoryButton) {
         clearHistoryButton.addEventListener('click', function() {
             if (confirm('Are you sure you want to delete all history? This action cannot be undone.')) {
