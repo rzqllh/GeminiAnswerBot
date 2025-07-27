@@ -1,8 +1,6 @@
-/* assets/popup.css - REWORK v2 based on HIG */
+/* == BASE COLORS & VARIABLES =================================== */
 
-/* --- THEME & TYPOGRAPHY VARIABLES --- */
 :root {
-  /* --- Light Mode Colors --- */
   --bg-color: #f2f2f7;
   --header-bg: #fdfdfd;
   --card-bg: #ffffff;
@@ -20,8 +18,6 @@
   --error-bg: #fff0f0;
   --error-border: #ffdada;
   --error-text: #d93025;
-
-  /* --- Sizing & Spacing --- */
   --base-font-size: 14px;
   --line-height: 1.5;
   --card-border-radius: 12px;
@@ -33,7 +29,6 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* --- Dark Mode Colors --- */
     --bg-color: #161618;
     --header-bg: #1d1d1f;
     --card-bg: #2c2c2e;
@@ -44,7 +39,6 @@
     --separator-color: #363638;
     --button-bg-hover: #404042;
     --accent-blue: #0a84ff;
-    --accent-blue-text: #ffffff;
     --accent-green: #30d158;
     --accent-yellow: #ffd60a;
     --accent-red: #ff453a;
@@ -54,7 +48,8 @@
   }
 }
 
-/* --- GENERAL & LAYOUT --- */
+/* == GLOBAL RESET ============================================== */
+
 * {
   box-sizing: border-box;
 }
@@ -77,6 +72,8 @@ body {
   display: none !important;
 }
 
+/* == LAYOUT ==================================================== */
+
 .container {
   display: flex;
   flex-direction: column;
@@ -95,13 +92,13 @@ body {
 .content-area::-webkit-scrollbar {
   width: 6px;
 }
-
 .content-area::-webkit-scrollbar-thumb {
   background-color: var(--tertiary-text);
   border-radius: 3px;
 }
 
-/* --- HEADER --- */
+/* == HEADER ==================================================== */
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -120,24 +117,28 @@ body {
   font-size: 15px;
 }
 
-.header-icon {
+.header-icon,
+.header-title svg {
+  width: 18px;
+  height: 18px;
   color: var(--accent-blue);
 }
 
 .header-actions {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
 }
 
-/* --- CARDS --- */
+/* == CARD ====================================================== */
+
 .card {
   background-color: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--card-border-radius);
   display: flex;
   flex-direction: column;
-  margin-top: 8px;
-  margin-bottom: 8px;
+  margin: 8px 0;
 }
 
 .card-header {
@@ -146,7 +147,7 @@ body {
   align-items: center;
   padding: 12px var(--card-padding);
   border-bottom: 1px solid var(--separator-color);
-  flex-shrink: 0;
+  gap: 16px;
 }
 
 .card-title {
@@ -156,11 +157,13 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0;
+  flex-grow: 1;
+  white-space: nowrap;
 }
 
-.card-controls {
-  display: flex;
-  gap: 6px;
+.card-title svg {
+  margin-right: 6px;
+  vertical-align: middle;
 }
 
 .card-body {
@@ -174,6 +177,34 @@ body {
 .card-body > *:last-child {
   margin-bottom: 0;
 }
+
+.card-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 2px; /* bantu visual offset biar rata dengan judul */
+}
+
+
+.card-controls .icon-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-controls .icon-button svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+  display: block;
+}
+
+/* == LIST STYLING ============================================== */
 
 .card-body ul {
   list-style-type: none;
@@ -191,25 +222,19 @@ body {
   content: '•';
   position: absolute;
   left: 4px;
-  top: 0px;
+  top: 0;
   color: var(--accent-blue);
   font-size: 18px;
 }
 
-.question-text {
-  font-weight: 600;
-  font-size: 16px;
-  line-height: 1.4;
-  margin-bottom: 1em;
-}
+/* == BUTTONS =================================================== */
 
-/* --- BUTTONS --- */
 .icon-button {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   background-color: transparent;
   border: none;
-  border-radius: 50%;
+  border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -226,6 +251,14 @@ body {
 
 .icon-button.copied {
   color: var(--accent-green) !important;
+}
+
+.icon-button svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  display: block;
 }
 
 .button-primary {
@@ -256,7 +289,8 @@ body {
   filter: none;
 }
 
-/* --- UI STATES & COMPONENTS --- */
+/* == STATES & SPINNERS ========================================= */
+
 .loading-state {
   display: flex;
   flex-direction: column;
@@ -283,6 +317,8 @@ body {
     transform: rotate(360deg);
   }
 }
+
+/* == EXPLANATION / CONFIDENCE ================================== */
 
 .confidence-wrapper {
   margin-top: var(--card-padding);
@@ -346,16 +382,7 @@ body {
 .answer-highlight {
   background-color: var(--card-bg);
   border-left: 4px solid var(--accent-blue);
-  padding-left: 12px;
-  font-size: 15px;
-  font-weight: 500;
-}
-
-/* Highlight style for answer */
-.answer-highlight {
-  background-color: var(--card-bg);
-  border-left: 4px solid var(--accent-blue);
-  padding-left: 12px;
+  padding: 12px;
   font-size: 15px;
   font-weight: 500;
   animation: fadeIn 0.4s ease-in-out;
@@ -364,4 +391,26 @@ body {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* == TOKEN COUNTER ============================================= */
+
+.token-count {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--tertiary-text);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--separator-color);
+}
+
+.token-count-label {
+  font-weight: 500;
+}
+
+.token-count-value {
+  font-weight: 600;
+  color: var(--secondary-text);
 }

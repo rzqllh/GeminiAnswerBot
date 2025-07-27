@@ -586,8 +586,8 @@ fieldset {
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 24px;
-  margin-top: 0; /* Dihapus margin atas */
-  margin-bottom: 32px; /* Ditambah margin bawah */
+  margin-top: 0;
+  margin-bottom: 32px;
   background-color: var(--input-bg);
 }
 
