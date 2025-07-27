@@ -35,10 +35,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     const historyListContainer = document.getElementById('history-list-container');
-    function escapeHtml(unsafe) {
-        if (!unsafe) return '';
-        return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-    }
+    
+    // FUNGSI YANG DIPERBAIKI DENGAN BENAR
+function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return String(unsafe)
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;")
+         .replace(/"/g, "&quot;")
+         .replace(/'/g, "&#039;");
+}
+
 
     function formatQuestionContent(content) {
         if (!content) return '';
@@ -77,7 +85,7 @@ document.addEventListener('DOMContentLoaded', function() {
             itemElement.innerHTML = `
                 <div class="history-item-header">
                     <div class="history-item-title"><a href="${item.url}" target="_blank" title="${item.title}">${item.title}</a></div>
-                    <div class="history-item-meta">${actionLabel} &bull; ${formattedDate}</div>
+                    <div class="history-item-meta">${actionLabel} • ${formattedDate}</div>
                 </div>
                 ${contentDisplay}
                 <div class="history-item-content">
@@ -104,30 +112,27 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // --- Element Selectors (General) ---
     const saveGeneralButton = document.getElementById('saveGeneralButton');
     const testButton = document.getElementById('testButton');
     const apiKeyInput = document.getElementById('apiKey');
     const revealApiKey = document.getElementById('revealApiKey');
     const modelSelect = document.getElementById('modelSelect');
     const autoHighlightToggle = document.getElementById('autoHighlightToggle');
-    const preSubmissionCheckToggle = document.getElementById('preSubmissionCheckToggle'); // Tambahkan ini
+    const preSubmissionCheckToggle = document.getElementById('preSubmissionCheckToggle');
     const temperatureSlider = document.getElementById('temperatureSlider');
     const clearHistoryButton = document.getElementById('clearHistoryButton');
     const exportHistoryButton = document.getElementById('exportHistoryButton');
 
-    // --- Load General Settings ---
     chrome.storage.sync.get(['geminiApiKey', 'selectedModel', 'autoHighlight', 'temperature', 'preSubmissionCheck'], (result) => {
         if (apiKeyInput) apiKeyInput.value = result.geminiApiKey || '';
         if (modelSelect) modelSelect.value = result.selectedModel || 'gemini-1.5-flash-latest';
-        if (autoHighlightToggle) autoHighlightToggle.checked = result.autoHighlight ?? false; // Gunakan ?? untuk default false
-        if (preSubmissionCheckToggle) preSubmissionCheckToggle.checked = result.preSubmissionCheck ?? true; // Defaultnya aktif
+        if (autoHighlightToggle) autoHighlightToggle.checked = result.autoHighlight ?? false;
+        if (preSubmissionCheckToggle) preSubmissionCheckToggle.checked = result.preSubmissionCheck ?? true;
         if (temperatureSlider) {
             temperatureSlider.value = result.temperature !== undefined ? result.temperature : 0.4;
         }
     });
     
-    // --- Event Listeners (General) ---
     if (revealApiKey) {
         revealApiKey.addEventListener('click', function() {
             const isPassword = apiKeyInput.type === 'password';
@@ -142,7 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'geminiApiKey': apiKeyInput.value.trim(),
                 'selectedModel': modelSelect.value,
                 'autoHighlight': autoHighlightToggle.checked,
-                'preSubmissionCheck': preSubmissionCheckToggle.checked, // Simpan statusnya
+                'preSubmissionCheck': preSubmissionCheckToggle.checked,
                 'temperature': parseFloat(temperatureSlider.value)
             };
             chrome.storage.sync.set(settingsToSave, () => {
@@ -170,10 +175,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-
-    // =================================================================
-    // =========== ADVANCED PROMPT MANAGEMENT LOGIC START ==============
-    // =================================================================
 
     const profileSelect = document.getElementById('profileSelect');
     const newProfileBtn = document.getElementById('newProfileBtn');
@@ -268,6 +269,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         promptProfiles[activeProfile] = currentProfileData;
         await chrome.storage.sync.set({ promptProfiles });
+        
+        chrome.runtime.sendMessage({ action: 'updateContextMenus' });
+
         showToast('Success', `Prompts for "${activeProfile}" have been saved!`, 'success');
     });
 
@@ -282,6 +286,7 @@ document.addEventListener('DOMContentLoaded', function() {
         promptProfiles[newName] = { ...promptProfiles[activeProfile] };
         await chrome.storage.sync.set({ promptProfiles, activeProfile: newName });
         await initializePromptManager();
+        chrome.runtime.sendMessage({ action: 'updateContextMenus' });
         showToast('Success', `Profile "${newName}" created.`, 'success');
     });
 
@@ -297,6 +302,7 @@ document.addEventListener('DOMContentLoaded', function() {
         delete promptProfiles[activeProfile];
         await chrome.storage.sync.set({ promptProfiles, activeProfile: newName });
         await initializePromptManager();
+        chrome.runtime.sendMessage({ action: 'updateContextMenus' });
         showToast('Success', `Profile renamed to "${newName}".`, 'success');
     });
 
@@ -307,16 +313,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const newActiveProfile = 'Default';
             await chrome.storage.sync.set({ promptProfiles, activeProfile: newActiveProfile });
             await initializePromptManager();
+            chrome.runtime.sendMessage({ action: 'updateContextMenus' });
             showToast('Success', `Profile "${activeProfile}" has been deleted.`, 'success');
         }
     });
 
     initializePromptManager();
-    // =================================================================
-    // =========== ADVANCED PROMPT MANAGEMENT LOGIC END ================
-    // =================================================================
-
-    // --- Data & History Tab Logic (tetap sama) ---
+    
     if (clearHistoryButton) {
         clearHistoryButton.addEventListener('click', function() {
             if (confirm('Are you sure you want to delete all history? This action cannot be undone.')) {

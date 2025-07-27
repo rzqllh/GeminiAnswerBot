@@ -178,6 +178,15 @@ body {
   margin-bottom: 0;
 }
 
+.card-body code {
+  background-color: var(--button-bg-hover);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'SF Mono', 'Menlo', 'monospace';
+  font-size: 0.9em;
+  color: var(--secondary-text);
+}
+
 .card-controls {
   display: flex;
   align-items: center;
@@ -386,6 +395,13 @@ body {
   font-size: 15px;
   font-weight: 500;
   animation: fadeIn 0.4s ease-in-out;
+}
+
+.answer-highlight code {
+  background-color: transparent;
+  padding: 0;
+  font-family: 'SF Mono', 'Menlo', 'monospace';
+  color: inherit;
 }
 
 @keyframes fadeIn {

@@ -32,22 +32,19 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
   }
 
   function highlightText(text) {
-      if (!markerInstance) { return; }
+      if (!markerInstance) return;
       removePreviousHighlights();
-      
       const textsToHighlight = Array.isArray(text) ? text : [text];
-      
-      correctAiAnswer = textsToHighlight.length > 0 ? textsToHighlight[0] : null; 
-      
-      if (textsToHighlight.length === 0 || textsToHighlight.every(t => !t || t.trim() === '')) { return; }
+      correctAiAnswer = textsToHighlight.length > 0 ? textsToHighlight[0] : null;
+      if (textsToHighlight.length === 0 || textsToHighlight.every(t => !t || t.trim() === '')) return;
 
       textsToHighlight.forEach(t => {
           if (t && t.trim() !== '') {
               markerInstance.mark(t, {
                   "className": "gemini-answer-highlight",
-                  "separateWordSearch": false, 
-                  "accuracy": "partially", 
-                  "caseSensitive": false, 
+                  "separateWordSearch": false,
+                  "accuracy": "exactly",
+                  "caseSensitive": false,
                   "acrossElements": true,
                   "done": () => {
                       chrome.storage.sync.get('preSubmissionCheck', (settings) => {
@@ -66,8 +63,7 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
       }
   }
 
-  // --- LOGIKA PRE-SUBMISSION CHECK ---
-
+  // --- Escape HTML ---
   function escapeHtml(unsafe) {
     if (typeof unsafe !== 'string') return '';
     return unsafe
@@ -86,13 +82,12 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
 
   function activatePreSubmissionCheck() {
       if (!correctAiAnswer) return;
-      
       quizContainer = findQuizContainer();
       if (!quizContainer) return;
 
       const keywords = ['next', 'submit', 'finish', 'selesai', 'lanjut', 'berikutnya', 'kirim'];
       const selectors = 'button, a, div[role="button"], input[type="submit"]';
-      
+
       quizContainer.querySelectorAll(selectors).forEach(el => {
           const elText = el.textContent.toLowerCase().trim();
           if (keywords.some(keyword => elText.includes(keyword))) {
@@ -104,24 +99,20 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
 
   function showCustomConfirm(userAnswer, aiAnswer, callback) {
       const oldDialog = document.getElementById('gemini-dialog-overlay');
-      if (oldDialog) {
-          oldDialog.remove();
-      }
+      if (oldDialog) oldDialog.remove();
 
       const styleLink = document.createElement('link');
       styleLink.rel = 'stylesheet';
       styleLink.type = 'text/css';
       styleLink.href = chrome.runtime.getURL('assets/dialog.css');
       document.head.appendChild(styleLink);
-      
+
       const dialogOverlay = document.createElement('div');
       dialogOverlay.id = 'gemini-dialog-overlay';
       dialogOverlay.className = 'gemini-answer-bot-dialog-overlay';
-      
-      const cleanedAiAnswer = typeof aiAnswer === 'string' ? aiAnswer.replace(/`/g, '') : aiAnswer;
 
       const safeUserAnswer = escapeHtml(userAnswer);
-      const safeAiAnswer = escapeHtml(cleanedAiAnswer);
+      const safeAiAnswer = escapeHtml(typeof aiAnswer === 'string' ? aiAnswer.replace(/`/g, '') : aiAnswer);
 
       dialogOverlay.innerHTML = `
         <div class="gemini-answer-bot-dialog-box">
@@ -132,22 +123,15 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
             <div class="gemini-answer-bot-dialog-content">
                 <p>Your selected answer is different from the AI's suggestion. Are you sure you want to continue?</p>
                 <div class="gemini-answer-bot-dialog-answers">
-                    <div class="gemini-answer-bot-answer-item">
-                        <strong>Your Answer</strong>
-                        <code>${safeUserAnswer}</code>
-                    </div>
-                    <div class="gemini-answer-bot-answer-item">
-                        <strong>AI's Suggestion</strong>
-                        <code>${safeAiAnswer}</code>
-                    </div>
+                    <div class="gemini-answer-bot-answer-item"><strong>Your Answer</strong><code>${safeUserAnswer}</code></div>
+                    <div class="gemini-answer-bot-answer-item"><strong>AI's Suggestion</strong><code>${safeAiAnswer}</code></div>
                 </div>
             </div>
             <div class="gemini-answer-bot-dialog-buttons">
                 <button class="gemini-answer-bot-dialog-button secondary" id="gemini-cancel-btn">Cancel</button>
                 <button class="gemini-answer-bot-dialog-button primary" id="gemini-confirm-btn">Continue Anyway</button>
             </div>
-        </div>
-      `;
+        </div>`;
 
       document.body.appendChild(dialogOverlay);
 
@@ -159,66 +143,52 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
           }, 200);
       }
 
-      const confirmBtn = document.getElementById('gemini-confirm-btn');
-      const cancelBtn = document.getElementById('gemini-cancel-btn');
-
-      confirmBtn.onclick = () => {
-          callback(true);
-          closeDialog();
-      };
-      cancelBtn.onclick = () => {
-          callback(false);
-          closeDialog();
-      };
+      document.getElementById('gemini-confirm-btn').onclick = () => { callback(true); closeDialog(); };
+      document.getElementById('gemini-cancel-btn').onclick = () => { callback(false); closeDialog(); };
 
       setTimeout(() => dialogOverlay.classList.add('visible'), 10);
   }
 
   function handleSubmissionClick(event) {
       if (!quizContainer || !correctAiAnswer) return;
-      
+
       const userSelectedInput = quizContainer.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked');
       if (!userSelectedInput) return;
 
       let userSelectedText = '';
-      const parentLabel = userSelectedInput.closest('label');
+      const parentLabel = userSelectedInput.closest('label') ||
+          document.querySelector(`label[for="${userSelectedInput.id}"]`);
       if (parentLabel) {
           userSelectedText = parentLabel.textContent.trim();
-      } else if (userSelectedInput.id) {
-          const labelFor = document.querySelector(`label[for="${userSelectedInput.id}"]`);
-          if (labelFor) {
-              userSelectedText = labelFor.textContent.trim();
-          }
-      }
-      if (!userSelectedText && userSelectedInput.value) {
+      } else if (userSelectedInput.value) {
           userSelectedText = userSelectedInput.value.trim();
       }
 
-      const normalize = (str) => {
-        if (typeof str !== 'string') return '';
-        return str.replace(/`/g, '').replace(/\s+/g, ' ').toLowerCase().trim();
-      }
-      
-      // PERBAIKAN: Bandingkan versi teks yang sama-sama sudah dinormalisasi
+      const normalize = str => str?.replace(/`/g, '').replace(/\s+/g, ' ').toLowerCase().trim();
       if (normalize(userSelectedText) !== normalize(correctAiAnswer)) {
           event.preventDefault();
           event.stopImmediatePropagation();
 
-          showCustomConfirm(userSelectedText, correctAiAnswer, (confirmed) => {
+          showCustomConfirm(userSelectedText, correctAiAnswer, confirmed => {
               if (confirmed) {
                   event.target.removeEventListener('click', handleSubmissionClick, true);
                   event.target.click();
-                  setTimeout(() => {
-                      event.target.addEventListener('click', handleSubmissionClick, true);
-                  }, 100);
+                  setTimeout(() => event.target.addEventListener('click', handleSubmissionClick, true), 100);
               }
           });
       }
   }
 
-  // --- (Sisa kode ekstraksi konten tetap sama) ---
+  // 🔧 REVISI EKSTRAKSI QUIZ YANG LEBIH FLEKSIBEL
   function _tryLevel1Extraction() {
-      const quizContainerSelectors = [ 'div.w3-container.w3-panel', 'div#mainLeaderboard > form', 'div[class*="quiz"], form[action*="quiz"]', 'div[class*="question-block"], div[id*="question"]' ];
+      const quizContainerSelectors = [
+          'div.w3-container.w3-panel',
+          'div#mainLeaderboard > form',
+          'div[class*="quiz"]',
+          'form[action*="quiz"]',
+          'div[class*="question-block"]',
+          'div[id*="question"]'
+      ];
       for (const selector of quizContainerSelectors) {
           const container = document.querySelector(selector);
           if (container && (container.querySelector('input[type="radio"]') || container.querySelector('input[type="checkbox"]'))) {
@@ -226,41 +196,30 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
               const questionCandidates = container.querySelectorAll('h3, h4, p:first-of-type, div.w3-large, div[class*="question"]');
               for (const qEl of questionCandidates) {
                   let qText = qEl.textContent.trim().replace(/^Question\s+\d+\s+of\s+\d+\s*[:-]?\s*/i, '').trim();
-                  if (qText.length > 10 && !qText.toLowerCase().includes('quiz') && !qText.toLowerCase().includes('html quiz')) {
+                  if (qText.length > 10 && !qText.toLowerCase().includes('quiz')) {
                       quizQuestion = qText;
                       break;
                   }
               }
+
               const quizOptions = [];
-              const rawOptionElements = container.querySelectorAll('input[type="radio"] + label, input[type="checkbox"] + label, div[class*="option"], div.w3-code, div.w3-example, li, p');
               const seenOptions = new Set();
-              rawOptionElements.forEach(el => {
-                  let optionContent = '';
-                  const codeOrPreEl = el.querySelector('code, pre');
-                  if (codeOrPreEl) {
-                      optionContent = codeOrPreEl.textContent.trim();
-                      optionContent = optionContent.includes('\n') ? `CODE_BLOCK_START\n${optionContent}\nCODE_BLOCK_END` : `\`${optionContent}\``;
-                  } else {
-                      const innerText = el.textContent.trim();
-                      const innerHTML = el.innerHTML.trim();
-                      if ((innerText.startsWith('<') && innerText.endsWith('>') && innerText.length < 50) || (innerHTML.includes('&lt;') && innerHTML.includes('&gt;') && innerHTML.length < 100)) {
-                          const tempDiv = document.createElement('div');
-                          tempDiv.innerHTML = innerHTML;
-                          const parsedHtmlEl = tempDiv.firstElementChild;
-                          if (parsedHtmlEl && parsedHtmlEl.tagName && parsedHtmlEl.outerHTML === innerHTML) {
-                              optionContent = `CODE_BLOCK_START\n${innerHTML}\nCODE_BLOCK_END`;
-                          } else {
-                              optionContent = innerText;
-                          }
-                      } else {
-                          optionContent = innerText;
+              const inputOptions = container.querySelectorAll('input[type="radio"], input[type="checkbox"]');
+
+              inputOptions.forEach(input => {
+                  let label = input.closest('label') || container.querySelector(`label[for="${input.id}"]`);
+                  if (label) {
+                      const tempDiv = document.createElement('div');
+                      tempDiv.innerHTML = label.innerHTML;
+                      tempDiv.querySelectorAll('input').forEach(el => el.remove());
+                      const optionContent = tempDiv.textContent.trim();
+                      if (optionContent.length > 0 && !seenOptions.has(optionContent)) {
+                          quizOptions.push(optionContent);
+                          seenOptions.add(optionContent);
                       }
                   }
-                  if (optionContent.length > 1 && !optionContent.toLowerCase().includes('next') && !optionContent.toLowerCase().includes('submit') && !optionContent.toLowerCase().includes('previous') && !seenOptions.has(optionContent.toLowerCase())) {
-                      quizOptions.push(optionContent);
-                      seenOptions.add(optionContent.toLowerCase());
-                  }
               });
+
               if (quizQuestion.length > 10 && quizOptions.length >= 2) {
                   let extractedStructuredContent = `Question: ${quizQuestion}\n\nOptions:\n`;
                   quizOptions.forEach(opt => { extractedStructuredContent += `- ${opt}\n`; });
@@ -300,11 +259,12 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
   }
   function getQuizContentFromPage() {
       const level1Result = _tryLevel1Extraction();
-      if (level1Result) { return level1Result; }
+      if (level1Result) return level1Result;
       const level2Result = _tryLevel2Extraction();
-      if (level2Result) { return level2Result; }
+      if (level2Result) return level2Result;
       return _tryLevel3Fallback();
   }
+
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (request.action === "ping_content_script") {
           sendResponse({ ready: isMarkerInitialized, success: true });
@@ -312,12 +272,7 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
       }
       if (request.action === "get_page_content") {
           const selectedText = window.getSelection().toString().trim();
-          let pageContent = '';
-          if (selectedText.length > 20) {
-              pageContent = selectedText;
-          } else {
-              pageContent = getQuizContentFromPage();
-          }
+          const pageContent = selectedText.length > 20 ? selectedText : getQuizContentFromPage();
           sendResponse({ content: pageContent, source: selectedText.length > 20 ? 'selection' : 'auto' });
           return true;
       } else if (request.action === "highlight-answer") {

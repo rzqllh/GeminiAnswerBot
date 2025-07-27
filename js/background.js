@@ -1,5 +1,72 @@
 // js/background.js
 
+// Fungsi untuk membuat ulang menu konteks secara dinamis
+async function updateContextMenus() {
+  // Hapus semua menu yang ada untuk menghindari duplikasi
+  await chrome.contextMenus.removeAll();
+
+  // Buat menu induk
+  chrome.contextMenus.create({
+    id: "gemini-answer-parent",
+    title: "GeminiAnswerBot Actions",
+    contexts: ["selection"]
+  });
+
+  // Daftar aksi standar
+  const standardActions = [
+    { id: 'summarize', title: 'Summarize Selection' },
+    { id: 'explain', title: 'Explain Selection' },
+    { id: 'translate', title: 'Translate Selection' }
+  ];
+
+  standardActions.forEach(action => {
+    chrome.contextMenus.create({
+      id: action.id,
+      parentId: "gemini-answer-parent",
+      title: action.title,
+      contexts: ["selection"]
+    });
+  });
+
+  // Ambil pengaturan profil aktif untuk bahasa rephrase
+  const { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+  const defaultLanguages = 'English, Indonesian';
+  let rephraseLanguages = defaultLanguages;
+
+  if (promptProfiles && activeProfile && promptProfiles[activeProfile] && promptProfiles[activeProfile].rephraseLanguages) {
+    rephraseLanguages = promptProfiles[activeProfile].rephraseLanguages;
+  } else if (promptProfiles && promptProfiles['Default'] && promptProfiles['Default'].rephraseLanguages) {
+    rephraseLanguages = promptProfiles['Default'].rephraseLanguages;
+  }
+
+  const languages = rephraseLanguages.split(',').map(lang => lang.trim()).filter(lang => lang);
+
+  // Jika ada bahasa untuk rephrase, buat menu dan sub-menunya
+  if (languages.length > 0) {
+    chrome.contextMenus.create({
+      id: "rephrase-parent",
+      parentId: "gemini-answer-parent",
+      title: "Rephrase Selection into...",
+      contexts: ["selection"]
+    });
+
+    languages.forEach(lang => {
+      chrome.contextMenus.create({
+        id: `rephrase-${lang}`, // ID unik untuk setiap bahasa, misal: "rephrase-English"
+        parentId: "rephrase-parent",
+        title: lang,
+        contexts: ["selection"]
+      });
+    });
+  }
+}
+
+// Panggil saat ekstensi diinstal atau diupdate
+chrome.runtime.onInstalled.addListener(updateContextMenus);
+
+// Panggil saat browser dimulai
+chrome.runtime.onStartup.addListener(updateContextMenus);
+
 async function performApiCall(payload) {
     const { apiKey, model, systemPrompt, userContent, generationConfig, originalUserContent, purpose } = payload;
     const endpoint = 'streamGenerateContent';
@@ -90,36 +157,17 @@ function handleTestConnection(payload, sendResponse) {
     .catch(err => sendResponse({ success: false, error: err.message }));
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-    console.log("GeminiAnswerBot installed.");
-    chrome.contextMenus.create({
-      id: "gemini-answer-parent",
-      title: "GeminiAnswerBot Actions",
-      contexts: ["selection"]
-    });
-    chrome.contextMenus.create({
-      id: "summarize",
-      parentId: "gemini-answer-parent",
-      title: "Summarize Selection",
-      contexts: ["selection"]
-    });
-    chrome.contextMenus.create({
-      id: "explain",
-      parentId: "gemini-answer-parent",
-      title: "Explain Selection",
-      contexts: ["selection"]
-    });
-});
-  
 chrome.contextMenus.onClicked.addListener((info, tab) => {
     if (!tab || !tab.id) {
       console.error("Context menu clicked without a valid tab context.");
       return;
     }
-    if (info.selectionText && info.menuItemId !== "gemini-answer-parent") {
-      const action = info.menuItemId;
+    
+    // Pastikan menu yang diklik adalah bagian dari ekstensi kita
+    if (info.selectionText && (info.parentMenuItemId === "gemini-answer-parent" || info.parentMenuItemId === "rephrase-parent")) {
       chrome.storage.local.set({
-        [`context_action_${tab.id}`]: { action, selectionText: info.selectionText }
+        // Simpan seluruh ID menu agar kita bisa mendapatkan bahasanya nanti
+        [`context_action_${tab.id}`]: { action: info.menuItemId, selectionText: info.selectionText }
       }, () => {
         chrome.action.openPopup();
       });
@@ -133,6 +181,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     if (request.action === 'testApiConnection') {
       handleTestConnection(request.payload, sendResponse);
+      return true;
+    }
+    if (request.action === 'updateContextMenus') {
+      updateContextMenus();
       return true;
     }
 });

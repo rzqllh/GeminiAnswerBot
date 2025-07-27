@@ -20,8 +20,41 @@ function simpleHash(str) {
 
 function show(el) { if (el) el.classList.remove('hidden'); }
 function hide(el) { if (el) el.classList.add('hidden'); }
+
+// FUNGSI YANG DIPERBAIKI DENGAN BENAR
 function escapeHtml(unsafe) {
-    return String(unsafe).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;");
+    return String(unsafe)
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;")
+         .replace(/"/g, "&quot;")
+         .replace(/'/g, "&#039;");
+}
+
+/**
+ * Mengirim pesan ke content script dengan timeout.
+ * Mencegah popup hang jika content script tidak merespons.
+ */
+function sendMessageWithTimeout(tabId, message, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            reject(new Error('Content script did not respond in time. Please reload the page.'));
+        }, timeout);
+
+        chrome.tabs.sendMessage(tabId, message, (response) => {
+            clearTimeout(timer);
+            if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message || 'Failed to communicate with the page. Try reloading the page.'));
+            } else {
+                resolve(response);
+            }
+        });
+    });
+}
+
+function isCode(str) {
+    const trimmed = String(str).trim();
+    return trimmed.startsWith('<') && trimmed.endsWith('>');
 }
 
 function formatQuestionContent(content) {
@@ -48,17 +81,33 @@ function formatQuestionContent(content) {
         options = lines;
     }
     question = escapeHtml(question.replace(/^Question:\s*/i, '').trim());
-    const optionsHtml = options.map(option => `<li>${escapeHtml(option.trim())}</li>`).join('');
+    const optionsHtml = options.map(option => {
+        const cleanOption = escapeHtml(option.trim());
+        if (isCode(cleanOption)) {
+            return `<li><code>${cleanOption}</code></li>`;
+        }
+        return `<li>${cleanOption}</li>`;
+    }).join('');
     return `<div class="question-text">${question}</div><ul>${optionsHtml}</ul>`;
 }
 
 function createQuizFingerprint(cleanedContent) {
     if (!cleanedContent) return null;
-    const lines = cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
+
+    const lines = cleanedContent
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => l);
+
     if (lines.length < 2) return null;
-    const question = lines[0];
-    const options = lines.slice(1).sort();
-    return question + options.join('');
+
+    // Gabungkan seluruh lines (soal + opsi) untuk memastikan fingerprint unik
+    const normalizedLines = lines.map(l =>
+        l.toLowerCase().replace(/\s+/g, ' ').trim()
+    );
+
+    const joinedContent = normalizedLines.join('\n');
+    return joinedContent;
 }
 
 
@@ -68,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sanitize: true
         });
     }
-    // --- Element Selectors ---
+
     const settingsButton = document.getElementById('settingsButton');
     const rescanButton = document.getElementById('rescanButton');
     const explanationButton = document.getElementById('explanationButton');
@@ -86,7 +135,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyAnswerButton = document.getElementById('copyAnswer');
     const copyExplanationButton = document.getElementById('copyExplanation');
 
-    // --- State Variables ---
     let currentTab = null;
     let appConfig = {};
     let currentCacheKey = null;
@@ -101,18 +149,26 @@ document.addEventListener('DOMContentLoaded', () => {
         show(messageArea);
     }
 
-    // --- Core Logic ---
     async function callGeminiStream(purpose, contentText, originalUserContent = '') {
         const { promptProfiles, activeProfile, temperature, selectedModel, geminiApiKey } = appConfig;
         const currentPrompts = (promptProfiles && promptProfiles[activeProfile]) || DEFAULT_PROMPTS;
         
         let systemPrompt = '';
-        switch(purpose) {
-            case 'cleaning': systemPrompt = currentPrompts.cleaning || DEFAULT_PROMPTS.cleaning; break;
-            case 'answer': systemPrompt = currentPrompts.answer || DEFAULT_PROMPTS.answer; break;
-            case 'explanation': systemPrompt = currentPrompts.explanation || DEFAULT_PROMPTS.explanation; break;
-            case 'summarize': systemPrompt = currentPrompts.summarize || DEFAULT_PROMPTS.summarize; break;
-            case 'explain': systemPrompt = currentPrompts.explanation || DEFAULT_PROMPTS.explanation; break;
+        let userContent = contentText;
+
+        if (purpose.startsWith('rephrase-')) {
+            const language = purpose.split('-')[1];
+            systemPrompt = currentPrompts.rephrase || DEFAULT_PROMPTS.rephrase;
+            userContent = `Target Language: ${language}\n\nText to rephrase:\n${contentText}`;
+        } else {
+            switch(purpose) {
+                case 'cleaning': systemPrompt = currentPrompts.cleaning || DEFAULT_PROMPTS.cleaning; break;
+                case 'answer': systemPrompt = currentPrompts.answer || DEFAULT_PROMPTS.answer; break;
+                case 'explanation': systemPrompt = currentPrompts.explanation || DEFAULT_PROMPTS.explanation; break;
+                case 'summarize': systemPrompt = currentPrompts.summarize || DEFAULT_PROMPTS.summarize; break;
+                case 'explain': systemPrompt = currentPrompts.explanation || DEFAULT_PROMPTS.explanation; break;
+                case 'translate': systemPrompt = currentPrompts.translate || DEFAULT_PROMPTS.translate; break;
+            }
         }
 
         const generationConfig = { temperature: temperature !== undefined ? temperature : 0.4 };
@@ -123,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 apiKey: geminiApiKey,
                 model: selectedModel,
                 systemPrompt, 
-                userContent: contentText, 
+                userContent: userContent,
                 generationConfig, 
                 originalUserContent,
                 purpose
@@ -139,10 +195,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (fingerprint) {
             currentCacheKey = simpleHash(fingerprint);
             const cachedResult = (await chrome.storage.local.get(currentCacheKey))[currentCacheKey];
-            if (cachedResult?.answerHTML) {
-                await _handleAnswerResult(cachedResult.answerHTML, true, cachedResult.totalTokenCount);
-                return;
-            }
+
+const lines = state.cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
+const rawQuestion = lines.length > 0 ? lines[0] : '';
+
+if (cachedResult?.answerHTML && cachedResult.rawQuestion === rawQuestion) {
+    await _handleAnswerResult(cachedResult.answerHTML, true, cachedResult.totalTokenCount);
+    return;
+}
+
         }
         retryAnswerButton.disabled = true;
         answerDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`;
@@ -159,7 +220,6 @@ document.addEventListener('DOMContentLoaded', () => {
         callGeminiStream('explanation', state.cleanedContent);
     }
     
-    // --- UI Handlers ---
     function _handleCleaningResult(fullText) {
         contentDisplay.innerHTML = formatQuestionContent(fullText);
         show(contentDisplayWrapper);
@@ -174,7 +234,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const reasonMatch = fullText.match(/Reason:(.*)/is);
         let answerText = (answerMatch ? answerMatch[1].trim() : fullText.trim()).replace(/`/g, '');
         
-        let formattedHtml = `<p class="answer-highlight">${escapeHtml(answerText).replace(/\n/g, '<br>')}</p>`;
+        let cleanAnswerText = escapeHtml(answerText);
+        let formattedHtml = `<p class="answer-highlight">${isCode(cleanAnswerText) ? `<code>${cleanAnswerText}</code>` : cleanAnswerText.replace(/\n/g, '<br>')}</p>`;
+        
         let confidenceWrapperHtml = '';
         if (confidenceMatch) {
             const confidence = confidenceMatch[1].toLowerCase();
@@ -199,8 +261,17 @@ document.addEventListener('DOMContentLoaded', () => {
             chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: [answerText] });
         }
         if (!fromCache && currentCacheKey) {
-            await chrome.storage.local.set({ [currentCacheKey]: { answerHTML: fullText, totalTokenCount: totalTokenCount } });
+    const lines = fullText.split('\n').map(l => l.trim()).filter(l => l);
+    const rawQuestion = lines.length > 0 ? lines[0] : '';
+    await chrome.storage.local.set({
+        [currentCacheKey]: {
+            answerHTML: fullText,
+            totalTokenCount: totalTokenCount,
+            rawQuestion
         }
+    });
+}
+
         await saveState({ answerHTML: fullText, totalTokenCount });
         if (!fromCache) {
             const state = await getState();
@@ -209,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function _handleExplanationResult(fullText) {
-        explanationDisplay.innerHTML = marked.parse(fullText); // Assuming marked.js is available
+        explanationDisplay.innerHTML = marked.parse(fullText);
         copyExplanationButton.dataset.copyText = fullText;
         explanationButton.disabled = false;
         retryExplanationButton.disabled = false;
@@ -226,10 +297,10 @@ document.addEventListener('DOMContentLoaded', () => {
         copyAnswerButton.dataset.copyText = fullText;
         hide(aiActionsWrapper);
         hide(explanationContainer);
-        saveToHistory({ cleanedContent: originalUserContent, answerHTML: fullText }, purpose);
+        const historyActionType = purpose.split('-')[0];
+        saveToHistory({ cleanedContent: originalUserContent, answerHTML: fullText }, historyActionType);
     }
 
-    // --- Storage & State ---
     async function getState() {
         if (!currentTab) return {};
         const key = currentTab.id.toString();
@@ -252,7 +323,6 @@ document.addEventListener('DOMContentLoaded', () => {
         await chrome.storage.local.set({ history });
     }
     
-    // --- Initialization ---
     async function initialize() {
         [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!currentTab || !currentTab.id) {
@@ -272,17 +342,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 files: ['js/vendor/marked.min.js', 'js/mark.min.js', 'js/content.js'] 
             }); 
 
-            const isReady = await new Promise((resolve) => {
-                chrome.tabs.sendMessage(currentTab.id, { action: "ping_content_script" }, (response) => {
-                    if (chrome.runtime.lastError) {
-                        resolve(false);
-                    } else {
-                        resolve(response && response.ready);
-                    }
-                });
-            });
+            const isReady = await sendMessageWithTimeout(currentTab.id, { action: "ping_content_script" });
 
-            if (!isReady) {
+            if (!isReady || !isReady.ready) {
                 throw new Error("Content script is not ready. Please reload the page and try again.");
             }
 
@@ -291,7 +353,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (contextData?.action && contextData?.selectionText) {
                 await chrome.storage.local.remove(contextKey);
-                displayMessage(`<div class="spinner"></div><p>Getting ${contextData.action}...</p>`);
+                const displayAction = contextData.action.split('-')[0];
+                displayMessage(`<div class="spinner"></div><p>Getting ${displayAction}...</p>`);
                 callGeminiStream(contextData.action, contextData.selectionText, contextData.selectionText);
             } else {
                 const state = await getState();
@@ -309,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 } else {
                     displayMessage(`<div class="spinner"></div><p>Step 1/2: Cleaning content...</p>`);
-                    const response = await chrome.tabs.sendMessage(currentTab.id, { action: "get_page_content" });
+                    const response = await sendMessageWithTimeout(currentTab.id, { action: "get_page_content" });
                     if (!response || !response.content?.trim()) {
                         throw new Error("No readable content found on this page.");
                     }
@@ -319,11 +382,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (e) { 
             console.error("Initialization failed:", e);
-            displayMessage(`This page cannot be scripted or is not ready. Try reloading the page and opening the extension again. <br><small>(${e.message.split(':')[0]})</small>`, true); 
+            displayMessage(`This page cannot be scripted or is not ready. Try reloading the page and opening the extension again. <br><small>(${e.message})</small>`, true); 
         }
     }
 
-    // --- Event Listeners ---
     settingsButton.addEventListener('click', () => chrome.runtime.openOptionsPage());
     rescanButton.addEventListener('click', async () => {
         if (!currentTab) return;
@@ -356,8 +418,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'cleaning': _handleCleaningResult(fullText); break;
                     case 'answer': _handleAnswerResult(fullText, false, payload.totalTokenCount); break;
                     case 'explanation': _handleExplanationResult(fullText); break;
-                    case 'summarize': case 'explain':
+                    case 'summarize': case 'explain': case 'translate':
                         _handleContextMenuResult(fullText, payload.originalUserContent, purpose);
+                        break;
+                    default:
+                        if (purpose.startsWith('rephrase-')) {
+                            _handleContextMenuResult(fullText, payload.originalUserContent, purpose);
+                        }
                         break;
                 }
             }

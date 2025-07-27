@@ -123,6 +123,12 @@ Setelah melakukan perubahan, buka `chrome://extensions/` dan klik **Reload** pad
 
 ## Changelog
 
+### [1.9.1] - 2025-07-28
+#### Fixed
+- **Critical Rendering Bug:** Fixed a major issue that caused the extension popup to break or hang on "Analyzing Page..." when encountering quiz questions with HTML code in the answers. The UI now correctly displays code as text.
+- **Context Menu:** Corrected the right-click context menu to properly display all available actions (Summarize, Explain, Translate, Rephrase) as intended.
+- **Stability:** Improved stability by preventing the popup from freezing if the connection to the web page is lost (e.g., after reloading the extension).
+
 ### [1.9.0] - 2025-07-27
 #### Fixed
 - Resolved a critical error that caused the extension popup to crash when attempting to display AI-generated explanations or context menu results (e.g., Summarize, Explain). This was due to the Markdown rendering library (`marked.js`) not being loaded correctly.
