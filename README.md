@@ -123,6 +123,11 @@ Setelah melakukan perubahan, buka `chrome://extensions/` dan klik **Reload** pad
 
 ## Changelog
 
+### [1.9.0] - 2025-07-27
+#### Fixed
+- Resolved a critical error that caused the extension popup to crash when attempting to display AI-generated explanations or context menu results (e.g., Summarize, Explain). This was due to the Markdown rendering library (`marked.js`) not being loaded correctly.
+- Improved security by sanitizing all Markdown-rendered content in the popup to prevent potential XSS vulnerabilities.
+
 ### [1.8.0] - 2025-07-26
 #### Added
 - **Pre-Submission Check:** Added a new feature that displays a custom confirmation dialog to warn the user if their selected quiz answer is different from the AI's suggestion. This feature can be toggled on or off in the General settings tab.
