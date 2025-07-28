@@ -1,0 +1,96 @@
+/* assets/toolbar.css */
+:root {
+  --gab-toolbar-bg-light: rgba(242, 242, 247, 0.8);
+  --gab-toolbar-bg-dark: rgba(44, 44, 46, 0.8);
+  --gab-toolbar-border-light: rgba(0, 0, 0, 0.1);
+  --gab-toolbar-border-dark: rgba(255, 255, 255, 0.15);
+  --gab-toolbar-shadow-light: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --gab-toolbar-shadow-dark: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --gab-toolbar-icon-light: #3c3c43;
+  --gab-toolbar-icon-dark: #e5e5e7;
+  --gab-toolbar-icon-hover-bg-light: rgba(0, 0, 0, 0.08);
+  --gab-toolbar-icon-hover-bg-dark: rgba(255, 255, 255, 0.12);
+}
+
+.gemini-answer-bot-toolbar {
+  position: absolute;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 9px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  /* Default light mode styles */
+  background-color: var(--gab-toolbar-bg-light);
+  border: 1px solid var(--gab-toolbar-border-light);
+  box-shadow: var(--gab-toolbar-shadow-light);
+
+  /* Transition for smooth appearance */
+  opacity: 0;
+  transform: translateY(8px) scale(0.95);
+  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.gemini-answer-bot-toolbar.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.gab-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  color: var(--gab-toolbar-icon-light);
+  transition: background-color 0.2s;
+}
+
+.gab-toolbar-button:hover {
+  background-color: var(--gab-toolbar-icon-hover-bg-light);
+}
+
+.gab-toolbar-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.gab-toolbar-separator {
+  width: 1px;
+  height: 18px;
+  background-color: var(--gab-toolbar-border-light);
+  margin: 0 4px;
+}
+
+/* Dark mode styles */
+@media (prefers-color-scheme: dark) {
+  .gemini-answer-bot-toolbar {
+    background-color: var(--gab-toolbar-bg-dark);
+    border: 1px solid var(--gab-toolbar-border-dark);
+    box-shadow: var(--gab-toolbar-shadow-dark);
+  }
+
+  .gab-toolbar-button {
+    color: var(--gab-toolbar-icon-dark);
+  }
+
+  .gab-toolbar-button:hover {
+    background-color: var(--gab-toolbar-icon-hover-bg-dark);
+  }
+
+  .gab-toolbar-separator {
+    background-color: var(--gab-toolbar-border-dark);
+  }
+}

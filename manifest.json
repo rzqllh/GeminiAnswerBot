@@ -30,7 +30,8 @@
     {
       "resources": [
         "assets/highlighter.css",
-        "assets/dialog.css"
+        "assets/dialog.css",
+        "assets/toolbar.css"
       ],
       "matches": [
         "<all_urls>"

@@ -63,15 +63,14 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
       }
   }
 
-  // --- Escape HTML ---
   function escapeHtml(unsafe) {
     if (typeof unsafe !== 'string') return '';
     return unsafe
-         .replace(/&/g, "&amp;")
-         .replace(/</g, "&lt;")
-         .replace(/>/g, "&gt;")
-         .replace(/"/g, "&quot;")
-         .replace(/'/g, "&#039;");
+         .replace(/&/g, "&")
+         .replace(/</g, "<")
+         .replace(/>/g, ">")
+         .replace(/"/g, "'")
+         .replace(/'/g, "'");
   }
 
   function findQuizContainer() {
@@ -179,7 +178,6 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
       }
   }
 
-  // 🔧 REVISI EKSTRAKSI QUIZ YANG LEBIH FLEKSIBEL
   function _tryLevel1Extraction() {
       const quizContainerSelectors = [
           'div.w3-container.w3-panel',
@@ -229,6 +227,7 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
       }
       return null;
   }
+
   function _tryLevel2Extraction() {
       const mainContentArea = document.querySelector('main') || document.querySelector('article') || document.querySelector('div.w3-main') || document.querySelector('#main') || document.querySelector('body > div.container');
       if (!mainContentArea) return null;
@@ -252,17 +251,132 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
       content = content.trim().replace(/\n\s*\n\s*\n/g, '\n\n').trim();
       return content.length > 50 ? content : null;
   }
+
   function _tryLevel3Fallback() {
       const bodyCloneFinal = document.body.cloneNode(true);
-      bodyCloneFinal.querySelectorAll('script', 'style', 'noscript', 'iframe', '.hidden', '[style*="display:none"]', '[aria-hidden="true"]').forEach(el => el.remove());
+      bodyCloneFinal.querySelectorAll('script, style, noscript, iframe, .hidden, [style*="display:none"], [aria-hidden="true"]').forEach(el => el.remove());
       return bodyCloneFinal.innerText.replace(/\s+/g, ' ').trim();
   }
+
   function getQuizContentFromPage() {
       const level1Result = _tryLevel1Extraction();
       if (level1Result) return level1Result;
       const level2Result = _tryLevel2Extraction();
       if (level2Result) return level2Result;
       return _tryLevel3Fallback();
+  }
+
+  if (typeof window.geminiAnswerBotToolbarInjected === 'undefined') {
+    window.geminiAnswerBotToolbarInjected = true;
+
+    let toolbarElement = null;
+
+    const toolbarActions = [
+      { action: 'summarize', title: 'Summarize', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.37 3.63a2.12 2.12 0 1 1 3 3L12 16l-4 1 1-4Z"/></svg>' },
+      { action: 'explain', title: 'Explain', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14-4-4 4-4"/><path d="M12 14h-4a2 2 0 0 0-2 2v4"/><path d="m16 10 4 4-4 4"/><path d="m16 10h4a2 2 0 0 1 2 2v4"/></svg>' },
+      { action: 'translate', title: 'Translate', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>' },
+    ];
+
+    function createToolbar() {
+      toolbarElement = document.createElement('div');
+      toolbarElement.className = 'gemini-answer-bot-toolbar';
+
+      toolbarActions.forEach(item => {
+        const button = document.createElement('button');
+        button.className = 'gab-toolbar-button';
+        button.title = item.title;
+        button.innerHTML = item.svg;
+        
+        button.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const selectedText = window.getSelection().toString();
+          if (selectedText.trim()) {
+            // FIX: Wrap sendMessage in try-catch to handle context invalidation.
+            try {
+              chrome.runtime.sendMessage({
+                action: 'triggerContextMenuAction',
+                payload: {
+                  action: item.action,
+                  selectionText: selectedText,
+                }
+              });
+            } catch (error) {
+              if (error.message.includes('Extension context invalidated')) {
+                console.warn('GeminiAnswerBot: Could not send message, context invalidated. This is expected if the extension was reloaded.');
+              } else {
+                console.error('GeminiAnswerBot: Error sending message:', error);
+              }
+            }
+          }
+          hideToolbar();
+        });
+        toolbarElement.appendChild(button);
+      });
+      
+      document.body.appendChild(toolbarElement);
+    }
+
+    function injectToolbarCSS() {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.type = 'text/css';
+      link.href = chrome.runtime.getURL('assets/toolbar.css');
+      document.head.appendChild(link);
+    }
+
+    function showToolbar() {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed) {
+        hideToolbar();
+        return;
+      }
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      if (rect.width < 5 && rect.height < 5) {
+        hideToolbar();
+        return;
+      }
+      toolbarElement.classList.add('visible');
+      const toolbarWidth = toolbarElement.offsetWidth;
+      const toolbarHeight = toolbarElement.offsetHeight;
+      let top = rect.top + window.scrollY - toolbarHeight - 10;
+      let left = rect.left + window.scrollX + (rect.width / 2) - (toolbarWidth / 2);
+      if (top < window.scrollY) {
+        top = rect.bottom + window.scrollY + 10;
+      }
+      if (left < 0) left = 5;
+      if (left + toolbarWidth > document.documentElement.clientWidth) {
+        left = document.documentElement.clientWidth - toolbarWidth - 5;
+      }
+      toolbarElement.style.top = `${top}px`;
+      toolbarElement.style.left = `${left}px`;
+    }
+
+    function hideToolbar() {
+      if (toolbarElement) {
+        toolbarElement.classList.remove('visible');
+      }
+    }
+    
+    injectToolbarCSS();
+    createToolbar();
+
+    document.addEventListener('mouseup', () => {
+      setTimeout(() => {
+        const selectionText = window.getSelection().toString().trim();
+        if (selectionText.length > 5) {
+          showToolbar();
+        } else {
+          hideToolbar();
+        }
+      }, 10);
+    });
+
+    document.addEventListener('mousedown', (e) => {
+      if (toolbarElement && !toolbarElement.contains(e.target)) {
+        hideToolbar();
+      }
+    });
   }
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

@@ -1,24 +1,38 @@
 // js/background.js
 
+/**
+ * Handles the logic for context menu and toolbar actions.
+ * @param {chrome.tabs.Tab} tab The active tab.
+ * @param {string} action The action to perform (e.g., 'summarize', 'rephrase-English').
+ * @param {string} selectionText The selected text.
+ */
+async function handleContextAction(tab, action, selectionText) {
+  if (!tab || !tab.id) {
+    console.error("Context action triggered without a valid tab.");
+    return;
+  }
+  // Store the necessary data in local storage for the popup to retrieve.
+  await chrome.storage.local.set({
+    [`context_action_${tab.id}`]: { action, selectionText }
+  });
+  // Open the popup to display the result.
+  chrome.action.openPopup();
+}
+
 // Fungsi untuk membuat ulang menu konteks secara dinamis
 async function updateContextMenus() {
-  // Hapus semua menu yang ada untuk menghindari duplikasi
   await chrome.contextMenus.removeAll();
-
-  // Buat menu induk
   chrome.contextMenus.create({
     id: "gemini-answer-parent",
     title: "GeminiAnswerBot Actions",
     contexts: ["selection"]
   });
 
-  // Daftar aksi standar
   const standardActions = [
     { id: 'summarize', title: 'Summarize Selection' },
     { id: 'explain', title: 'Explain Selection' },
     { id: 'translate', title: 'Translate Selection' }
   ];
-
   standardActions.forEach(action => {
     chrome.contextMenus.create({
       id: action.id,
@@ -28,20 +42,16 @@ async function updateContextMenus() {
     });
   });
 
-  // Ambil pengaturan profil aktif untuk bahasa rephrase
   const { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
   const defaultLanguages = 'English, Indonesian';
   let rephraseLanguages = defaultLanguages;
-
   if (promptProfiles && activeProfile && promptProfiles[activeProfile] && promptProfiles[activeProfile].rephraseLanguages) {
     rephraseLanguages = promptProfiles[activeProfile].rephraseLanguages;
   } else if (promptProfiles && promptProfiles['Default'] && promptProfiles['Default'].rephraseLanguages) {
     rephraseLanguages = promptProfiles['Default'].rephraseLanguages;
   }
-
   const languages = rephraseLanguages.split(',').map(lang => lang.trim()).filter(lang => lang);
 
-  // Jika ada bahasa untuk rephrase, buat menu dan sub-menunya
   if (languages.length > 0) {
     chrome.contextMenus.create({
       id: "rephrase-parent",
@@ -49,10 +59,9 @@ async function updateContextMenus() {
       title: "Rephrase Selection into...",
       contexts: ["selection"]
     });
-
     languages.forEach(lang => {
       chrome.contextMenus.create({
-        id: `rephrase-${lang}`, // ID unik untuk setiap bahasa, misal: "rephrase-English"
+        id: `rephrase-${lang}`,
         parentId: "rephrase-parent",
         title: lang,
         contexts: ["selection"]
@@ -61,13 +70,11 @@ async function updateContextMenus() {
   }
 }
 
-// Panggil saat ekstensi diinstal atau diupdate
 chrome.runtime.onInstalled.addListener(updateContextMenus);
-
-// Panggil saat browser dimulai
 chrome.runtime.onStartup.addListener(updateContextMenus);
 
 async function performApiCall(payload) {
+    // ... (kode fungsi performApiCall tetap sama, tidak perlu diubah)
     const { apiKey, model, systemPrompt, userContent, generationConfig, originalUserContent, purpose } = payload;
     const endpoint = 'streamGenerateContent';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}&alt=sse`;
@@ -134,6 +141,7 @@ async function performApiCall(payload) {
 }
   
 function handleTestConnection(payload, sendResponse) {
+    // ... (kode fungsi handleTestConnection tetap sama, tidak perlu diubah)
     const { apiKey } = payload;
     const testModel = 'gemini-1.5-flash-latest';
     const testContent = "Reply with only 'OK'.";
@@ -157,20 +165,10 @@ function handleTestConnection(payload, sendResponse) {
     .catch(err => sendResponse({ success: false, error: err.message }));
 }
 
+// Listener untuk menu klik-kanan, sekarang memanggil fungsi yang direfactor
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-    if (!tab || !tab.id) {
-      console.error("Context menu clicked without a valid tab context.");
-      return;
-    }
-    
-    // Pastikan menu yang diklik adalah bagian dari ekstensi kita
     if (info.selectionText && (info.parentMenuItemId === "gemini-answer-parent" || info.parentMenuItemId === "rephrase-parent")) {
-      chrome.storage.local.set({
-        // Simpan seluruh ID menu agar kita bisa mendapatkan bahasanya nanti
-        [`context_action_${tab.id}`]: { action: info.menuItemId, selectionText: info.selectionText }
-      }, () => {
-        chrome.action.openPopup();
-      });
+      handleContextAction(tab, info.menuItemId, info.selectionText);
     }
 });
   
@@ -185,6 +183,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     if (request.action === 'updateContextMenus') {
       updateContextMenus();
+      return true;
+    }
+    // Listener baru untuk aksi dari toolbar
+    if (request.action === 'triggerContextMenuAction') {
+      // 'sender.tab' sudah disediakan oleh Chrome saat pesan dikirim dari content script
+      handleContextAction(sender.tab, request.payload.action, request.payload.selectionText);
       return true;
     }
 });
