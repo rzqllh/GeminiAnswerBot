@@ -1,25 +1,16 @@
 // js/background.js
 
-/**
- * Handles the logic for context menu and toolbar actions.
- * @param {chrome.tabs.Tab} tab The active tab.
- * @param {string} action The action to perform (e.g., 'summarize', 'rephrase-English').
- * @param {string} selectionText The selected text.
- */
 async function handleContextAction(tab, action, selectionText) {
   if (!tab || !tab.id) {
     console.error("Context action triggered without a valid tab.");
     return;
   }
-  // Store the necessary data in local storage for the popup to retrieve.
   await chrome.storage.local.set({
     [`context_action_${tab.id}`]: { action, selectionText }
   });
-  // Open the popup to display the result.
   chrome.action.openPopup();
 }
 
-// Fungsi untuk membuat ulang menu konteks secara dinamis
 async function updateContextMenus() {
   await chrome.contextMenus.removeAll();
   chrome.contextMenus.create({
@@ -74,8 +65,26 @@ chrome.runtime.onInstalled.addListener(updateContextMenus);
 chrome.runtime.onStartup.addListener(updateContextMenus);
 
 async function performApiCall(payload) {
-    // ... (kode fungsi performApiCall tetap sama, tidak perlu diubah)
-    const { apiKey, model, systemPrompt, userContent, generationConfig, originalUserContent, purpose } = payload;
+    const { apiKey, model, systemPrompt, userContent, generationConfig: baseGenerationConfig, originalUserContent, purpose } = payload;
+    
+    // Logic for determining temperature
+    const settings = await chrome.storage.sync.get(['promptProfiles', 'activeProfile', 'temperature']);
+    const activeProfileName = settings.activeProfile || 'Default';
+    const activeProfile = settings.promptProfiles ? (settings.promptProfiles[activeProfileName] || {}) : {};
+    const globalTemp = settings.temperature !== undefined ? settings.temperature : 0.4;
+    
+    const purposeBase = purpose.startsWith('rephrase-') ? 'rephrase' : purpose;
+    const tempKey = `${purposeBase}_temp`;
+
+    const finalTemperature = activeProfile[tempKey] !== undefined ? activeProfile[tempKey] : globalTemp;
+
+    const generationConfig = {
+        ...baseGenerationConfig,
+        temperature: finalTemperature
+    };
+    
+    console.log(`Executing '${purpose}' with temperature: ${finalTemperature} (Global: ${globalTemp}, Profile Specific: ${activeProfile[tempKey] !== undefined})`);
+
     const endpoint = 'streamGenerateContent';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}&alt=sse`;
   
@@ -141,7 +150,6 @@ async function performApiCall(payload) {
 }
   
 function handleTestConnection(payload, sendResponse) {
-    // ... (kode fungsi handleTestConnection tetap sama, tidak perlu diubah)
     const { apiKey } = payload;
     const testModel = 'gemini-1.5-flash-latest';
     const testContent = "Reply with only 'OK'.";
@@ -165,7 +173,6 @@ function handleTestConnection(payload, sendResponse) {
     .catch(err => sendResponse({ success: false, error: err.message }));
 }
 
-// Listener untuk menu klik-kanan, sekarang memanggil fungsi yang direfactor
 chrome.contextMenus.onClicked.addListener((info, tab) => {
     if (info.selectionText && (info.parentMenuItemId === "gemini-answer-parent" || info.parentMenuItemId === "rephrase-parent")) {
       handleContextAction(tab, info.menuItemId, info.selectionText);
@@ -185,9 +192,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       updateContextMenus();
       return true;
     }
-    // Listener baru untuk aksi dari toolbar
     if (request.action === 'triggerContextMenuAction') {
-      // 'sender.tab' sudah disediakan oleh Chrome saat pesan dikirim dari content script
       handleContextAction(sender.tab, request.payload.action, request.payload.selectionText);
       return true;
     }

@@ -472,7 +472,6 @@ input[type="range"] {
   color: var(--secondary-text);
 }
 
-/* Custom History List Styles */
 #history-list-container {
   display: flex;
   flex-direction: column;
@@ -567,16 +566,19 @@ input[type="range"] {
     border-radius: 12px;
     margin-bottom: 32px;
 }
+
 .form-group-inline {
     display: flex;
     align-items: center;
     gap: 12px;
 }
+
 .form-group-inline label {
     margin-bottom: 0;
     font-weight: 500;
     white-space: nowrap;
 }
+
 .profile-actions {
     display: flex;
     gap: 8px;
@@ -609,4 +611,21 @@ legend {
   margin-top: -8px;
   margin-bottom: 24px;
   max-width: 90%;
+}
+
+.temperature-control-group {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.temperature-control-group > label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--secondary-text);
+    margin-bottom: 12px;
+}
+
+.temperature-control-group .slider-container {
+    padding-left: 4px;
 }

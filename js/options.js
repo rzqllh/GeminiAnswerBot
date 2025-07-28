@@ -3,6 +3,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     let activeToast = null;
     const notificationContainer = document.getElementById('notification-container');
+    let globalTemperature = 0.4; // Default global temperature, will be updated from storage
 
     function showToast(title, message, type = 'info') {
         if (activeToast) {
@@ -36,17 +37,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const historyListContainer = document.getElementById('history-list-container');
     
-    // FUNGSI YANG DIPERBAIKI DENGAN BENAR
-function escapeHtml(unsafe) {
-    if (!unsafe) return '';
-    return String(unsafe)
-         .replace(/&/g, "&amp;")
-         .replace(/</g, "&lt;")
-         .replace(/>/g, "&gt;")
-         .replace(/"/g, "&quot;")
-         .replace(/'/g, "&#039;");
-}
-
+    function escapeHtml(unsafe) {
+        if (!unsafe) return '';
+        return String(unsafe)
+             .replace(/&/g, "&")
+             .replace(/</g, "<")
+             .replace(/>/g, ">")
+             .replace(/"/g, "'")
+             .replace(/'/g, '"');
+    }
 
     function formatQuestionContent(content) {
         if (!content) return '';
@@ -120,6 +119,7 @@ function escapeHtml(unsafe) {
     const autoHighlightToggle = document.getElementById('autoHighlightToggle');
     const preSubmissionCheckToggle = document.getElementById('preSubmissionCheckToggle');
     const temperatureSlider = document.getElementById('temperatureSlider');
+    const temperatureValue = document.getElementById('temperatureValue');
     const clearHistoryButton = document.getElementById('clearHistoryButton');
     const exportHistoryButton = document.getElementById('exportHistoryButton');
 
@@ -128,11 +128,21 @@ function escapeHtml(unsafe) {
         if (modelSelect) modelSelect.value = result.selectedModel || 'gemini-1.5-flash-latest';
         if (autoHighlightToggle) autoHighlightToggle.checked = result.autoHighlight ?? false;
         if (preSubmissionCheckToggle) preSubmissionCheckToggle.checked = result.preSubmissionCheck ?? true;
-        if (temperatureSlider) {
-            temperatureSlider.value = result.temperature !== undefined ? result.temperature : 0.4;
-        }
+        
+        const temp = result.temperature !== undefined ? result.temperature : 0.4;
+        if (temperatureSlider) temperatureSlider.value = temp;
+        if (temperatureValue) temperatureValue.textContent = parseFloat(temp).toFixed(1);
+        globalTemperature = temp; // Set initial global temperature
     });
     
+    if (temperatureSlider) {
+        temperatureSlider.addEventListener('input', () => {
+            if (temperatureValue) {
+                temperatureValue.textContent = parseFloat(temperatureSlider.value).toFixed(1);
+            }
+        });
+    }
+
     if (revealApiKey) {
         revealApiKey.addEventListener('click', function() {
             const isPassword = apiKeyInput.type === 'password';
@@ -143,14 +153,17 @@ function escapeHtml(unsafe) {
     }
     if (saveGeneralButton) {
         saveGeneralButton.addEventListener('click', function() {
+            const newGlobalTemp = parseFloat(temperatureSlider.value);
             const settingsToSave = {
                 'geminiApiKey': apiKeyInput.value.trim(),
                 'selectedModel': modelSelect.value,
                 'autoHighlight': autoHighlightToggle.checked,
                 'preSubmissionCheck': preSubmissionCheckToggle.checked,
-                'temperature': parseFloat(temperatureSlider.value)
+                'temperature': newGlobalTemp
             };
             chrome.storage.sync.set(settingsToSave, () => {
+                globalTemperature = newGlobalTemp; // Update global var on save
+                loadPromptsForActiveProfile(); // Reload prompts to update placeholders
                 showToast('Success', 'General settings have been saved!', 'success');
             });
         });
@@ -181,6 +194,7 @@ function escapeHtml(unsafe) {
     const renameProfileBtn = document.getElementById('renameProfileBtn');
     const deleteProfileBtn = document.getElementById('deleteProfileBtn');
     const savePromptsButton = document.getElementById('savePromptsButton');
+    
     const promptTextareas = {
         cleaning: document.getElementById('cleaningPrompt'),
         answer: document.getElementById('answerPrompt'),
@@ -189,19 +203,39 @@ function escapeHtml(unsafe) {
         translate: document.getElementById('translatePrompt'),
         rephrase: document.getElementById('rephrasePrompt')
     };
+
+    const promptTempSliders = {
+        answer: document.getElementById('answer_temp_slider'),
+        explanation: document.getElementById('explanation_temp_slider'),
+        summarize: document.getElementById('summarize_temp_slider'),
+        translate: document.getElementById('translate_temp_slider'),
+        rephrase: document.getElementById('rephrase_temp_slider')
+    };
+
     const rephraseLanguagesInput = document.getElementById('rephraseLanguages');
+
+    function initializeTempSliders() {
+        Object.values(promptTempSliders).forEach(slider => {
+            if (slider) {
+                const valueDisplay = document.getElementById(slider.dataset.target);
+                slider.addEventListener('input', () => {
+                    valueDisplay.textContent = parseFloat(slider.value).toFixed(1);
+                });
+            }
+        });
+    }
 
     function updateButtonStates() {
         const selectedProfile = profileSelect.value;
         const isDefault = selectedProfile === 'Default';
         const isLastProfile = profileSelect.options.length <= 1;
-
-        renameProfileBtn.disabled = isDefault;
-        deleteProfileBtn.disabled = isDefault || isLastProfile;
+        if (renameProfileBtn) renameProfileBtn.disabled = isDefault;
+        if (deleteProfileBtn) deleteProfileBtn.disabled = isDefault || isLastProfile;
     }
 
     async function populateProfileSelector() {
         const { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+        if (!profileSelect) return;
         profileSelect.innerHTML = '';
         for (const profileName in promptProfiles) {
             const option = document.createElement('option');
@@ -223,7 +257,19 @@ function escapeHtml(unsafe) {
                 promptTextareas[key].placeholder = DEFAULT_PROMPTS[key] || '';
             }
         }
-        rephraseLanguagesInput.value = activeProfileData.rephraseLanguages || 'English, Indonesian';
+
+        for (const key in promptTempSliders) {
+            const slider = promptTempSliders[key];
+            if (slider) {
+                const valueDisplay = document.getElementById(slider.dataset.target);
+                const tempValue = activeProfileData[`${key}_temp`] !== undefined ? activeProfileData[`${key}_temp`] : globalTemperature;
+                slider.value = tempValue;
+                valueDisplay.textContent = parseFloat(tempValue).toFixed(1);
+                slider.title = `Using ${activeProfileData[`${key}_temp`] !== undefined ? 'profile-specific' : 'global'} temperature.`;
+            }
+        }
+
+        if(rephraseLanguagesInput) rephraseLanguagesInput.value = activeProfileData.rephraseLanguages || 'English, Indonesian';
     }
 
     async function initializePromptManager() {
@@ -237,86 +283,107 @@ function escapeHtml(unsafe) {
         }
         await populateProfileSelector();
         await loadPromptsForActiveProfile();
+        initializeTempSliders();
+    }
+    if (profileSelect) {
+        profileSelect.addEventListener('change', async () => {
+            const newActiveProfile = profileSelect.value;
+            await chrome.storage.sync.set({ activeProfile: newActiveProfile });
+            await loadPromptsForActiveProfile();
+            updateButtonStates();
+            showToast('Profile Changed', `Active profile is now "${newActiveProfile}".`, 'info');
+        });
     }
 
-    profileSelect.addEventListener('change', async () => {
-        const newActiveProfile = profileSelect.value;
-        await chrome.storage.sync.set({ activeProfile: newActiveProfile });
-        await loadPromptsForActiveProfile();
-        updateButtonStates();
-        showToast('Profile Changed', `Active profile is now "${newActiveProfile}".`, 'info');
-    });
-
-    savePromptsButton.addEventListener('click', async () => {
-        let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
-        
-        const currentProfileData = promptProfiles[activeProfile] || {};
-        for (const key in promptTextareas) {
-            const currentValue = promptTextareas[key].value.trim();
-            const defaultValue = DEFAULT_PROMPTS[key] || '';
-            if (currentValue !== defaultValue) {
-                currentProfileData[key] = currentValue;
-            } else {
-                delete currentProfileData[key];
+    if (savePromptsButton) {
+        savePromptsButton.addEventListener('click', async () => {
+            let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+            
+            const currentProfileData = promptProfiles[activeProfile] || {};
+            for (const key in promptTextareas) {
+                const currentValue = promptTextareas[key].value.trim();
+                const defaultValue = DEFAULT_PROMPTS[key] || '';
+                if (currentValue !== defaultValue && currentValue) {
+                    currentProfileData[key] = currentValue;
+                } else {
+                    delete currentProfileData[key];
+                }
             }
-        }
-        const currentLangValue = rephraseLanguagesInput.value.trim();
-        if (currentLangValue !== 'English, Indonesian') {
-             currentProfileData.rephraseLanguages = currentLangValue;
-        } else {
-             delete currentProfileData.rephraseLanguages;
-        }
 
-        promptProfiles[activeProfile] = currentProfileData;
-        await chrome.storage.sync.set({ promptProfiles });
-        
-        chrome.runtime.sendMessage({ action: 'updateContextMenus' });
+            for (const key in promptTempSliders) {
+                const slider = promptTempSliders[key];
+                if (slider) {
+                    const tempValue = parseFloat(slider.value);
+                    if (Math.abs(tempValue - globalTemperature) > 0.01) { // Use tolerance for float comparison
+                        currentProfileData[`${key}_temp`] = tempValue;
+                    } else {
+                        delete currentProfileData[`${key}_temp`];
+                    }
+                }
+            }
 
-        showToast('Success', `Prompts for "${activeProfile}" have been saved!`, 'success');
-    });
+            const currentLangValue = rephraseLanguagesInput.value.trim();
+            if (currentLangValue !== 'English, Indonesian') {
+                 currentProfileData.rephraseLanguages = currentLangValue;
+            } else {
+                 delete currentProfileData.rephraseLanguages;
+            }
 
-    newProfileBtn.addEventListener('click', async () => {
-        const newName = prompt("Enter a name for the new profile:", "My New Profile");
-        if (!newName || newName.trim() === '') return;
-        let { promptProfiles, activeProfile } = await chrome.storage.sync.get('promptProfiles');
-        if (promptProfiles[newName]) {
-            showToast('Error', 'A profile with that name already exists.', 'error');
-            return;
-        }
-        promptProfiles[newName] = { ...promptProfiles[activeProfile] };
-        await chrome.storage.sync.set({ promptProfiles, activeProfile: newName });
-        await initializePromptManager();
-        chrome.runtime.sendMessage({ action: 'updateContextMenus' });
-        showToast('Success', `Profile "${newName}" created.`, 'success');
-    });
+            promptProfiles[activeProfile] = currentProfileData;
+            await chrome.storage.sync.set({ promptProfiles });
+            
+            chrome.runtime.sendMessage({ action: 'updateContextMenus' });
+            showToast('Success', `Prompts for "${activeProfile}" have been saved!`, 'success');
+        });
+    }
 
-    renameProfileBtn.addEventListener('click', async () => {
-        let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
-        const newName = prompt(`Enter a new name for the "${activeProfile}" profile:`, activeProfile);
-        if (!newName || newName.trim() === '' || newName === activeProfile) return;
-        if (promptProfiles[newName]) {
-            showToast('Error', 'A profile with that name already exists.', 'error');
-            return;
-        }
-        promptProfiles[newName] = promptProfiles[activeProfile];
-        delete promptProfiles[activeProfile];
-        await chrome.storage.sync.set({ promptProfiles, activeProfile: newName });
-        await initializePromptManager();
-        chrome.runtime.sendMessage({ action: 'updateContextMenus' });
-        showToast('Success', `Profile renamed to "${newName}".`, 'success');
-    });
-
-    deleteProfileBtn.addEventListener('click', async () => {
-        let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
-        if (confirm(`Are you sure you want to delete the "${activeProfile}" profile? This cannot be undone.`)) {
-            delete promptProfiles[activeProfile];
-            const newActiveProfile = 'Default';
-            await chrome.storage.sync.set({ promptProfiles, activeProfile: newActiveProfile });
+    if (newProfileBtn) {
+        newProfileBtn.addEventListener('click', async () => {
+            const newName = prompt("Enter a name for the new profile:", "My New Profile");
+            if (!newName || newName.trim() === '') return;
+            let { promptProfiles, activeProfile } = await chrome.storage.sync.get('promptProfiles');
+            if (promptProfiles[newName]) {
+                showToast('Error', 'A profile with that name already exists.', 'error');
+                return;
+            }
+            promptProfiles[newName] = { ...promptProfiles[activeProfile] };
+            await chrome.storage.sync.set({ promptProfiles, activeProfile: newName });
             await initializePromptManager();
             chrome.runtime.sendMessage({ action: 'updateContextMenus' });
-            showToast('Success', `Profile "${activeProfile}" has been deleted.`, 'success');
-        }
-    });
+            showToast('Success', `Profile "${newName}" created.`, 'success');
+        });
+    }
+
+    if (renameProfileBtn) {
+        renameProfileBtn.addEventListener('click', async () => {
+            let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+            const newName = prompt(`Enter a new name for the "${activeProfile}" profile:`, activeProfile);
+            if (!newName || newName.trim() === '' || newName === activeProfile) return;
+            if (promptProfiles[newName]) {
+                showToast('Error', 'A profile with that name already exists.', 'error');
+                return;
+            }
+            promptProfiles[newName] = promptProfiles[activeProfile];
+            delete promptProfiles[activeProfile];
+            await chrome.storage.sync.set({ promptProfiles, activeProfile: newName });
+            await initializePromptManager();
+            chrome.runtime.sendMessage({ action: 'updateContextMenus' });
+            showToast('Success', `Profile renamed to "${newName}".`, 'success');
+        });
+    }
+    if (deleteProfileBtn) {
+        deleteProfileBtn.addEventListener('click', async () => {
+            let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+            if (confirm(`Are you sure you want to delete the "${activeProfile}" profile? This cannot be undone.`)) {
+                delete promptProfiles[activeProfile];
+                const newActiveProfile = 'Default';
+                await chrome.storage.sync.set({ promptProfiles, activeProfile: newActiveProfile });
+                await initializePromptManager();
+                chrome.runtime.sendMessage({ action: 'updateContextMenus' });
+                showToast('Success', `Profile "${activeProfile}" has been deleted.`, 'success');
+            }
+        });
+    }
 
     initializePromptManager();
     

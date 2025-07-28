@@ -1,7 +1,7 @@
 # GeminiAnswerBot
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.5.0-brightgreen)
+![Version](https://img.shields.io/badge/version-1.9.2-brightgreen)
 
 **GeminiAnswerBot** adalah ekstensi Chrome cerdas yang mengutamakan privasi, didukung oleh Google Gemini API. Ekstensi ini menganalisis konten pada halaman untuk secara cerdas menyelesaikan kuis, menyempurnakan teks yang dipilih, dan menyediakan alat konteks bertenaga AI—semuanya langsung di browser Anda.
 
@@ -11,6 +11,7 @@
 
 - **Penyelesai Kuis Cerdas**: Mendeteksi dan menyelesaikan soal kuis secara otomatis pada halaman yang didukung.
 - **Penyorotan Jawaban**: Menyorot jawaban yang benar secara langsung di dalam halaman web (DOM) dengan gaya yang konsisten dengan tema.
+- **Toolbar Aksi Mengambang (Inline Toolbar)**: Saat menyeleksi teks, sebuah toolbar modern akan muncul untuk akses super cepat ke aksi AI tanpa perlu klik-kanan.
 - **Tindakan Teks Kontekstual**: Klik kanan pada teks yang dipilih untuk:
   - Meringkas
   - Menjelaskan
@@ -25,12 +26,11 @@
 ## Skenario Penggunaan
 
 - Secara instan menyelesaikan dan menyorot jawaban kuis di platform e-learning.
-- Meringkas atau menjelaskan dokumentasi yang padat saat membaca.
+- **Meringkas, menjelaskan, atau menerjemahkan teks dengan cepat menggunakan toolbar mengambang saat membaca dokumentasi atau artikel.**
 - Menerjemahkan atau memparafrasekan teks yang dipilih secara real-time tanpa meninggalkan halaman.
 - Membangun sistem prompt dan perilaku agen Anda sendiri untuk Gemini melalui kustomisasi prompt.
 
 ---
-
 ## Memulai
 
 ### Prasyarat
@@ -78,25 +78,27 @@ Proyek ini diatur dengan pemisahan tugas yang jelas untuk skalabilitas dan pemel
 ```
 GeminiAnswerBot/
 ├── assets/
-│   ├── options.css
-│   └── popup.css
-│   └── icon.png
+│ ├── options.css
+│ ├── popup.css
+│ ├── toolbar.css # BARU: Style untuk inline toolbar
+│ └── icon.png
 ├── js/
-│   ├── vendor/
-│   │   └── marked.min.js   # Library untuk render Markdown
-│   ├── background.js       # Service worker untuk event & panggilan API
-│   ├── content.js          # Script konten yang diinjeksi
-│   ├── options.js          # Logika untuk dasbor opsi
-│   ├── prompts.js          # Prompt default untuk AI
-│   └── mark.min.js         # Library untuk menyorot teks
+│ ├── vendor/
+│ │ └── marked.min.js # Library untuk render Markdown
+│ ├── background.js # Service worker untuk event & panggilan API
+│ ├── content.js # Script konten yang diinjeksi
+│ ├── options.js # Logika untuk dasbor opsi
+│ ├── prompts.js # Prompt default untuk AI
+│ └── mark.min.js # Library untuk menyorot teks
 ├── ui/
-│   ├── options.html        # UI untuk Opsi, Riwayat, dan Data
-│   └── popup.html          # UI popup utama ekstensi
-├── .gitignore              # File yang diabaikan oleh Git
-├── LICENSE                 # Lisensi proyek
-├── manifest.json           # File konfigurasi inti ekstensi
-└── README.md               # Dokumentasi ini
+│ ├── options.html # UI untuk Opsi, Riwayat, dan Data
+│ └── popup.html # UI popup utama ekstensi
+├── .gitignore # File yang diabaikan oleh Git
+├── LICENSE # Lisensi proyek
+├── manifest.json # File konfigurasi inti ekstensi
+└── README.md # Dokumentasi ini
 ```
+
 ---
 
 ## Privasi & Keamanan
@@ -112,7 +114,7 @@ GeminiAnswerBot **tidak mengumpulkan data pribadi apa pun**. Semua pemrosesan te
 
 ## Catatan Pengembangan
 
-- `content.js` digunakan untuk logika pemindaian halaman dan penyorotan.
+- `content.js` digunakan untuk logika pemindaian halaman, penyorotan, dan inline toolbar.
 - `background.js` menangani komunikasi dengan Gemini API.
 - Semua logika UI untuk pengaturan ditangani di `options.js`.
 - Prompt dapat diedit langsung melalui `prompts.js` atau halaman Opsi.
@@ -122,6 +124,14 @@ Setelah melakukan perubahan, buka `chrome://extensions/` dan klik **Reload** pad
 ---
 
 ## Changelog
+
+### [1.9.2] - 2025-07-29
+#### Added
+- **Inline Action Toolbar:** Implemented a sleek, floating toolbar that appears on text selection. This provides instant access to AI actions (Summarize, Explain, Translate) without needing to right-click, significantly speeding up a user's workflow. The toolbar is designed to be modern and unobtrusive, following Apple's HIG principles.
+#### Fixed
+- **Development Stability:** Added a defensive `try...catch` block around message passing in the content script. This gracefully handles the "Extension context invalidated" error that commonly occurs during development when the extension is reloaded, preventing console errors and improving the development experience.
+#### Changed
+- **Code Refactoring:** Refactored the context action logic in `background.js` into a reusable function (`handleContextAction`). This eliminates code duplication and ensures that both the traditional right-click context menu and the new Inline Action Toolbar use the same robust logic pathway.
 
 ### [1.9.1] - 2025-07-28
 #### Fixed
