@@ -525,3 +525,111 @@ body {
         color: var(--primary-text);
     }
 }
+
+/* == FEEDBACK & CORRECTION STYLES ========================== */
+.card-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+    padding: 8px var(--card-padding);
+    border-top: 1px solid var(--separator-color);
+    background-color: transparent; /* Changed */
+}
+
+.footer-label {
+    font-size: 13px;
+    color: var(--secondary-text);
+    font-weight: 500;
+    margin-right: auto; /* Push buttons to the right */
+}
+
+.feedback-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.feedback-button {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    background-color: var(--card-bg);
+    color: var(--secondary-text);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.feedback-button:hover {
+    background-color: var(--button-bg-hover);
+    color: var(--primary-text);
+    transform: scale(1.1);
+}
+
+.feedback-button.selected-correct {
+    background-color: var(--accent-green);
+    border-color: var(--accent-green);
+    color: white;
+    cursor: default;
+}
+
+.feedback-button.selected-incorrect {
+    background-color: var(--accent-red);
+    border-color: var(--accent-red);
+    color: white;
+    cursor: default;
+}
+
+.feedback-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+.feedback-button:disabled:hover {
+    background-color: var(--card-bg);
+}
+
+
+.correction-card {
+    border-color: var(--accent-blue);
+    animation: fadeIn 0.3s;
+}
+
+.correction-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.correction-option-button {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    text-align: left;
+    border: 1px solid var(--border-color);
+    background-color: var(--card-bg);
+    color: var(--primary-text);
+    border-radius: var(--button-border-radius);
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+    line-height: 1.4;
+}
+
+.correction-option-button:hover {
+    background-color: var(--button-bg-hover);
+    border-color: var(--secondary-text);
+}
+
+.correction-option-button code {
+    background-color: var(--button-bg-hover);
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+.text-center {
+    text-align: center;
+    color: var(--secondary-text);
+}

@@ -43,7 +43,8 @@ function sendMessageWithTimeout(tabId, message, timeout = 5000) {
 
 function isCode(str) {
     const trimmed = String(str).trim();
-    return trimmed.startsWith('<') && trimmed.endsWith('>');
+    // A simple check; can be made more robust if needed
+    return trimmed.startsWith('<') && trimmed.endsWith('>') || trimmed.includes('(') || trimmed.includes('{');
 }
 
 function formatQuestionContent(content) {
@@ -110,10 +111,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const retryExplanationButton = document.getElementById('retryExplanation');
     const copyAnswerButton = document.getElementById('copyAnswer');
     const copyExplanationButton = document.getElementById('copyExplanation');
+    const feedbackContainer = document.getElementById('feedbackContainer');
+    const feedbackCorrectBtn = document.getElementById('feedbackCorrect');
+    const feedbackIncorrectBtn = document.getElementById('feedbackIncorrect');
+    const correctionPanel = document.getElementById('correctionPanel');
+    const correctionOptionsContainer = document.getElementById('correctionOptions');
 
     let currentTab = null;
     let appConfig = {};
     let currentCacheKey = null;
+    let currentIncorrectAnswer = null;
 
     function displayInfoPanel(title, message) {
         hide(resultsWrapper);
@@ -184,6 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('error-settings-btn')?.addEventListener('click', () => chrome.runtime.openOptionsPage());
         document.getElementById('error-quota-btn')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://aistudio.google.com/billing' }));
         document.getElementById('error-google-btn')?.addEventListener('click', () => {
+            if (!query) return;
             const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
             chrome.tabs.create({ url: searchUrl });
         });
@@ -196,28 +204,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function callGeminiStream(purpose, contentText, originalUserContent = '') {
-        const { promptProfiles, activeProfile, temperature, selectedModel, geminiApiKey } = appConfig;
+        const { promptProfiles, activeProfile, selectedModel, geminiApiKey } = appConfig;
         const currentPrompts = (promptProfiles && promptProfiles[activeProfile]) || DEFAULT_PROMPTS;
         
         let systemPrompt = '';
         let userContent = contentText;
 
-        if (purpose.startsWith('rephrase-')) {
-            const language = purpose.split('-')[1];
-            systemPrompt = currentPrompts.rephrase || DEFAULT_PROMPTS.rephrase;
-            userContent = `Target Language: ${language}\n\nText to rephrase:\n${contentText}`;
-        } else {
-            switch(purpose) {
-                case 'cleaning': systemPrompt = currentPrompts.cleaning || DEFAULT_PROMPTS.cleaning; break;
-                case 'answer': systemPrompt = currentPrompts.answer || DEFAULT_PROMPTS.answer; break;
-                case 'explanation': systemPrompt = currentPrompts.explanation || DEFAULT_PROMPTS.explanation; break;
-                case 'summarize': systemPrompt = currentPrompts.summarize || DEFAULT_PROMPTS.summarize; break;
-                case 'explain': systemPrompt = currentPrompts.explanation || DEFAULT_PROMPTS.explanation; break;
-                case 'translate': systemPrompt = currentPrompts.translate || DEFAULT_PROMPTS.translate; break;
-            }
+        switch(purpose) {
+            case 'cleaning': systemPrompt = currentPrompts.cleaning || DEFAULT_PROMPTS.cleaning; break;
+            case 'answer': systemPrompt = currentPrompts.answer || DEFAULT_PROMPTS.answer; break;
+            case 'explanation': systemPrompt = currentPrompts.explanation || DEFAULT_PROMPTS.explanation; break;
+            case 'correction': systemPrompt = currentPrompts.correction || DEFAULT_PROMPTS.correction; break;
+            case 'summarize': systemPrompt = currentPrompts.summarize || DEFAULT_PROMPTS.summarize; break;
+            case 'explain': systemPrompt = currentPrompts.explanation || DEFAULT_PROMPTS.explanation; break; // Re-use explanation prompt
+            case 'translate': systemPrompt = currentPrompts.translate || DEFAULT_PROMPTS.translate; break;
+            default:
+                if (purpose.startsWith('rephrase-')) {
+                    const language = purpose.split('-')[1];
+                    systemPrompt = currentPrompts.rephrase || DEFAULT_PROMPTS.rephrase;
+                    userContent = `Target Language: ${language}\n\nText to rephrase:\n${contentText}`;
+                }
+                break;
         }
-        
-        const generationConfig = { temperature: temperature !== undefined ? temperature : 0.4 };
         
         chrome.runtime.sendMessage({ 
             action: 'callGeminiStream', 
@@ -226,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 model: selectedModel,
                 systemPrompt, 
                 userContent: userContent,
-                generationConfig, 
+                generationConfig: {}, // Let background script handle temperature
                 originalUserContent,
                 purpose
             }
@@ -289,13 +297,18 @@ document.addEventListener('DOMContentLoaded', () => {
             confidenceWrapperHtml += `<div class="token-count"><span class="token-count-label">Tokens Used</span><span class="token-count-value">${totalTokenCount}</span></div>`;
         }
         if(confidenceWrapperHtml) {
-            formattedHtml += `<div class.confidence-wrapper">${confidenceWrapperHtml}</div>`;
+            formattedHtml += `<div class="confidence-wrapper">${confidenceWrapperHtml}</div>`;
         }
         answerDisplay.innerHTML = formattedHtml;
         copyAnswerButton.dataset.copyText = answerText;
         retryAnswerButton.disabled = false;
         show(aiActionsWrapper);
         hide(explanationContainer);
+        hide(correctionPanel);
+        show(feedbackContainer);
+        resetFeedbackButtons();
+        currentIncorrectAnswer = answerText;
+
         if (appConfig.autoHighlight) {
             chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: [answerText] });
         }
@@ -321,6 +334,19 @@ document.addEventListener('DOMContentLoaded', () => {
         saveToHistory({ ...state, explanationHTML: fullText }, 'explanation');
     }
 
+    async function _handleCorrectionResult(fullText) {
+        // This function treats a correction result as a new explanation
+        explanationDisplay.innerHTML = marked.parse(fullText);
+        copyExplanationButton.dataset.copyText = fullText;
+        explanationButton.disabled = false;
+        retryExplanationButton.disabled = false;
+        show(explanationContainer);
+        // We can choose to save this as a special "correction" type in history if needed
+        const state = await getState();
+        saveToHistory({ ...state, explanationHTML: fullText }, 'correction');
+    }
+
+
     function _handleContextMenuResult(fullText, originalUserContent, purpose) {
         show(contentDisplayWrapper);
         show(answerContainer);
@@ -329,6 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
         copyAnswerButton.dataset.copyText = fullText;
         hide(aiActionsWrapper);
         hide(explanationContainer);
+        hide(feedbackContainer);
         const historyActionType = purpose.split('-')[0];
         saveToHistory({ cleanedContent: originalUserContent, answerHTML: fullText }, historyActionType);
     }
@@ -354,7 +381,63 @@ document.addEventListener('DOMContentLoaded', () => {
         if (history.length > 100) history.pop();
         await chrome.storage.local.set({ history });
     }
-    
+
+    function resetFeedbackButtons() {
+        feedbackCorrectBtn.disabled = false;
+        feedbackIncorrectBtn.disabled = false;
+        feedbackCorrectBtn.classList.remove('selected-correct');
+        feedbackIncorrectBtn.classList.remove('selected-incorrect');
+    }
+
+    async function handleIncorrectFeedback() {
+        feedbackIncorrectBtn.disabled = true;
+        feedbackCorrectBtn.disabled = true;
+        feedbackIncorrectBtn.classList.add('selected-incorrect');
+        
+        hide(aiActionsWrapper);
+        show(correctionPanel);
+        correctionOptionsContainer.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Fetching options...</p></div>`;
+        
+        try {
+            const response = await sendMessageWithTimeout(currentTab.id, { action: "get_quiz_options" });
+            if (response && response.options && response.options.length > 0) {
+                renderCorrectionOptions(response.options);
+            } else {
+                correctionOptionsContainer.innerHTML = '<p class="text-center">Could not automatically find options on the page.</p>';
+            }
+        } catch (e) {
+            correctionOptionsContainer.innerHTML = `<p class="text-center">Error fetching options: ${e.message}</p>`;
+        }
+    }
+
+    function renderCorrectionOptions(options) {
+        correctionOptionsContainer.innerHTML = '';
+        options.forEach(optionText => {
+            const button = document.createElement('button');
+            button.className = 'correction-option-button';
+            
+            if (isCode(optionText)) {
+                button.innerHTML = `<code>${escapeHtml(optionText)}</code>`;
+            } else {
+                button.textContent = optionText;
+            }
+            
+            button.addEventListener('click', async () => {
+                const state = await getState();
+                const userCorrectAnswer = optionText;
+                
+                const correctionContent = `The original quiz content was:\n${state.cleanedContent}\n\nMy previous incorrect answer was: \`${currentIncorrectAnswer}\`\n\nThe user has indicated the correct answer is: \`${userCorrectAnswer}\``;
+
+                hide(correctionPanel);
+                show(explanationContainer);
+                explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div><p>Generating corrected explanation...</p></div>`;
+
+                callGeminiStream('correction', correctionContent);
+            });
+            correctionOptionsContainer.appendChild(button);
+        });
+    }
+
     async function initialize() {
         [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!currentTab || !currentTab.id) {
@@ -362,13 +445,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // --- BARU: Deteksi halaman terproteksi ---
         const protectedUrls = ['chrome://', 'https://chrome.google.com/'];
         if (protectedUrls.some(url => currentTab.url.startsWith(url))) {
-            displayInfoPanel(
-                'Page Not Supported',
-                'For your security, Chrome extensions are not allowed to run on this special page.'
-            );
+            displayInfoPanel('Page Not Supported', 'For your security, Chrome extensions are not allowed to run on this special page.');
             return;
         }
         
@@ -400,16 +479,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (state.cleanedContent && !state.answerHTML) {
                     hide(messageArea);
                     show(resultsWrapper);
-                    contentDisplay.innerHTML = formatQuestionContent(state.cleanedContent);
-                    show(contentDisplayWrapper);
                     show(answerContainer);
+                    contentDisplay.innerHTML = formatQuestionContent(state.cleanedContent);
                     getAnswer();
                 } else if (state.cleanedContent && state.answerHTML) {
                     hide(messageArea);
                     show(resultsWrapper);
-                    contentDisplay.innerHTML = formatQuestionContent(state.cleanedContent);
-                    show(contentDisplayWrapper);
                     show(answerContainer);
+                    contentDisplay.innerHTML = formatQuestionContent(state.cleanedContent);
                     await _handleAnswerResult(state.answerHTML, false, state.totalTokenCount);
                     if (state.explanationHTML) {
                        await _handleExplanationResult(state.explanationHTML);
@@ -439,6 +516,12 @@ document.addEventListener('DOMContentLoaded', () => {
     explanationButton.addEventListener('click', getExplanation);
     retryAnswerButton.addEventListener('click', getAnswer);
     retryExplanationButton.addEventListener('click', getExplanation);
+    feedbackCorrectBtn.addEventListener('click', () => {
+        feedbackCorrectBtn.disabled = true;
+        feedbackIncorrectBtn.disabled = true;
+        feedbackCorrectBtn.classList.add('selected-correct');
+    });
+    feedbackIncorrectBtn.addEventListener('click', handleIncorrectFeedback);
     
     chrome.runtime.onMessage.addListener((request) => {
         if (request.action !== 'geminiStreamUpdate') return;
@@ -454,8 +537,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let targetDisplay;
         if (purpose === 'cleaning') targetDisplay = contentDisplay;
-        else if (purpose.includes('answer')) targetDisplay = answerDisplay;
-        else if (purpose === 'explanation') targetDisplay = explanationDisplay;
+        else if (purpose === 'answer') targetDisplay = answerDisplay;
+        else if (purpose === 'explanation' || purpose === 'correction') targetDisplay = explanationDisplay;
         else targetDisplay = answerDisplay;
 
         if (payload.chunk) {
@@ -467,6 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'cleaning': _handleCleaningResult(fullText); break;
                 case 'answer': _handleAnswerResult(fullText, false, payload.totalTokenCount); break;
                 case 'explanation': _handleExplanationResult(fullText); break;
+                case 'correction': _handleCorrectionResult(fullText); break;
                 case 'summarize': case 'explain': case 'translate':
                     _handleContextMenuResult(fullText, payload.originalUserContent, purpose);
                     break;

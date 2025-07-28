@@ -70,7 +70,7 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
          .replace(/</g, "<")
          .replace(/>/g, ">")
          .replace(/"/g, "'")
-         .replace(/'/g, "'");
+         .replace(/'/g, '"');
   }
 
   function findQuizContainer() {
@@ -137,8 +137,8 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
       function closeDialog() {
           dialogOverlay.classList.remove('visible');
           setTimeout(() => {
-              dialogOverlay.remove();
-              styleLink.remove();
+              if (dialogOverlay.parentElement) dialogOverlay.remove();
+              if (styleLink.parentElement) styleLink.remove();
           }, 200);
       }
 
@@ -291,7 +291,6 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
           e.stopPropagation();
           const selectedText = window.getSelection().toString();
           if (selectedText.trim()) {
-            // FIX: Wrap sendMessage in try-catch to handle context invalidation.
             try {
               chrome.runtime.sendMessage({
                 action: 'triggerContextMenuAction',
@@ -378,6 +377,38 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
       }
     });
   }
+  
+  function getQuizOptionsFromPage() {
+    const quizContainerSelectors = [
+        'div.w3-container.w3-panel', 'div#mainLeaderboard > form', 'div[class*="quiz"]',
+        'form[action*="quiz"]', 'div[class*="question-block"]', 'div[id*="question"]'
+    ];
+    for (const selector of quizContainerSelectors) {
+        const container = document.querySelector(selector);
+        if (container && (container.querySelector('input[type="radio"]') || container.querySelector('input[type="checkbox"]'))) {
+            const quizOptions = [];
+            const seenOptions = new Set();
+            const inputOptions = container.querySelectorAll('input[type="radio"], input[type="checkbox"]');
+            inputOptions.forEach(input => {
+                let label = input.closest('label') || container.querySelector(`label[for="${input.id}"]`);
+                if (label) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = label.innerHTML;
+                    tempDiv.querySelectorAll('input').forEach(el => el.remove());
+                    const optionContent = tempDiv.textContent.trim();
+                    if (optionContent.length > 0 && !seenOptions.has(optionContent)) {
+                        quizOptions.push(optionContent);
+                        seenOptions.add(optionContent);
+                    }
+                }
+            });
+            if (quizOptions.length > 1) {
+                return quizOptions;
+            }
+        }
+    }
+    return [];
+  }
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (request.action === "ping_content_script") {
@@ -393,6 +424,10 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
           highlightText(request.text);
           sendResponse({ success: true });
           return true;
+      } else if (request.action === "get_quiz_options") {
+        const options = getQuizOptionsFromPage();
+        sendResponse({ options: options });
+        return true;
       }
   });
 }

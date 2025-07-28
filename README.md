@@ -10,7 +10,8 @@
 ## Fitur Utama
 
 - **Penyelesai Kuis Cerdas**: Mendeteksi dan menyelesaikan soal kuis secara otomatis pada halaman yang didukung.
-- **Sistem Fallback Cerdas**: Secara otomatis mendeteksi error API spesifik (kunci tidak valid, kuota habis) dan memberikan umpan balik yang jelas dengan tombol aksi yang relevan (misalnya, "Buka Pengaturan" atau "Cari di Google").
+- **Feedback Loop Interaktif**: Pengguna dapat menandai jawaban AI sebagai "benar" atau "salah". Jika salah, pengguna dapat memilih jawaban yang benar, yang kemudian digunakan untuk meminta AI memberikan penjelasan yang telah dikoreksi.
+- **Sistem Fallback Cerdas**: Secara otomatis mendeteksi error API spesifik (kunci tidak valid, kuota habis) dan memberikan umpan balik yang jelas dengan tombol aksi yang relevan.
 - **Toolbar Aksi Mengambang (Inline Toolbar)**: Saat menyeleksi teks, sebuah toolbar modern akan muncul untuk akses super cepat ke aksi AI.
 - **Tindakan Teks Kontekstual**: Klik kanan pada teks yang dipilih untuk meringkas, menjelaskan, menerjemahkan, atau memparafrasekan.
 - **Dasbor Pengaturan Modern**: Antarmuka opsi yang terinspirasi dari antarmuka modern dengan tab yang jelas.
@@ -22,8 +23,9 @@
 ## Skenario Penggunaan
 
 - Secara instan menyelesaikan dan menyorot jawaban kuis di platform e-learning.
+- **Memberikan koreksi jika AI salah menjawab**, dan secara instan mendapatkan penjelasan baru berdasarkan jawaban yang benar.
 - Meringkas, menjelaskan, atau menerjemahkan teks dengan cepat menggunakan toolbar mengambang.
-- **Mendapat notifikasi yang jelas jika kunci API salah atau kuota habis**, dengan panduan untuk memperbaikinya.
+- Mendapat notifikasi yang jelas jika kunci API salah atau kuota habis.
 - Menerjemahkan atau memparafrasekan teks yang dipilih secara real-time.
 - Menyesuaikan perilaku AI untuk berbagai tugas dengan kontrol suhu.
 - Membangun sistem prompt Anda sendiri melalui kustomisasi.

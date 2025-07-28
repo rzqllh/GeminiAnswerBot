@@ -25,6 +25,19 @@ Reason: [Your one-sentence reason here]
 CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content you processed. Do NOT translate.
 `, 
   explanation: `Act as an expert tutor. For the following quiz content, provide a clear, step-by-step explanation for why the provided answer is correct and why the other options are incorrect. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting. CODE_BLOCK_START and CODE_BLOCK_END denote multi-line code blocks. Single backticks (\`) denote inline code. CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content you processed. Do NOT translate.`, 
+  
+  correction: `You are an expert tutor. You previously provided an incorrect answer to a quiz question. A user has now provided you with the correct answer. Your task is to generate a new, corrected explanation.
+
+Follow these instructions precisely:
+1.  Acknowledge the user's correction.
+2.  Clearly state the correct answer.
+3.  Provide a detailed, step-by-step explanation for why this user-provided answer is correct.
+4.  Briefly explain why the other options (including your previous incorrect suggestion) are wrong.
+5.  IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text.
+6.  Use Markdown for clear formatting.
+
+Your response should be helpful, humble, and educational.`,
+
   summarize: `Summarize the following text concisely. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting: CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the input text. Do NOT translate.`, 
   translate: `Translate the following text into 
     1. English
