@@ -1,5 +1,4 @@
 /* == BASE COLORS & VARIABLES =================================== */
-
 :root {
   --bg-color: #f2f2f7;
   --header-bg: #fdfdfd;
@@ -18,6 +17,9 @@
   --error-bg: #fff0f0;
   --error-border: #ffdada;
   --error-text: #d93025;
+  --info-bg: #eef5ff;
+  --info-border: #d6eaff;
+  --info-text: #004085;
   --base-font-size: 14px;
   --line-height: 1.5;
   --card-border-radius: 12px;
@@ -45,11 +47,13 @@
     --error-bg: #3d2525;
     --error-border: #5c3b3b;
     --error-text: #ff887f;
+    --info-bg: #1c2a3e;
+    --info-border: #2a4161;
+    --info-text: #cce5ff;
   }
 }
 
 /* == GLOBAL RESET ============================================== */
-
 * {
   box-sizing: border-box;
 }
@@ -73,7 +77,6 @@ body {
 }
 
 /* == LAYOUT ==================================================== */
-
 .container {
   display: flex;
   flex-direction: column;
@@ -86,7 +89,6 @@ body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
 }
 
 .content-area::-webkit-scrollbar {
@@ -98,7 +100,6 @@ body {
 }
 
 /* == HEADER ==================================================== */
-
 .header {
   display: flex;
   justify-content: space-between;
@@ -131,14 +132,18 @@ body {
 }
 
 /* == CARD ====================================================== */
-
 .card {
   background-color: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--card-border-radius);
   display: flex;
   flex-direction: column;
-  margin: 8px 0;
+}
+
+#resultsWrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
 }
 
 .card-header {
@@ -192,9 +197,8 @@ body {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  padding-top: 2px; /* bantu visual offset biar rata dengan judul */
+  padding-top: 2px;
 }
-
 
 .card-controls .icon-button {
   width: 30px;
@@ -214,7 +218,6 @@ body {
 }
 
 /* == LIST STYLING ============================================== */
-
 .card-body ul {
   list-style-type: none;
   padding-left: 0;
@@ -237,7 +240,6 @@ body {
 }
 
 /* == BUTTONS =================================================== */
-
 .icon-button {
   width: 32px;
   height: 32px;
@@ -299,7 +301,6 @@ body {
 }
 
 /* == STATES & SPINNERS ========================================= */
-
 .loading-state {
   display: flex;
   flex-direction: column;
@@ -328,7 +329,6 @@ body {
 }
 
 /* == EXPLANATION / CONFIDENCE ================================== */
-
 .confidence-wrapper {
   margin-top: var(--card-padding);
   padding-top: var(--card-padding);
@@ -374,20 +374,6 @@ body {
   font-size: 13px;
 }
 
-.error-message {
-  padding: 14px;
-  background-color: var(--error-bg);
-  border: 1px solid var(--error-border);
-  color: var(--error-text);
-  border-radius: var(--button-border-radius);
-  font-weight: 500;
-}
-
-.error-message strong {
-  display: block;
-  margin-bottom: 4px;
-}
-
 .answer-highlight {
   background-color: var(--card-bg);
   border-left: 4px solid var(--accent-blue);
@@ -410,7 +396,6 @@ body {
 }
 
 /* == TOKEN COUNTER ============================================= */
-
 .token-count {
   display: flex;
   justify-content: space-between;
@@ -429,4 +414,114 @@ body {
 .token-count-value {
   font-weight: 600;
   color: var(--secondary-text);
+}
+
+/* == INFO & ERROR PANEL STYLING ================================= */
+.info-panel, .error-panel {
+    border-radius: var(--card-border-radius);
+    padding: var(--card-padding);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.info-panel {
+    background-color: var(--info-bg);
+    border: 1px solid var(--info-border);
+    color: var(--info-text);
+}
+
+.error-panel {
+    background-color: var(--error-bg);
+    border: 1px solid var(--error-border);
+    color: var(--error-text);
+}
+
+.info-panel-header, .error-panel-header {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.info-panel-header { color: var(--info-text); }
+.error-panel-header { color: var(--error-text); }
+
+.info-panel-body p, .error-panel-body p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.error-details {
+    margin-top: 12px;
+}
+
+.error-details summary {
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--secondary-text);
+    font-size: 13px;
+    outline: none;
+}
+
+.error-details code {
+    display: block;
+    margin-top: 8px;
+    background: rgba(0,0,0,0.1);
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    word-break: break-all;
+    white-space: pre-wrap;
+    color: var(--error-text);
+}
+
+@media (prefers-color-scheme: dark) {
+    .error-details code {
+        background: rgba(255,255,255,0.05);
+    }
+}
+
+.error-panel-actions {
+    margin-top: 8px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.button-error {
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: var(--button-border-radius);
+    cursor: pointer;
+    background-color: rgba(0,0,0,0.05);
+    color: var(--error-text);
+    border: 1px solid var(--error-border);
+    transition: background-color 0.2s;
+}
+
+.button-error:hover {
+    background-color: rgba(0,0,0,0.1);
+}
+
+.button-error.primary {
+    background-color: var(--error-text);
+    color: var(--bg-color);
+    border-color: var(--error-text);
+}
+
+.button-error.primary:hover {
+    filter: brightness(1.1);
+}
+
+@media (prefers-color-scheme: dark) {
+    .button-error {
+        background-color: rgba(255,255,255,0.1);
+        border-color: var(--error-border);
+    }
+    .button-error:hover {
+        background-color: rgba(255,255,255,0.15);
+    }
+    .button-error.primary {
+        color: var(--primary-text);
+    }
 }

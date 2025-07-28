@@ -1,40 +1,29 @@
 // js/popup.js
 
-/**
- * Fungsi hashing sederhana untuk membuat kunci cache yang unik dan pendek.
- */
 function simpleHash(str) {
     let hash = 0;
     if (str.length === 0) return hash;
     for (let i = 0; i < str.length; i++) {
         const char = str.charCodeAt(i);
         hash = ((hash << 5) - hash) + char;
-        hash |= 0; // Convert to 32bit integer
+        hash |= 0;
     }
     return 'cache_' + new Uint32Array([hash])[0].toString(16);
 }
 
-// =================================================================
-// PEMINDAHAN SEMUA FUNGSI PEMBANTU KE ATAS
-// =================================================================
-
 function show(el) { if (el) el.classList.remove('hidden'); }
 function hide(el) { if (el) el.classList.add('hidden'); }
 
-// FUNGSI YANG DIPERBAIKI DENGAN BENAR
 function escapeHtml(unsafe) {
+    if (!unsafe) return '';
     return String(unsafe)
-         .replace(/&/g, "&amp;")
-         .replace(/</g, "&lt;")
-         .replace(/>/g, "&gt;")
-         .replace(/"/g, "&quot;")
-         .replace(/'/g, "&#039;");
+         .replace(/&/g, "&")
+         .replace(/</g, "<")
+         .replace(/>/g, ">")
+         .replace(/"/g, "'")
+         .replace(/'/g, '"');
 }
 
-/**
- * Mengirim pesan ke content script dengan timeout.
- * Mencegah popup hang jika content script tidak merespons.
- */
 function sendMessageWithTimeout(tabId, message, timeout = 5000) {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
@@ -93,29 +82,16 @@ function formatQuestionContent(content) {
 
 function createQuizFingerprint(cleanedContent) {
     if (!cleanedContent) return null;
-
-    const lines = cleanedContent
-        .split('\n')
-        .map(l => l.trim())
-        .filter(l => l);
-
+    const lines = cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
     if (lines.length < 2) return null;
-
-    // Gabungkan seluruh lines (soal + opsi) untuk memastikan fingerprint unik
-    const normalizedLines = lines.map(l =>
-        l.toLowerCase().replace(/\s+/g, ' ').trim()
-    );
-
+    const normalizedLines = lines.map(l => l.toLowerCase().replace(/\s+/g, ' ').trim());
     const joinedContent = normalizedLines.join('\n');
     return joinedContent;
 }
 
-
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof marked !== 'undefined') {
-        marked.setOptions({
-            sanitize: true
-        });
+        marked.setOptions({ sanitize: true });
     }
 
     const settingsButton = document.getElementById('settingsButton');
@@ -139,13 +115,83 @@ document.addEventListener('DOMContentLoaded', () => {
     let appConfig = {};
     let currentCacheKey = null;
 
-    function displayMessage(htmlContent, isError = false) {
+    function displayInfoPanel(title, message) {
         hide(resultsWrapper);
-        if (isError) {
-            messageArea.innerHTML = `<div class="error-message"><strong>Analysis Failed:</strong><br>${htmlContent}</div>`;
-        } else {
-            messageArea.innerHTML = `<div class="loading-state">${htmlContent}</div>`;
+        show(messageArea);
+        const infoHtml = `
+            <div class="info-panel">
+                <div class="info-panel-header">${title}</div>
+                <div class="info-panel-body">
+                    <p>${message}</p>
+                </div>
+            </div>`;
+        messageArea.innerHTML = infoHtml;
+    }
+
+    async function displayError(error) {
+        hide(resultsWrapper);
+        show(messageArea);
+
+        let title = 'An Error Occurred';
+        let userMessage = 'Something went wrong. Please try again.';
+        let actionsHtml = `<button id="error-retry-btn" class="button-error">Try Again</button>`;
+        const state = await getState();
+        const query = state.cleanedContent || state.originalUserContent || '';
+
+        switch (error.type) {
+            case 'INVALID_API_KEY':
+                title = 'Invalid API Key';
+                userMessage = 'The provided API key is not valid or has been revoked. Please check your key in the settings.';
+                actionsHtml = `<button id="error-settings-btn" class="button-error primary">Open Settings</button>`;
+                break;
+            case 'QUOTA_EXCEEDED':
+                title = 'API Quota Exceeded';
+                userMessage = 'You have exceeded your Google AI API quota. Please check your usage and billing in the Google AI Studio.';
+                actionsHtml = `<button id="error-quota-btn" class="button-error">Check Quota</button> <button id="error-retry-btn" class="button-error">Try Again</button>`;
+                break;
+            case 'NETWORK_ERROR':
+                title = 'Network Error';
+                userMessage = 'Could not connect to the API. Please check your internet connection.';
+                break;
+            case 'INTERNAL_ERROR':
+                title = 'Connection Failed';
+                userMessage = 'Could not connect to the current page. Some pages may not be compatible.';
+                break;
+            case 'API_ERROR':
+            default:
+                title = 'API Error';
+                userMessage = 'The API returned an error. See details below.';
+                if(query) actionsHtml += ` <button id="error-google-btn" class="button-error">Search on Google</button>`;
+                break;
         }
+
+        const errorHtml = `
+            <div class="error-panel">
+                <div class="error-panel-header">${title}</div>
+                <div class="error-panel-body">
+                    <p>${userMessage}</p>
+                    <details class="error-details">
+                        <summary>Technical Details</summary>
+                        <code>${escapeHtml(error.message)}</code>
+                    </details>
+                </div>
+                <div class="error-panel-actions">${actionsHtml}</div>
+            </div>`;
+        
+        messageArea.innerHTML = errorHtml;
+
+        document.getElementById('error-retry-btn')?.addEventListener('click', initialize);
+        document.getElementById('error-settings-btn')?.addEventListener('click', () => chrome.runtime.openOptionsPage());
+        document.getElementById('error-quota-btn')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://aistudio.google.com/billing' }));
+        document.getElementById('error-google-btn')?.addEventListener('click', () => {
+            const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+            chrome.tabs.create({ url: searchUrl });
+        });
+    }
+
+    function displayMessage(htmlContent) {
+        hide(resultsWrapper);
+        messageArea.innerHTML = `<div class="loading-state">${htmlContent}</div>`;
         show(messageArea);
     }
 
@@ -170,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'translate': systemPrompt = currentPrompts.translate || DEFAULT_PROMPTS.translate; break;
             }
         }
-
+        
         const generationConfig = { temperature: temperature !== undefined ? temperature : 0.4 };
         
         chrome.runtime.sendMessage({ 
@@ -190,20 +236,16 @@ document.addEventListener('DOMContentLoaded', () => {
     async function getAnswer() {
         const state = await getState();
         if (!state.cleanedContent) return;
-
         const fingerprint = createQuizFingerprint(state.cleanedContent);
         if (fingerprint) {
             currentCacheKey = simpleHash(fingerprint);
             const cachedResult = (await chrome.storage.local.get(currentCacheKey))[currentCacheKey];
-
-const lines = state.cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
-const rawQuestion = lines.length > 0 ? lines[0] : '';
-
-if (cachedResult?.answerHTML && cachedResult.rawQuestion === rawQuestion) {
-    await _handleAnswerResult(cachedResult.answerHTML, true, cachedResult.totalTokenCount);
-    return;
-}
-
+            const lines = state.cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
+            const rawQuestion = lines.length > 0 ? lines[0] : '';
+            if (cachedResult?.answerHTML && cachedResult.rawQuestion === rawQuestion) {
+                await _handleAnswerResult(cachedResult.answerHTML, true, cachedResult.totalTokenCount);
+                return;
+            }
         }
         retryAnswerButton.disabled = true;
         answerDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`;
@@ -233,10 +275,8 @@ if (cachedResult?.answerHTML && cachedResult.rawQuestion === rawQuestion) {
         const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
         const reasonMatch = fullText.match(/Reason:(.*)/is);
         let answerText = (answerMatch ? answerMatch[1].trim() : fullText.trim()).replace(/`/g, '');
-        
         let cleanAnswerText = escapeHtml(answerText);
         let formattedHtml = `<p class="answer-highlight">${isCode(cleanAnswerText) ? `<code>${cleanAnswerText}</code>` : cleanAnswerText.replace(/\n/g, '<br>')}</p>`;
-        
         let confidenceWrapperHtml = '';
         if (confidenceMatch) {
             const confidence = confidenceMatch[1].toLowerCase();
@@ -249,9 +289,8 @@ if (cachedResult?.answerHTML && cachedResult.rawQuestion === rawQuestion) {
             confidenceWrapperHtml += `<div class="token-count"><span class="token-count-label">Tokens Used</span><span class="token-count-value">${totalTokenCount}</span></div>`;
         }
         if(confidenceWrapperHtml) {
-            formattedHtml += `<div class="confidence-wrapper">${confidenceWrapperHtml}</div>`;
+            formattedHtml += `<div class.confidence-wrapper">${confidenceWrapperHtml}</div>`;
         }
-
         answerDisplay.innerHTML = formattedHtml;
         copyAnswerButton.dataset.copyText = answerText;
         retryAnswerButton.disabled = false;
@@ -261,17 +300,10 @@ if (cachedResult?.answerHTML && cachedResult.rawQuestion === rawQuestion) {
             chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: [answerText] });
         }
         if (!fromCache && currentCacheKey) {
-    const lines = fullText.split('\n').map(l => l.trim()).filter(l => l);
-    const rawQuestion = lines.length > 0 ? lines[0] : '';
-    await chrome.storage.local.set({
-        [currentCacheKey]: {
-            answerHTML: fullText,
-            totalTokenCount: totalTokenCount,
-            rawQuestion
+            const lines = fullText.split('\n').map(l => l.trim()).filter(l => l);
+            const rawQuestion = lines.length > 0 ? lines[0] : '';
+            await chrome.storage.local.set({ [currentCacheKey]: { answerHTML: fullText, totalTokenCount: totalTokenCount, rawQuestion } });
         }
-    });
-}
-
         await saveState({ answerHTML: fullText, totalTokenCount });
         if (!fromCache) {
             const state = await getState();
@@ -326,27 +358,33 @@ if (cachedResult?.answerHTML && cachedResult.rawQuestion === rawQuestion) {
     async function initialize() {
         [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!currentTab || !currentTab.id) {
-            displayMessage('Cannot find active tab.', true);
+            displayError({ type: 'INTERNAL_ERROR', message: 'Cannot find the active tab.' });
+            return;
+        }
+
+        // --- BARU: Deteksi halaman terproteksi ---
+        const protectedUrls = ['chrome://', 'https://chrome.google.com/'];
+        if (protectedUrls.some(url => currentTab.url.startsWith(url))) {
+            displayInfoPanel(
+                'Page Not Supported',
+                'For your security, Chrome extensions are not allowed to run on this special page.'
+            );
             return;
         }
         
         appConfig = await chrome.storage.sync.get(null);
         if (!appConfig.geminiApiKey) { 
-            displayMessage('API Key not set. Please go to options page.', true);
+            displayError({ type: 'INVALID_API_KEY', message: 'API Key not set. Please go to the options page to set it up.' });
             return; 
         }
 
-        try { 
-            await chrome.scripting.executeScript({ 
-                target: { tabId: currentTab.id }, 
-                files: ['js/vendor/marked.min.js', 'js/mark.min.js', 'js/content.js'] 
-            }); 
+        try {
+            await chrome.scripting.executeScript({
+                target: { tabId: currentTab.id },
+                files: ['js/vendor/marked.min.js', 'js/mark.min.js', 'js/content.js']
+            });
 
-            const isReady = await sendMessageWithTimeout(currentTab.id, { action: "ping_content_script" });
-
-            if (!isReady || !isReady.ready) {
-                throw new Error("Content script is not ready. Please reload the page and try again.");
-            }
+            await sendMessageWithTimeout(currentTab.id, { action: "ping_content_script" });
 
             const contextKey = `context_action_${currentTab.id}`;
             const contextData = (await chrome.storage.local.get(contextKey))[contextKey];
@@ -355,20 +393,26 @@ if (cachedResult?.answerHTML && cachedResult.rawQuestion === rawQuestion) {
                 await chrome.storage.local.remove(contextKey);
                 const displayAction = contextData.action.split('-')[0];
                 displayMessage(`<div class="spinner"></div><p>Getting ${displayAction}...</p>`);
+                saveState({ originalUserContent: contextData.selectionText });
                 callGeminiStream(contextData.action, contextData.selectionText, contextData.selectionText);
             } else {
                 const state = await getState();
-                if (state.cleanedContent) {
+                if (state.cleanedContent && !state.answerHTML) {
                     hide(messageArea);
                     show(resultsWrapper);
                     contentDisplay.innerHTML = formatQuestionContent(state.cleanedContent);
                     show(contentDisplayWrapper);
                     show(answerContainer);
-                    if (state.answerHTML) {
-                        await _handleAnswerResult(state.answerHTML, false, state.totalTokenCount);
-                    }
+                    getAnswer();
+                } else if (state.cleanedContent && state.answerHTML) {
+                    hide(messageArea);
+                    show(resultsWrapper);
+                    contentDisplay.innerHTML = formatQuestionContent(state.cleanedContent);
+                    show(contentDisplayWrapper);
+                    show(answerContainer);
+                    await _handleAnswerResult(state.answerHTML, false, state.totalTokenCount);
                     if (state.explanationHTML) {
-                        _handleExplanationResult(state.explanationHTML);
+                       await _handleExplanationResult(state.explanationHTML);
                     }
                 } else {
                     displayMessage(`<div class="spinner"></div><p>Step 1/2: Cleaning content...</p>`);
@@ -376,13 +420,13 @@ if (cachedResult?.answerHTML && cachedResult.rawQuestion === rawQuestion) {
                     if (!response || !response.content?.trim()) {
                         throw new Error("No readable content found on this page.");
                     }
+                    saveState({ originalUserContent: response.content });
                     callGeminiStream('cleaning', response.content);
                 }
             }
-
         } catch (e) { 
             console.error("Initialization failed:", e);
-            displayMessage(`This page cannot be scripted or is not ready. Try reloading the page and opening the extension again. <br><small>(${e.message})</small>`, true); 
+            displayError({ type: 'INTERNAL_ERROR', message: `Could not establish connection. ${e.message}` });
         }
     }
 
@@ -396,9 +440,15 @@ if (cachedResult?.answerHTML && cachedResult.rawQuestion === rawQuestion) {
     retryAnswerButton.addEventListener('click', getAnswer);
     retryExplanationButton.addEventListener('click', getExplanation);
     
-    chrome.runtime.onMessage.addListener((request, sender) => {
-        if (sender.tab || request.action !== 'geminiStreamUpdate') return;
+    chrome.runtime.onMessage.addListener((request) => {
+        if (request.action !== 'geminiStreamUpdate') return;
         const { payload, purpose } = request;
+        
+        if (!payload.success) {
+            displayError(payload.error);
+            return;
+        }
+
         hide(messageArea);
         show(resultsWrapper);
         
@@ -408,28 +458,24 @@ if (cachedResult?.answerHTML && cachedResult.rawQuestion === rawQuestion) {
         else if (purpose === 'explanation') targetDisplay = explanationDisplay;
         else targetDisplay = answerDisplay;
 
-        if (payload.success) {
-            if (payload.chunk) {
-                if (targetDisplay?.querySelector('.loading-state')) targetDisplay.innerHTML = '';
-                if (targetDisplay) targetDisplay.textContent += payload.chunk;
-            } else if (payload.done) {
-                const fullText = payload.fullText || (targetDisplay ? targetDisplay.textContent : '');
-                switch(purpose) {
-                    case 'cleaning': _handleCleaningResult(fullText); break;
-                    case 'answer': _handleAnswerResult(fullText, false, payload.totalTokenCount); break;
-                    case 'explanation': _handleExplanationResult(fullText); break;
-                    case 'summarize': case 'explain': case 'translate':
+        if (payload.chunk) {
+            if (targetDisplay?.querySelector('.loading-state')) targetDisplay.innerHTML = '';
+            targetDisplay.textContent += payload.chunk;
+        } else if (payload.done) {
+            const fullText = payload.fullText || (targetDisplay ? targetDisplay.textContent : '');
+            switch(purpose) {
+                case 'cleaning': _handleCleaningResult(fullText); break;
+                case 'answer': _handleAnswerResult(fullText, false, payload.totalTokenCount); break;
+                case 'explanation': _handleExplanationResult(fullText); break;
+                case 'summarize': case 'explain': case 'translate':
+                    _handleContextMenuResult(fullText, payload.originalUserContent, purpose);
+                    break;
+                default:
+                    if (purpose.startsWith('rephrase-')) {
                         _handleContextMenuResult(fullText, payload.originalUserContent, purpose);
-                        break;
-                    default:
-                        if (purpose.startsWith('rephrase-')) {
-                            _handleContextMenuResult(fullText, payload.originalUserContent, purpose);
-                        }
-                        break;
-                }
+                    }
+                    break;
             }
-        } else {
-            displayMessage(escapeHtml(payload.error), true);
         }
     });
 

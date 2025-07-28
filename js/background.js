@@ -67,7 +67,6 @@ chrome.runtime.onStartup.addListener(updateContextMenus);
 async function performApiCall(payload) {
     const { apiKey, model, systemPrompt, userContent, generationConfig: baseGenerationConfig, originalUserContent, purpose } = payload;
     
-    // Logic for determining temperature
     const settings = await chrome.storage.sync.get(['promptProfiles', 'activeProfile', 'temperature']);
     const activeProfileName = settings.activeProfile || 'Default';
     const activeProfile = settings.promptProfiles ? (settings.promptProfiles[activeProfileName] || {}) : {};
@@ -82,8 +81,6 @@ async function performApiCall(payload) {
         ...baseGenerationConfig,
         temperature: finalTemperature
     };
-    
-    console.log(`Executing '${purpose}' with temperature: ${finalTemperature} (Global: ${globalTemp}, Profile Specific: ${activeProfile[tempKey] !== undefined})`);
 
     const endpoint = 'streamGenerateContent';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}&alt=sse`;
@@ -109,9 +106,23 @@ async function performApiCall(payload) {
         body: JSON.stringify(apiPayload)
       });
   
-      if (!response.ok || !response.body) {
+      if (!response.ok) {
         const errorBody = await response.json();
-        throw new Error(errorBody.error?.message || `Request failed with status ${response.status}`);
+        const errorMessage = errorBody.error?.message || `Request failed with status ${response.status}`;
+        let errorType = 'API_ERROR';
+        
+        // --- BARU: Analisis jenis error dari API ---
+        if (errorMessage.includes("API key not valid")) {
+          errorType = 'INVALID_API_KEY';
+        } else if (errorBody.error?.status === 'RESOURCE_EXHAUSTED' || errorMessage.includes("quota")) {
+          errorType = 'QUOTA_EXCEEDED';
+        }
+
+        throw { type: errorType, message: errorMessage };
+      }
+
+      if (!response.body) {
+        throw { type: 'NETWORK_ERROR', message: 'Response body is empty.' };
       }
   
       const reader = response.body.getReader();
@@ -138,14 +149,21 @@ async function performApiCall(payload) {
               totalTokenCount = data.usageMetadata.totalTokenCount;
             }
           } catch (e) {
+            // This is a chunk parsing error, not a fatal API error
             console.warn("Error parsing stream chunk:", e);
           }
         }
       }
       streamCallback({ success: true, done: true, fullText, totalTokenCount });
+
     } catch (error) {
       console.error("API call error:", error);
-      streamCallback({ success: false, error: error.message });
+      // --- BARU: Mengirim objek error yang lebih terstruktur ---
+      const errorPayload = {
+        type: error.type || 'NETWORK_ERROR',
+        message: error.message || 'Check your internet connection or the browser console for more details.'
+      };
+      streamCallback({ success: false, error: errorPayload });
     }
 }
   
@@ -161,7 +179,7 @@ function handleTestConnection(payload, sendResponse) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: testContent }] }] })
     })
-    .then(res => res.ok ? res.json() : res.json().then(err => { throw new Error(err.error?.message); }))
+    .then(res => res.ok ? res.json() : res.json().then(err => { throw new Error(err.error?.message || "An unknown error occurred."); }))
     .then(result => {
       const text = result.candidates?.[0]?.content?.parts?.[0]?.text.trim() || "";
       if (text.toUpperCase() === 'OK') {

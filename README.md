@@ -1,7 +1,7 @@
 # GeminiAnswerBot
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.9.2-brightgreen)
+![Version](https://img.shields.io/badge/version-1.9.3-brightgreen)
 
 **GeminiAnswerBot** adalah ekstensi Chrome cerdas yang mengutamakan privasi, didukung oleh Google Gemini API. Ekstensi ini menganalisis konten pada halaman untuk secara cerdas menyelesaikan kuis, menyempurnakan teks yang dipilih, dan menyediakan alat konteks bertenaga AI—semuanya langsung di browser Anda.
 
@@ -10,25 +10,23 @@
 ## Fitur Utama
 
 - **Penyelesai Kuis Cerdas**: Mendeteksi dan menyelesaikan soal kuis secara otomatis pada halaman yang didukung.
-- **Penyorotan Jawaban**: Menyorot jawaban yang benar secara langsung di dalam halaman web (DOM) dengan gaya yang konsisten dengan tema.
-- **Toolbar Aksi Mengambang (Inline Toolbar)**: Saat menyeleksi teks, sebuah toolbar modern akan muncul untuk akses super cepat ke aksi AI tanpa perlu klik-kanan.
-- **Tindakan Teks Kontekstual**: Klik kanan pada teks yang dipilih untuk:
-  - Meringkas
-  - Menjelaskan
-  - Menerjemahkan
-  - Memparafrasekan
+- **Sistem Fallback Cerdas**: Secara otomatis mendeteksi error API spesifik (kunci tidak valid, kuota habis) dan memberikan umpan balik yang jelas dengan tombol aksi yang relevan (misalnya, "Buka Pengaturan" atau "Cari di Google").
+- **Toolbar Aksi Mengambang (Inline Toolbar)**: Saat menyeleksi teks, sebuah toolbar modern akan muncul untuk akses super cepat ke aksi AI.
+- **Tindakan Teks Kontekstual**: Klik kanan pada teks yang dipilih untuk meringkas, menjelaskan, menerjemahkan, atau memparafrasekan.
 - **Dasbor Pengaturan Modern**: Antarmuka opsi yang terinspirasi dari antarmuka modern dengan tab yang jelas.
 - **AI yang Dapat Disesuaikan**: Atur kunci API Gemini Anda, pilih model, sesuaikan prompt sistem, dan ubah perilaku ekstensi.
-- **Panel Riwayat Lokal**: Lihat semua interaksi AI sebelumnya di dalam dasbor, yang sekarang menampilkan format Markdown dengan benar untuk keterbacaan yang lebih baik.
+- **Kontrol Suhu Granular**: Atur tingkat "kreativitas" (suhu) AI secara spesifik untuk setiap jenis tugas.
+- **Panel Riwayat Lokal**: Lihat semua interaksi AI sebelumnya di dalam dasbor.
 
 ---
-
 ## Skenario Penggunaan
 
 - Secara instan menyelesaikan dan menyorot jawaban kuis di platform e-learning.
-- **Meringkas, menjelaskan, atau menerjemahkan teks dengan cepat menggunakan toolbar mengambang saat membaca dokumentasi atau artikel.**
-- Menerjemahkan atau memparafrasekan teks yang dipilih secara real-time tanpa meninggalkan halaman.
-- Membangun sistem prompt dan perilaku agen Anda sendiri untuk Gemini melalui kustomisasi prompt.
+- Meringkas, menjelaskan, atau menerjemahkan teks dengan cepat menggunakan toolbar mengambang.
+- **Mendapat notifikasi yang jelas jika kunci API salah atau kuota habis**, dengan panduan untuk memperbaikinya.
+- Menerjemahkan atau memparafrasekan teks yang dipilih secara real-time.
+- Menyesuaikan perilaku AI untuk berbagai tugas dengan kontrol suhu.
+- Membangun sistem prompt Anda sendiri melalui kustomisasi.
 
 ---
 ## Memulai
@@ -80,23 +78,23 @@ GeminiAnswerBot/
 ├── assets/
 │ ├── options.css
 │ ├── popup.css
-│ ├── toolbar.css # BARU: Style untuk inline toolbar
+│ ├── toolbar.css
 │ └── icon.png
 ├── js/
 │ ├── vendor/
-│ │ └── marked.min.js # Library untuk render Markdown
-│ ├── background.js # Service worker untuk event & panggilan API
-│ ├── content.js # Script konten yang diinjeksi
-│ ├── options.js # Logika untuk dasbor opsi
-│ ├── prompts.js # Prompt default untuk AI
-│ └── mark.min.js # Library untuk menyorot teks
+│ │ └── marked.min.js
+│ ├── background.js
+│ ├── content.js
+│ ├── options.js
+│ ├── prompts.js
+│ └── mark.min.js
 ├── ui/
-│ ├── options.html # UI untuk Opsi, Riwayat, dan Data
-│ └── popup.html # UI popup utama ekstensi
-├── .gitignore # File yang diabaikan oleh Git
-├── LICENSE # Lisensi proyek
-├── manifest.json # File konfigurasi inti ekstensi
-└── README.md # Dokumentasi ini
+│ ├── options.html
+│ └── popup.html
+├── .gitignore
+├── LICENSE
+├── manifest.json
+└── README.md
 ```
 
 ---
@@ -125,44 +123,40 @@ Setelah melakukan perubahan, buka `chrome://extensions/` dan klik **Reload** pad
 
 ## Changelog
 
+### [1.9.5] - 2025-08-01
+#### Added
+- **Protected Page Detection:** The extension now proactively detects when it's activated on a protected browser page (e.g., `chrome://extensions`, New Tab Page, Chrome Webstore).
+- **Informational UI Panel:** Instead of showing a generic connection error on protected pages, the extension now displays a clear, user-friendly informational panel explaining why it cannot run, improving user trust and reducing confusion.
+
+### [1.9.4] - 2025-07-31
+#### Added
+- **Smart Fallback System:** Implemented intelligent error handling for API calls. The extension now detects specific API failures (e.g., `INVALID_API_KEY`, `QUOTA_EXCEEDED`, `TIMEOUT`) and displays a user-friendly error panel in the popup.
+- **Contextual Error Actions:** The new error panel includes relevant action buttons based on the error type, such as "Open Settings" for an invalid key, or "Search on Google" for a general failure, guiding the user toward a resolution.
+
+### [1.9.3] - 2025-07-30
+#### Added
+- **Per-Action Temperature Control:** Users can now set the AI's creativity level (temperature) individually for each specific task (Answering, Explaining, Summarizing, etc.) in the "Prompts" tab of the options page.
+
 ### [1.9.2] - 2025-07-29
 #### Added
-- **Inline Action Toolbar:** Implemented a sleek, floating toolbar that appears on text selection. This provides instant access to AI actions (Summarize, Explain, Translate) without needing to right-click, significantly speeding up a user's workflow. The toolbar is designed to be modern and unobtrusive, following Apple's HIG principles.
+- **Inline Action Toolbar:** Implemented a sleek, floating toolbar that appears on text selection. This provides instant access to AI actions (Summarize, Explain, Translate) without needing to right-click, significantly speeding up a user's workflow.
 #### Fixed
-- **Development Stability:** Added a defensive `try...catch` block around message passing in the content script. This gracefully handles the "Extension context invalidated" error that commonly occurs during development when the extension is reloaded, preventing console errors and improving the development experience.
+- **Development Stability:** Added a defensive `try...catch` block around message passing in the content script to gracefully handle the "Extension context invalidated" error during development.
 #### Changed
-- **Code Refactoring:** Refactored the context action logic in `background.js` into a reusable function (`handleContextAction`). This eliminates code duplication and ensures that both the traditional right-click context menu and the new Inline Action Toolbar use the same robust logic pathway.
+- **Code Refactoring:** Refactored the context action logic in `background.js` into a reusable function (`handleContextAction`) to be used by both the context menu and the new toolbar.
 
 ### [1.9.1] - 2025-07-28
 #### Fixed
-- **Critical Rendering Bug:** Fixed a major issue that caused the extension popup to break or hang on "Analyzing Page..." when encountering quiz questions with HTML code in the answers. The UI now correctly displays code as text.
-- **Context Menu:** Corrected the right-click context menu to properly display all available actions (Summarize, Explain, Translate, Rephrase) as intended.
-- **Stability:** Improved stability by preventing the popup from freezing if the connection to the web page is lost (e.g., after reloading the extension).
+- **Critical Rendering Bug:** Fixed a major issue that caused the extension popup to break or hang when encountering quiz questions with HTML code in the answers.
+- **Context Menu:** Corrected the right-click context menu to properly display all available actions.
+- **Stability:** Improved stability by preventing the popup from freezing if the connection to the web page is lost.
 
 ### [1.9.0] - 2025-07-27
 #### Fixed
-- Resolved a critical error that caused the extension popup to crash when attempting to display AI-generated explanations or context menu results (e.g., Summarize, Explain). This was due to the Markdown rendering library (`marked.js`) not being loaded correctly.
-- Improved security by sanitizing all Markdown-rendered content in the popup to prevent potential XSS vulnerabilities.
+- Resolved a critical error that caused the extension popup to crash when attempting to display AI-generated results due to a Markdown rendering library issue.
+- Improved security by sanitizing all Markdown-rendered content.
 
-### [1.8.0] - 2025-07-26
-#### Added
-- **Pre-Submission Check:** Added a new feature that displays a custom confirmation dialog to warn the user if their selected quiz answer is different from the AI's suggestion. This feature can be toggled on or off in the General settings tab.
-
-### [1.7.0] - 2025-07-26
-#### Added
-- **Smart Caching:** The extension now caches quiz results locally. If the same quiz is encountered again, the answer is provided instantly without using the Gemini API, saving API quota and speeding up response time.
-
-### [1.6.0] - 2025-07-26
-#### Changed
-- **UI Standardization:** The layout of the "General" and "Data" tabs in the options page has been refactored to use fieldsets, creating a consistent, card-based design across all sections.
-- **History UI:** The appearance of history entries has been updated to match the overall visual theme, incorporating a blurred background effect.
-
-### [1.5.0] - 2025-07-25
-#### Added
-- **Markdown Rendering**: AI responses in the history tab now render full Markdown formatting, including lists, bold/italics, and code blocks, for improved readability.
-#### Changed
-- **UI Consistency**: The on-page answer highlighter style has been updated to use the blue accent color, matching the overall theme of the extension.
-- **Icon Format**: The extension icon has been converted from JPG to PNG to support transparency and improve its appearance in the browser toolbar.
+... (Changelog lama lainnya)
 
 ---
 
