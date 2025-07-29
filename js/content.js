@@ -62,14 +62,15 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
           firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
   }
-function escapeHtml(unsafe) {
-    if (typeof unsafe !== 'string') return '';
-    return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+  
+function _escapeHtml(unsafe) {
+  if (typeof unsafe !== 'string') return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
   function findQuizContainer() {
@@ -177,23 +178,25 @@ function escapeHtml(unsafe) {
       }
   }
 
-  function _tryLevel1Extraction() {
+  /**
+   * Tries to extract a structured quiz (question + options) from the page.
+   * This is the most specific extraction method.
+   * @returns {string|null} The extracted quiz content or null if not found.
+   */
+  function getQuizContent() {
       const quizContainerSelectors = [
-          'div.w3-container.w3-panel',
-          'div#mainLeaderboard > form',
-          'div[class*="quiz"]',
-          'form[action*="quiz"]',
-          'div[class*="question-block"]',
-          'div[id*="question"]'
+          'div.w3-container.w3-panel', 'form[action*="quiz"]', 'div[id*="quiz"]',
+          'div[class*="quiz"]', 'div[class*="question-block"]', 'div[id*="question"]'
       ];
+
       for (const selector of quizContainerSelectors) {
           const container = document.querySelector(selector);
           if (container && (container.querySelector('input[type="radio"]') || container.querySelector('input[type="checkbox"]'))) {
               let quizQuestion = '';
-              const questionCandidates = container.querySelectorAll('h3, h4, p:first-of-type, div.w3-large, div[class*="question"]');
+              const questionCandidates = container.querySelectorAll('h3, h4, p, div.w3-large, div[class*="question-text"]');
               for (const qEl of questionCandidates) {
                   let qText = qEl.textContent.trim().replace(/^Question\s+\d+\s+of\s+\d+\s*[:-]?\s*/i, '').trim();
-                  if (qText.length > 10 && !qText.toLowerCase().includes('quiz')) {
+                  if (qText.length > 10 && !qEl.querySelector('input')) { // Ensure it's not a label
                       quizQuestion = qText;
                       break;
                   }
@@ -201,91 +204,84 @@ function escapeHtml(unsafe) {
 
               const quizOptions = [];
               const seenOptions = new Set();
-              const inputOptions = container.querySelectorAll('input[type="radio"], input[type="checkbox"]');
+              container.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
+                  let label = input.closest('label');
+                  if (!label) {
+                      const inputId = input.id;
+                      if (inputId) {
+                          label = container.querySelector(`label[for="${inputId}"]`);
+                      }
+                  }
 
-              inputOptions.forEach(input => {
-                  let label = input.closest('label') || container.querySelector(`label[for="${input.id}"]`);
                   if (label) {
-                      const tempDiv = document.createElement('div');
-                      tempDiv.innerHTML = label.innerHTML;
-                      tempDiv.querySelectorAll('input').forEach(el => el.remove());
-                      const optionContent = tempDiv.textContent.trim();
-                      if (optionContent.length > 0 && !seenOptions.has(optionContent)) {
+                      const optionContent = label.textContent.trim();
+                      if (optionContent && !seenOptions.has(optionContent)) {
                           quizOptions.push(optionContent);
                           seenOptions.add(optionContent);
                       }
                   }
               });
 
-              if (quizQuestion.length > 10 && quizOptions.length >= 2) {
-                  let extractedStructuredContent = `Question: ${quizQuestion}\n\nOptions:\n`;
-                  quizOptions.forEach(opt => { extractedStructuredContent += `- ${opt}\n`; });
-                  return extractedStructuredContent.trim();
+              if (quizQuestion && quizOptions.length >= 2) {
+                  let extractedContent = `Question: ${quizQuestion}\n\nOptions:\n`;
+                  quizOptions.forEach(opt => { extractedContent += `- ${opt}\n`; });
+                  return extractedContent.trim();
               }
           }
       }
       return null;
   }
+  
+  /**
+   * Extracts the main textual content of the page, ignoring interactive elements.
+   * This is used for the "Analyze Page" feature.
+   * @returns {string|null} The main page content, or null if nothing significant is found.
+   */
+  function getFullPageContent() {
+      const mainContentArea = document.querySelector('main, article, div[role="main"], #main, .main-content');
+      const clone = (mainContentArea || document.body).cloneNode(true);
 
-  function _tryLevel2Extraction() {
-      const mainContentArea = document.querySelector('main') || document.querySelector('article') || document.querySelector('div.w3-main') || document.querySelector('#main') || document.querySelector('body > div.container');
-      if (!mainContentArea) return null;
-      let content = '';
-      const clone = mainContentArea.cloneNode(true);
-      const aggressiveSelectorsToRemove = ['script', 'style', 'noscript', 'iframe', '.ads', '.ad', '[id*="ad"]', '[class*="ad"]', 'nav', 'header', 'footer', 'aside', '.hidden', '[style*="display:none"]', '[aria-hidden="true"]', '.w3-sidebar', '#mySidenav', '.w3-bar', '.w3-top', '.w3-bottom', 'input[type="hidden"]', 'button', 'textarea', 'select', 'img', '.w3-example', '.w3-code', '[class*="google-ads"]', '[id*="google_ads"]', '.w3-include-css', '.w3-include-html', '.w3-hide-small', '.w3-hide-medium', '.w3-hide-large', '#google_translate_element', 'div[id*="at-svc"]', 'div[class*="at-svc"]', 'a[href*="#"]', '[role="button"]', '.navbar', '.breadcrumb', '.footer', '#main-footer', '.sidebar', '.section-header', '.course-info-card', '.progress-bar', '.user-profile-widget', '.activity-log', '.notification-area', '.leaderboard-widget', '[class*="ad-box"]', '[id*="ad-block"]', '[class*="ad-unit"]'];
-      clone.querySelectorAll(aggressiveSelectorsToRemove.join(', ')).forEach(el => el.remove());
-      clone.childNodes.forEach(node => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-              const tagName = node.tagName.toLowerCase();
-              if (['script', 'style', 'nav', 'header', 'footer', 'aside', 'iframe'].includes(tagName)) return;
-              let text = node.textContent.trim();
-              if (tagName === 'pre' || tagName === 'code') { text = `CODE_BLOCK_START\n${text}\nCODE_BLOCK_END`; }
-              if (text.length > 1 && text.length < 1000 && !/advertisement|cookie|login|sign up|next|previous|submit|test your skills/i.test(text)) {
-                  content += text + '\n\n';
-              }
-          } else if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim().length > 1) {
-              content += node.nodeValue.trim() + '\n\n';
-          }
-      });
-      content = content.trim().replace(/\n\s*\n\s*\n/g, '\n\n').trim();
-      return content.length > 50 ? content : null;
+      const selectorsToRemove = [
+          'script', 'style', 'noscript', 'iframe', 'nav', 'header', 'footer', 'aside',
+          '.ads', '.ad', '[id*="ad"]', '[class*="ad"]', '.hidden', '[style*="display:none"]',
+          '[aria-hidden="true"]', 'button', 'input', 'textarea', 'select', 'form',
+          '[class*="quiz"]', '[id*="quiz"]', '.w3-sidebar', '.w3-bar', '.w3-example'
+      ];
+      clone.querySelectorAll(selectorsToRemove.join(', ')).forEach(el => el.remove());
+
+      let content = clone.innerText;
+      content = content.replace(/\s+/g, ' ').trim();
+      
+      return content.length > 100 ? content : null;
   }
 
-  function _tryLevel3Fallback() {
-      const bodyCloneFinal = document.body.cloneNode(true);
-      bodyCloneFinal.querySelectorAll('script, style, noscript, iframe, .hidden, [style*="display:none"], [aria-hidden="true"]').forEach(el => el.remove());
-      return bodyCloneFinal.innerText.replace(/\s+/g, ' ').trim();
+  /**
+   * Fallback to get any text content if other methods fail.
+   * @returns {string} The innerText of the body.
+   */
+  function getAnyContentFallback() {
+      const bodyClone = document.body.cloneNode(true);
+      bodyClone.querySelectorAll('script, style, noscript, iframe').forEach(el => el.remove());
+      return bodyClone.innerText.trim();
   }
 
-  function getQuizContentFromPage() {
-      const level1Result = _tryLevel1Extraction();
-      if (level1Result) return level1Result;
-      const level2Result = _tryLevel2Extraction();
-      if (level2Result) return level2Result;
-      return _tryLevel3Fallback();
-  }
-
+  // Toolbar injection logic (unchanged)
   if (typeof window.geminiAnswerBotToolbarInjected === 'undefined') {
     window.geminiAnswerBotToolbarInjected = true;
-
     let toolbarElement = null;
-
     const toolbarActions = [
       { action: 'summarize', title: 'Summarize', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.37 3.63a2.12 2.12 0 1 1 3 3L12 16l-4 1 1-4Z"/></svg>' },
       { action: 'explain', title: 'Explain', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14-4-4 4-4"/><path d="M12 14h-4a2 2 0 0 0-2 2v4"/><path d="m16 10 4 4-4 4"/><path d="m16 10h4a2 2 0 0 1 2 2v4"/></svg>' },
       { action: 'translate', title: 'Translate', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>' },
     ];
-
     function createToolbar() {
       toolbarElement = document.createElement('div');
       toolbarElement.className = 'gemini-answer-bot-toolbar';
-
       toolbarActions.forEach(item => {
         const button = document.createElement('button');
         button.className = 'gab-toolbar-button';
         button.title = item.title;
         button.innerHTML = item.svg;
-        
         button.addEventListener('click', (e) => {
           e.stopPropagation();
           const selectedText = window.getSelection().toString();
@@ -293,27 +289,20 @@ function escapeHtml(unsafe) {
             try {
               chrome.runtime.sendMessage({
                 action: 'triggerContextMenuAction',
-                payload: {
-                  action: item.action,
-                  selectionText: selectedText,
-                }
+                payload: { action: item.action, selectionText: selectedText }
               });
             } catch (error) {
               if (error.message.includes('Extension context invalidated')) {
-                console.warn('GeminiAnswerBot: Could not send message, context invalidated. This is expected if the extension was reloaded.');
-              } else {
-                console.error('GeminiAnswerBot: Error sending message:', error);
-              }
+                console.warn('GeminiAnswerBot: Context invalidated.');
+              } else { console.error('GeminiAnswerBot:', error); }
             }
           }
           hideToolbar();
         });
         toolbarElement.appendChild(button);
       });
-      
       document.body.appendChild(toolbarElement);
     }
-
     function injectToolbarCSS() {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
@@ -321,92 +310,50 @@ function escapeHtml(unsafe) {
       link.href = chrome.runtime.getURL('assets/toolbar.css');
       document.head.appendChild(link);
     }
-
     function showToolbar() {
       const selection = window.getSelection();
-      if (!selection || selection.isCollapsed) {
-        hideToolbar();
-        return;
-      }
+      if (!selection || selection.isCollapsed) { hideToolbar(); return; }
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
-      if (rect.width < 5 && rect.height < 5) {
-        hideToolbar();
-        return;
-      }
+      if (rect.width < 5 && rect.height < 5) { hideToolbar(); return; }
       toolbarElement.classList.add('visible');
       const toolbarWidth = toolbarElement.offsetWidth;
       const toolbarHeight = toolbarElement.offsetHeight;
       let top = rect.top + window.scrollY - toolbarHeight - 10;
       let left = rect.left + window.scrollX + (rect.width / 2) - (toolbarWidth / 2);
-      if (top < window.scrollY) {
-        top = rect.bottom + window.scrollY + 10;
-      }
+      if (top < window.scrollY) { top = rect.bottom + window.scrollY + 10; }
       if (left < 0) left = 5;
-      if (left + toolbarWidth > document.documentElement.clientWidth) {
-        left = document.documentElement.clientWidth - toolbarWidth - 5;
-      }
+      if (left + toolbarWidth > document.documentElement.clientWidth) { left = document.documentElement.clientWidth - toolbarWidth - 5; }
       toolbarElement.style.top = `${top}px`;
       toolbarElement.style.left = `${left}px`;
     }
-
-    function hideToolbar() {
-      if (toolbarElement) {
-        toolbarElement.classList.remove('visible');
-      }
-    }
-    
+    function hideToolbar() { if (toolbarElement) { toolbarElement.classList.remove('visible'); } }
     injectToolbarCSS();
     createToolbar();
-
-    document.addEventListener('mouseup', () => {
-      setTimeout(() => {
-        const selectionText = window.getSelection().toString().trim();
-        if (selectionText.length > 5) {
-          showToolbar();
-        } else {
-          hideToolbar();
-        }
-      }, 10);
-    });
-
-    document.addEventListener('mousedown', (e) => {
-      if (toolbarElement && !toolbarElement.contains(e.target)) {
-        hideToolbar();
-      }
-    });
+    document.addEventListener('mouseup', () => setTimeout(() => {
+      const selectionText = window.getSelection().toString().trim();
+      if (selectionText.length > 5) { showToolbar(); } else { hideToolbar(); }
+    }, 10));
+    document.addEventListener('mousedown', (e) => { if (toolbarElement && !toolbarElement.contains(e.target)) { hideToolbar(); } });
   }
   
   function getQuizOptionsFromPage() {
-    const quizContainerSelectors = [
-        'div.w3-container.w3-panel', 'div#mainLeaderboard > form', 'div[class*="quiz"]',
-        'form[action*="quiz"]', 'div[class*="question-block"]', 'div[id*="question"]'
-    ];
-    for (const selector of quizContainerSelectors) {
-        const container = document.querySelector(selector);
-        if (container && (container.querySelector('input[type="radio"]') || container.querySelector('input[type="checkbox"]'))) {
-            const quizOptions = [];
-            const seenOptions = new Set();
-            const inputOptions = container.querySelectorAll('input[type="radio"], input[type="checkbox"]');
-            inputOptions.forEach(input => {
-                let label = input.closest('label') || container.querySelector(`label[for="${input.id}"]`);
-                if (label) {
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = label.innerHTML;
-                    tempDiv.querySelectorAll('input').forEach(el => el.remove());
-                    const optionContent = tempDiv.textContent.trim();
-                    if (optionContent.length > 0 && !seenOptions.has(optionContent)) {
-                        quizOptions.push(optionContent);
-                        seenOptions.add(optionContent);
-                    }
-                }
-            });
-            if (quizOptions.length > 1) {
-                return quizOptions;
-            }
+    const quizContainer = document.querySelector('div[class*="quiz"], form[action*="quiz"], div.w3-panel');
+    if (!quizContainer) return [];
+
+    const options = [];
+    const seenOptions = new Set();
+    quizContainer.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
+      const label = input.closest('label') || document.querySelector(`label[for="${input.id}"]`);
+      if (label) {
+        const optionContent = label.textContent.trim();
+        if (optionContent && !seenOptions.has(optionContent)) {
+          options.push(optionContent);
+          seenOptions.add(optionContent);
         }
-    }
-    return [];
+      }
+    });
+    return options;
   }
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -414,16 +361,32 @@ function escapeHtml(unsafe) {
           sendResponse({ ready: isMarkerInitialized, success: true });
           return true;
       }
-      if (request.action === "get_page_content") {
+      
+      if (request.action === "get_quiz_content") {
           const selectedText = window.getSelection().toString().trim();
-          const pageContent = selectedText.length > 20 ? selectedText : getQuizContentFromPage();
-          sendResponse({ content: pageContent, source: selectedText.length > 20 ? 'selection' : 'auto' });
+          let content;
+          if (selectedText.length > 20) {
+              content = selectedText;
+          } else {
+              content = getQuizContent() || getAnyContentFallback();
+          }
+          sendResponse({ content });
           return true;
-      } else if (request.action === "highlight-answer") {
+      }
+      
+      if (request.action === "get_full_page_content") {
+          const content = getFullPageContent() || getAnyContentFallback();
+          sendResponse({ content });
+          return true;
+      }
+
+      if (request.action === "highlight-answer") {
           highlightText(request.text);
           sendResponse({ success: true });
           return true;
-      } else if (request.action === "get_quiz_options") {
+      }
+      
+      if (request.action === "get_quiz_options") {
         const options = getQuizOptionsFromPage();
         sendResponse({ options: options });
         return true;

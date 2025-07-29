@@ -97,7 +97,7 @@ class PopupApp {
             }
 
             await this._injectScripts();
-            
+
             const contextKey = `context_action_${tab.id}`;
             const contextData = (await chrome.storage.local.get(contextKey))[contextKey];
 
@@ -117,9 +117,9 @@ class PopupApp {
                 } else {
                     this.state.view = 'loading';
                     this.render();
-                    const response = await this._sendMessageToContentScript({ action: "get_page_content" });
+                    const response = await this._sendMessageToContentScript({ action: "get_quiz_content" });
                     if (!response || !response.content?.trim()) {
-                        throw new Error("No readable content found on this page.");
+                        throw new Error("No readable quiz content found on this page.");
                     }
                     this.state.originalUserContent = response.content;
                     this._callGeminiStream('cleaning', response.content);
@@ -132,7 +132,7 @@ class PopupApp {
             this.render();
         }
     }
-    
+
     /**
      * Centralized UI render function based on the current state view.
      */
@@ -156,7 +156,7 @@ class PopupApp {
                 this.elements.messageArea.classList.remove('hidden');
                 this._renderErrorState();
                 break;
-                
+
             case 'summary':
                 this.elements.pageSummaryContainer.classList.remove('hidden');
                 break;
@@ -167,7 +167,7 @@ class PopupApp {
                 break;
         }
     }
-    
+
     /**
      * Renders the UI for the 'quiz' view based on the current state.
      * @private
@@ -185,7 +185,7 @@ class PopupApp {
         if (this.state.answerHTML) {
             this._handleAnswerResult(this.state.answerHTML, false, this.state.totalTokenCount);
         } else if (this.state.cleanedContent) {
-             this._getAnswer();
+            this._getAnswer();
         }
 
         if (this.state.explanationHTML) {
@@ -214,7 +214,7 @@ class PopupApp {
         }
 
         this.elements.messageArea.innerHTML = `<div class="error-panel"><div class="error-panel-header">${title}</div><div class="error-panel-body"><p>${userMessage}</p><details class="error-details"><summary>Technical Details</summary><code>${this._escapeHtml(this.state.error.message)}</code></details></div><div class="error-panel-actions">${actionsHtml}</div></div>`;
-        
+
         document.getElementById('error-retry-btn')?.addEventListener('click', () => this.init());
         document.getElementById('error-settings-btn')?.addEventListener('click', () => chrome.runtime.openOptionsPage());
         document.getElementById('error-quota-btn')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://aistudio.google.com/billing' }));
@@ -230,16 +230,16 @@ class PopupApp {
         });
         this.init();
     }
-    
+
     async _handlePageAnalysis() {
         this.state.view = 'loading';
         this.render();
         this.elements.messageArea.querySelector('p').textContent = 'Analyzing the entire page...';
-        
+
         try {
-            const response = await this._sendMessageToContentScript({ action: "get_page_content" });
+            const response = await this._sendMessageToContentScript({ action: "get_full_page_content" });
             if (!response || !response.content?.trim()) {
-                throw new Error("No readable content found on this page.");
+                throw new Error("No significant text content found for analysis.");
             }
             this._callGeminiStream('pageAnalysis', response.content);
         } catch (e) {
@@ -279,7 +279,7 @@ class PopupApp {
     _callGeminiStream(purpose, contentText, originalUserContent = '') {
         const { promptProfiles, activeProfile, selectedModel, geminiApiKey } = this.state.config;
         const currentPrompts = (promptProfiles?.[activeProfile]) || DEFAULT_PROMPTS;
-        
+
         let systemPrompt = '';
         let userContent = contentText;
 
@@ -297,7 +297,7 @@ class PopupApp {
             systemPrompt = currentPrompts.rephrase || DEFAULT_PROMPTS.rephrase;
             userContent = `Target Language: ${language}\n\nText to rephrase:\n${contentText}`;
         }
-        
+
         chrome.runtime.sendMessage({
             action: 'callGeminiStream',
             payload: { apiKey: geminiApiKey, model: selectedModel, systemPrompt, userContent, generationConfig: {}, originalUserContent, purpose }
@@ -312,14 +312,14 @@ class PopupApp {
 
         if (this.state.cacheKey) {
             chrome.storage.local.get(this.state.cacheKey).then(cachedResult => {
-                 const cacheData = cachedResult[this.state.cacheKey];
-                 const lines = this.state.cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
-                 const rawQuestion = lines.length > 0 ? lines[0] : '';
-                 if (cacheData?.answerHTML && cacheData.rawQuestion === rawQuestion) {
-                     this._handleAnswerResult(cacheData.answerHTML, true, cacheData.totalTokenCount);
-                     return;
-                 }
-                 this._continueGetAnswer();
+                const cacheData = cachedResult[this.state.cacheKey];
+                const lines = this.state.cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
+                const rawQuestion = lines.length > 0 ? lines[0] : '';
+                if (cacheData?.answerHTML && cacheData.rawQuestion === rawQuestion) {
+                    this._handleAnswerResult(cacheData.answerHTML, true, cacheData.totalTokenCount);
+                    return;
+                }
+                this._continueGetAnswer();
             });
         } else {
             this._continueGetAnswer();
@@ -355,18 +355,6 @@ class PopupApp {
             const fullText = payload.fullText || this.streamAccumulator[purpose] || '';
             delete this.streamAccumulator[purpose];
 
-            const handlePageAnalysis = (text) => {
-                const cleanJsonText = text.replace(/```json|```/g, '').trim();
-                try {
-                    const jsonData = JSON.parse(cleanJsonText);
-                    this._renderPageSummary(jsonData);
-                } catch (e) {
-                    // Graceful fallback for non-JSON response
-                    console.warn("Failed to parse JSON, rendering as fallback.", e);
-                    this._renderPageSummary(text, true);
-                }
-            };
-            
             const purposeHandlers = {
                 'cleaning': (text) => this._handleCleaningResult(text),
                 'answer': (text) => this._handleAnswerResult(text, false, payload.totalTokenCount),
@@ -375,15 +363,15 @@ class PopupApp {
                 'summarize': (text) => this._handleContextMenuResult(text, payload.originalUserContent, purpose),
                 'explain': (text) => this._handleContextMenuResult(text, payload.originalUserContent, purpose),
                 'translate': (text) => this._handleContextMenuResult(text, payload.originalUserContent, purpose),
-                'pageAnalysis': handlePageAnalysis,
+                'pageAnalysis': (text) => this._handlePageAnalysisResult(text),
             };
-            
+
             if (purposeHandlers[purpose]) {
                 purposeHandlers[purpose](fullText);
             } else if (purpose.startsWith('rephrase-')) {
                 this._handleContextMenuResult(fullText, payload.originalUserContent, purpose);
             }
-        
+
         } else if (payload.chunk) {
             this.streamAccumulator[purpose] = (this.streamAccumulator[purpose] || '') + payload.chunk;
             if (purpose === 'pageAnalysis') {
@@ -393,6 +381,32 @@ class PopupApp {
             }
         }
     }
+
+    _handlePageAnalysisResult(text) {
+    let parsed = false;
+
+    try {
+        // Try to extract a JSON block if it exists
+        const jsonMatch = text.match(/{[\s\S]*}/);
+        if (jsonMatch) {
+            const jsonCandidate = jsonMatch[0];
+            const jsonData = JSON.parse(jsonCandidate);
+            this._renderPageSummary(jsonData);
+            parsed = true;
+        }
+    } catch (e) {
+        console.warn("JSON parse failed, falling back to raw render.", e);
+    }
+
+    if (!parsed) {
+        // Render raw as fallback (Markdown/HTML-safe)
+        this._renderPageSummary(text, true);
+    }
+}
+
+
+
+
 
     _handleCleaningResult(fullText) {
         this.state.cleanedContent = fullText;
@@ -409,7 +423,7 @@ class PopupApp {
         const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
         const reasonMatch = fullText.match(/Reason:(.*)/is);
         let answerText = (answerMatch ? answerMatch[1].trim() : fullText.trim()).replace(/`/g, '');
-        
+
         let formattedHtml = `<p class="answer-highlight">${this._escapeHtml(answerText).replace(/\n/g, '<br>')}</p>`;
         let confidenceWrapperHtml = '';
         if (confidenceMatch) {
@@ -433,7 +447,7 @@ class PopupApp {
         this.state.incorrectAnswer = answerText;
 
         if (this.state.config.autoHighlight) this._sendMessageToContentScript({ action: 'highlight-answer', text: [answerText] });
-        
+
         if (!fromCache && this.state.cacheKey) {
             const lines = this.state.cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
             const rawQuestion = lines.length > 0 ? lines[0] : '';
@@ -462,38 +476,36 @@ class PopupApp {
         this.state.view = 'quiz';
         this.state.originalUserContent = originalUserContent;
         this.state.answerHTML = fullText;
-        
+
         this.render();
-        
+
         this.elements.answerDisplay.innerHTML = marked.parse(fullText);
         this.elements.copyAnswer.dataset.copyText = fullText;
         this.elements.aiActionsWrapper.classList.add('hidden');
         this.elements.explanationContainer.classList.add('hidden');
         this.elements.feedbackContainer.classList.add('hidden');
-        
+
         const historyActionType = purpose.split('-')[0];
         this._saveToHistory({ cleanedContent: originalUserContent, answerHTML: fullText }, historyActionType);
     }
-    
+
     _renderPageSummary(data, isFallback = false) {
         this.state.view = 'summary';
         let summaryHtml;
 
         if (isFallback) {
-            // Render non-JSON response as a general summary.
             summaryHtml = `<div class="summary-section">
                 <h3 class="summary-section-title">General Summary</h3>
                 <div class="card-body">${marked.parse(data)}</div>
             </div>`;
         } else {
-            // Render the structured JSON data.
             const tldrHtml = data.tldr ? `<div class="summary-section summary-tldr"><h3 class="summary-section-title">TL;DR</h3><p>${this._escapeHtml(data.tldr)}</p></div>` : '';
             const takeawaysHtml = (data.takeaways?.length > 0) ? `<div class="summary-section summary-takeaways"><h3 class="summary-section-title">Key Takeaways</h3><ul>${data.takeaways.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ul></div>` : '';
             const renderEntities = (entities, label) => (entities?.length > 0) ? `<div class="entity-group"><span class="entity-label">${label}</span><div class="entity-tags">${entities.map(e => `<span class="entity-tag">${this._escapeHtml(e)}</span>`).join('')}</div></div>` : '';
             const entitiesHtml = (data.entities && (data.entities.people?.length || data.entities.organizations?.length || data.entities.locations?.length)) ? `<div class="summary-section summary-entities"><h3 class="summary-section-title">Entities Mentioned</h3>${renderEntities(data.entities.people, 'People')}${renderEntities(data.entities.organizations, 'Organizations')}${renderEntities(data.entities.locations, 'Locations')}</div>` : '';
             summaryHtml = tldrHtml + takeawaysHtml + entitiesHtml;
         }
-        
+
         this.elements.pageSummaryContainer.innerHTML = summaryHtml;
         this.render();
     }
@@ -523,7 +535,7 @@ class PopupApp {
         this.elements.feedbackCorrect.classList.remove('selected-correct');
         this.elements.feedbackIncorrect.classList.remove('selected-incorrect');
     }
-    
+
     _copyToClipboard(button) {
         const textToCopy = button.dataset.copyText;
         if (textToCopy) {
@@ -560,7 +572,7 @@ class PopupApp {
         if (history.length > 100) history.pop();
         await chrome.storage.local.set({ history });
     }
-    
+
     async _injectScripts() {
         await chrome.scripting.executeScript({
             target: { tabId: this.state.tab.id },
@@ -573,7 +585,6 @@ class PopupApp {
         return new Promise((resolve, reject) => {
             const timer = setTimeout(() => reject(new Error('Content script did not respond in time.')), timeout);
             chrome.tabs.sendMessage(this.state.tab.id, message, (response) => {
-                clearTimeout(timer);
                 chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message || 'Failed to communicate.')) : resolve(response);
             });
         });
@@ -581,15 +592,23 @@ class PopupApp {
 
     _escapeHtml(unsafe) {
         if (typeof unsafe !== 'string') return '';
-        return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
-    
+
     _formatQuestionContent(content) {
         if (!content) return '';
+        if (!content.toLowerCase().includes('question:') || !content.toLowerCase().includes('options:')) {
+            return `<div class="question-text">${this._escapeHtml(content)}</div>`;
+        }
         const lines = content.split('\n').filter(line => line.trim() !== '');
-        if (lines.length === 0) return '';
+        if (lines.length === 0) return `<div class="question-text">${this._escapeHtml(content)}</div>`;
         const question = this._escapeHtml(lines.shift().replace(/^Question:\s*/i, ''));
-        const optionsHtml = lines.map(option => `<li>${this._escapeHtml(option.trim().replace(/^[\*\-•]\s*|\d+\.\s*|[a-zA-Z]\)\s*/, ''))}</li>`).join('');
+        const optionsHtml = lines.map(option => `<li>${this._escapeHtml(option.trim().replace(/^[\*\-•]\s*Options:\s*|^\s*[\*\-]\s*/, ''))}</li>`).join('');
         return `<div class="question-text">${question}</div><ul>${optionsHtml}</ul>`;
     }
 
@@ -598,7 +617,7 @@ class PopupApp {
         const lines = cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
         return lines.length < 2 ? null : lines.map(l => l.toLowerCase().replace(/\s+/g, ' ').trim()).join('\n');
     }
-    
+
     _simpleHash(str) {
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
@@ -613,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof marked !== 'undefined') {
         marked.setOptions({ sanitize: true });
     }
-    
+
     const app = new PopupApp();
     app.init();
 });
