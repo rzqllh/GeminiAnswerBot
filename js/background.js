@@ -111,7 +111,6 @@ async function performApiCall(payload) {
         const errorMessage = errorBody.error?.message || `Request failed with status ${response.status}`;
         let errorType = 'API_ERROR';
         
-        // --- BARU: Analisis jenis error dari API ---
         if (errorMessage.includes("API key not valid")) {
           errorType = 'INVALID_API_KEY';
         } else if (errorBody.error?.status === 'RESOURCE_EXHAUSTED' || errorMessage.includes("quota")) {
@@ -149,7 +148,6 @@ async function performApiCall(payload) {
               totalTokenCount = data.usageMetadata.totalTokenCount;
             }
           } catch (e) {
-            // This is a chunk parsing error, not a fatal API error
             console.warn("Error parsing stream chunk:", e);
           }
         }
@@ -158,7 +156,6 @@ async function performApiCall(payload) {
 
     } catch (error) {
       console.error("API call error:", error);
-      // --- BARU: Mengirim objek error yang lebih terstruktur ---
       const errorPayload = {
         type: error.type || 'NETWORK_ERROR',
         message: error.message || 'Check your internet connection or the browser console for more details.'
@@ -200,18 +197,19 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'callGeminiStream') {
       performApiCall(request.payload);
-      return true;
+      // Jangan return true karena kita tidak memanggil sendResponse
     }
     if (request.action === 'testApiConnection') {
       handleTestConnection(request.payload, sendResponse);
+      // Return true karena handleTestConnection adalah async dan memanggil sendResponse
       return true;
     }
     if (request.action === 'updateContextMenus') {
       updateContextMenus();
-      return true;
+       // Jangan return true karena ini adalah aksi sinkron
     }
     if (request.action === 'triggerContextMenuAction') {
       handleContextAction(sender.tab, request.payload.action, request.payload.selectionText);
-      return true;
+       // Jangan return true karena kita tidak memanggil sendResponse
     }
 });

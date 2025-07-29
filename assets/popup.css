@@ -140,7 +140,7 @@ body {
   flex-direction: column;
 }
 
-#resultsWrapper {
+#quizModeContainer {
     display: flex;
     flex-direction: column;
     gap: 14px;
@@ -534,14 +534,14 @@ body {
     gap: 12px;
     padding: 8px var(--card-padding);
     border-top: 1px solid var(--separator-color);
-    background-color: transparent; /* Changed */
+    background-color: transparent;
 }
 
 .footer-label {
     font-size: 13px;
     color: var(--secondary-text);
     font-weight: 500;
-    margin-right: auto; /* Push buttons to the right */
+    margin-right: auto;
 }
 
 .feedback-buttons {
@@ -632,4 +632,93 @@ body {
 .text-center {
     text-align: center;
     color: var(--secondary-text);
+}
+
+/* == PAGE SUMMARY STYLES ================================= */
+#pageSummaryContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    animation: fadeIn 0.4s ease-in-out;
+}
+
+.summary-section {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--card-border-radius);
+    padding: var(--card-padding);
+}
+
+.summary-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--secondary-text);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 12px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--separator-color);
+}
+
+.summary-tldr p {
+    font-weight: 500;
+    margin: 0;
+}
+
+.summary-takeaways ul {
+    list-style-type: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.summary-takeaways li {
+    padding-left: 20px;
+    position: relative;
+    margin-bottom: 8px;
+}
+
+.summary-takeaways li:last-child {
+    margin-bottom: 0;
+}
+
+.summary-takeaways li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: var(--accent-green);
+    font-weight: 600;
+}
+
+.summary-entities {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.entity-group {
+    display: flex;
+    align-items: flex-start;
+}
+
+.entity-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--secondary-text);
+    flex-shrink: 0;
+    width: 90px;
+}
+
+.entity-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.entity-tag {
+    background-color: var(--button-bg-hover);
+    color: var(--primary-text);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
 }

@@ -3,7 +3,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     let activeToast = null;
     const notificationContainer = document.getElementById('notification-container');
-    let globalTemperature = 0.4; // Default global temperature, will be updated from storage
+    let globalTemperature = 0.4;
 
     function showToast(title, message, type = 'info') {
         if (activeToast) {
@@ -37,15 +37,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const historyListContainer = document.getElementById('history-list-container');
     
-    function escapeHtml(unsafe) {
-        if (!unsafe) return '';
-        return String(unsafe)
-             .replace(/&/g, "&")
-             .replace(/</g, "<")
-             .replace(/>/g, ">")
-             .replace(/"/g, "'")
-             .replace(/'/g, '"');
-    }
+function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') return '';
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
     function formatQuestionContent(content) {
         if (!content) return '';
@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const temp = result.temperature !== undefined ? result.temperature : 0.4;
         if (temperatureSlider) temperatureSlider.value = temp;
         if (temperatureValue) temperatureValue.textContent = parseFloat(temp).toFixed(1);
-        globalTemperature = temp; // Set initial global temperature
+        globalTemperature = temp;
     });
     
     if (temperatureSlider) {
@@ -162,8 +162,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 'temperature': newGlobalTemp
             };
             chrome.storage.sync.set(settingsToSave, () => {
-                globalTemperature = newGlobalTemp; // Update global var on save
-                loadPromptsForActiveProfile(); // Reload prompts to update placeholders
+                globalTemperature = newGlobalTemp;
+                loadPromptsForActiveProfile();
                 showToast('Success', 'General settings have been saved!', 'success');
             });
         });
@@ -314,7 +314,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const slider = promptTempSliders[key];
                 if (slider) {
                     const tempValue = parseFloat(slider.value);
-                    if (Math.abs(tempValue - globalTemperature) > 0.01) { // Use tolerance for float comparison
+                    if (Math.abs(tempValue - globalTemperature) > 0.01) {
                         currentProfileData[`${key}_temp`] = tempValue;
                     } else {
                         delete currentProfileData[`${key}_temp`];

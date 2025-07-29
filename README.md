@@ -9,19 +9,20 @@
 
 ## Fitur Utama
 
-- **Penyelesai Kuis Cerdas**: Mendeteksi dan menyelesaikan soal kuis secara otomatis pada halaman yang didukung.
-- **Feedback Loop Interaktif**: Pengguna dapat menandai jawaban AI sebagai "benar" atau "salah". Jika salah, pengguna dapat memilih jawaban yang benar, yang kemudian digunakan untuk meminta AI memberikan penjelasan yang telah dikoreksi.
-- **Sistem Fallback Cerdas**: Secara otomatis mendeteksi error API spesifik (kunci tidak valid, kuota habis) dan memberikan umpan balik yang jelas dengan tombol aksi yang relevan.
-- **Toolbar Aksi Mengambang (Inline Toolbar)**: Saat menyeleksi teks, sebuah toolbar modern akan muncul untuk akses super cepat ke aksi AI.
-- **Tindakan Teks Kontekstual**: Klik kanan pada teks yang dipilih untuk meringkas, menjelaskan, menerjemahkan, atau memparafrasekan.
-- **Dasbor Pengaturan Modern**: Antarmuka opsi yang terinspirasi dari antarmuka modern dengan tab yang jelas.
-- **AI yang Dapat Disesuaikan**: Atur kunci API Gemini Anda, pilih model, sesuaikan prompt sistem, dan ubah perilaku ekstensi.
-- **Kontrol Suhu Granular**: Atur tingkat "kreativitas" (suhu) AI secara spesifik untuk setiap jenis tugas.
+- **Analisis Halaman Penuh**: Dengan satu klik, dapatkan ringkasan komprehensif dari halaman web mana pun, termasuk TL;DR, poin-poin kunci, dan entitas penting yang disebutkan.
+- **Penyelesai Kuis Cerdas**: Mendeteksi dan menyelesaikan soal kuis secara otomatis.
+- **Feedback Loop Interaktif**: Koreksi jawaban AI yang salah dan dapatkan penjelasan baru secara instan.
+- **Sistem Fallback Cerdas**: Mendeteksi error API spesifik dan memberikan umpan balik yang jelas.
+- **Toolbar Aksi Mengambang (Inline Toolbar)**: Akses AI super cepat saat menyeleksi teks.
+- **Tindakan Teks Kontekstual**: Klik kanan untuk meringkas, menjelaskan, menerjemahkan, atau memparafrasekan.
+- **Dasbor Pengaturan Modern & Kustomisasi Penuh**: Atur kunci API, model, prompt, dan perilaku ekstensi.
+- **Kontrol Suhu Granular**: Atur tingkat kreativitas AI secara spesifik untuk setiap jenis tugas.
 - **Panel Riwayat Lokal**: Lihat semua interaksi AI sebelumnya di dalam dasbor.
 
 ---
 ## Skenario Penggunaan
 
+- **Mendapatkan intisari artikel panjang dalam hitungan detik** sebelum memutuskan untuk membacanya.
 - Secara instan menyelesaikan dan menyorot jawaban kuis di platform e-learning.
 - **Memberikan koreksi jika AI salah menjawab**, dan secara instan mendapatkan penjelasan baru berdasarkan jawaban yang benar.
 - Meringkas, menjelaskan, atau menerjemahkan teks dengan cepat menggunakan toolbar mengambang.
@@ -124,6 +125,17 @@ Setelah melakukan perubahan, buka `chrome://extensions/` dan klik **Reload** pad
 ---
 
 ## Changelog
+
+### [1.9.7] - 2025-08-03
+#### Added
+- **Full Page Analysis:** Introduced a new "Analyze Page" feature, accessible from the popup header. This allows users to get a comprehensive, structured summary of the entire webpage content.
+- **Structured JSON Output:** The analysis provides a TL;DR, key takeaways, and a list of mentioned entities (people, places, etc.), powered by a new, robust prompt designed to ensure the AI returns a valid JSON format.
+- **Dynamic Summary UI:** The popup UI has been enhanced to beautifully render the structured analysis, making complex information easy to digest at a glance.
+
+### [1.9.6] - 2025-08-02
+#### Added
+- **Interactive Feedback Loop:** Users can now provide feedback on the AI's answer by marking it as "Correct" (👍) or "Incorrect" (👎).
+- **Answer Correction Flow:** If an answer is marked as incorrect, the user is prompted to select the correct option, which is then sent back to the API to generate a new, corrected explanation.
 
 ### [1.9.5] - 2025-08-01
 #### Added

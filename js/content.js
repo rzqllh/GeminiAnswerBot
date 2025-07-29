@@ -62,16 +62,15 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
           firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
   }
-
-  function escapeHtml(unsafe) {
+function escapeHtml(unsafe) {
     if (typeof unsafe !== 'string') return '';
     return unsafe
-         .replace(/&/g, "&")
-         .replace(/</g, "<")
-         .replace(/>/g, ">")
-         .replace(/"/g, "'")
-         .replace(/'/g, '"');
-  }
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
   function findQuizContainer() {
       const highlight = document.querySelector('mark.gemini-answer-highlight');

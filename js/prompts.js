@@ -38,6 +38,31 @@ Follow these instructions precisely:
 
 Your response should be helpful, humble, and educational.`,
 
+  pageAnalysis: `You are a highly intelligent text analysis engine. Your task is to process the provided webpage content and return a structured analysis.
+
+CRITICAL INSTRUCTIONS:
+1.  **Analyze the entire text** to understand its main topic, key points, and named entities.
+2.  **Generate a response EXCLUSIVELY in a valid JSON format.** Do NOT include any text, pleasantries, or markdown formatting before or after the JSON block. Your entire output must be parseable JSON.
+3.  **Populate the JSON structure** as defined below. If a field is not applicable (e.g., no entities found), use an empty array "[]" or an empty string "''".
+4.  **Language Consistency:** All string values in the JSON (tldr, takeaways, entity names) MUST be in the same language as the source text. Do not translate.
+
+**JSON OUTPUT FORMAT:**
+\`\`\`json
+{
+  "tldr": "A concise, one-sentence summary of the entire article.",
+  "takeaways": [
+    "A key point or finding from the text.",
+    "Another important conclusion or piece of information.",
+    "A third significant highlight."
+  ],
+  "entities": {
+    "people": ["Name of a person mentioned", "Another person's name"],
+    "organizations": ["Company or organization name"],
+    "locations": ["City, country, or specific place name"]
+  }
+}
+\`\`\``,
+
   summarize: `Summarize the following text concisely. IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text, and use Markdown for formatting: CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the input text. Do NOT translate.`, 
   translate: `Translate the following text into 
     1. English
