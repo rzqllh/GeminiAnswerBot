@@ -30,7 +30,7 @@ CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content y
 
 Follow these instructions precisely:
 1.  Acknowledge the user's correction.
-2.  Clearly state the correct answer.
+2.  Clear-ly state the correct answer.
 3.  Provide a detailed, step-by-step explanation for why this user-provided answer is correct.
 4.  Briefly explain why the other options (including your previous incorrect suggestion) are wrong.
 5.  IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text.
@@ -42,9 +42,10 @@ Your response should be helpful, humble, and educational.`,
 
 CRITICAL INSTRUCTIONS:
 1.  **Analyze the entire text** to understand its main topic, key points, and named entities.
-2.  **Generate a response EXCLUSIVELY in a valid JSON format.** Do NOT include any text, pleasantries, or markdown formatting before or after the JSON block. Your entire output must be parseable JSON.
-3.  **Populate the JSON structure** as defined below. If a field is not applicable (e.g., no entities found), use an empty array "[]" or an empty string "''".
+2.  **MANDATORY JSON OUTPUT:** Your response MUST BE EXCLUSIVELY a valid JSON object. Do NOT include any text, apologies, or markdown formatting before or after the JSON block. The entire output must be a single, parseable JSON.
+3.  **Populate the JSON structure** as defined below. If a field is not applicable (e.g., no entities found, or the text is too short/unclear to summarize), use an empty array "[]" or an empty string "" for that field's value. DO NOT omit any keys.
 4.  **Language Consistency:** All string values in the JSON (tldr, takeaways, entity names) MUST be in the same language as the source text. Do not translate.
+5.  **FALLBACK FOR UN-ANALYZABLE CONTENT:** If the provided text is nonsensical, contains only code, or cannot be summarized, you MUST STILL return the valid JSON structure with empty or null values. For example: { "tldr": "Content could not be summarized.", "takeaways": [], "entities": { "people": [], "organizations": [], "locations": [] } }
 
 **JSON OUTPUT FORMAT:**
 \`\`\`json
