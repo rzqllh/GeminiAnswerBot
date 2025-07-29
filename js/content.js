@@ -63,15 +63,15 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
       }
   }
   
-function _escapeHtml(unsafe) {
-  if (typeof unsafe !== 'string') return '';
-  return unsafe
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
+  function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') return '';
+    return unsafe
+        .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+  }
 
   function findQuizContainer() {
       const highlight = document.querySelector('mark.gemini-answer-highlight');
@@ -99,13 +99,7 @@ function _escapeHtml(unsafe) {
   function showCustomConfirm(userAnswer, aiAnswer, callback) {
       const oldDialog = document.getElementById('gemini-dialog-overlay');
       if (oldDialog) oldDialog.remove();
-
-      const styleLink = document.createElement('link');
-      styleLink.rel = 'stylesheet';
-      styleLink.type = 'text/css';
-      styleLink.href = chrome.runtime.getURL('assets/dialog.css');
-      document.head.appendChild(styleLink);
-
+      
       const dialogOverlay = document.createElement('div');
       dialogOverlay.id = 'gemini-dialog-overlay';
       dialogOverlay.className = 'gemini-answer-bot-dialog-overlay';
@@ -138,7 +132,6 @@ function _escapeHtml(unsafe) {
           dialogOverlay.classList.remove('visible');
           setTimeout(() => {
               if (dialogOverlay.parentElement) dialogOverlay.remove();
-              if (styleLink.parentElement) styleLink.remove();
           }, 200);
       }
 

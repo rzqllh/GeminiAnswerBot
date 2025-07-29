@@ -37,5 +37,12 @@
         "<all_urls>"
       ]
     }
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["js/vendor/marked.min.js", "js/mark.min.js", "js/content.js"],
+      "css": ["assets/highlighter.css", "assets/dialog.css", "assets/toolbar.css"]
+    }
   ]
 }

@@ -1,20 +1,36 @@
 // js/background.js
 
-async function handleContextAction(tab, action, selectionText) {
+async function handleContextAction(info, tab) {
   if (!tab || !tab.id) {
     console.error("Context action triggered without a valid tab.");
     return;
   }
+  
+  const actionData = {
+    action: info.menuItemId
+  };
+
+  if (info.selectionText) {
+    actionData.selectionText = info.selectionText;
+  }
+  
+  if (info.mediaType === 'image' && info.srcUrl) {
+    actionData.srcUrl = info.srcUrl;
+  }
+  
   await chrome.storage.local.set({
-    [`context_action_${tab.id}`]: { action, selectionText }
+    [`context_action_${tab.id}`]: actionData
   });
+
   chrome.action.openPopup();
 }
 
 async function updateContextMenus() {
   await chrome.contextMenus.removeAll();
+  
+  // --- Text Selection Menus ---
   chrome.contextMenus.create({
-    id: "gemini-answer-parent",
+    id: "gemini-text-parent",
     title: "GeminiAnswerBot Actions",
     contexts: ["selection"]
   });
@@ -26,75 +42,90 @@ async function updateContextMenus() {
   ];
   standardActions.forEach(action => {
     chrome.contextMenus.create({
-      id: action.id,
-      parentId: "gemini-answer-parent",
-      title: action.title,
-      contexts: ["selection"]
+      id: action.id, parentId: "gemini-text-parent",
+      title: action.title, contexts: ["selection"]
     });
   });
 
   const { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
   const defaultLanguages = 'English, Indonesian';
   let rephraseLanguages = defaultLanguages;
-  if (promptProfiles && activeProfile && promptProfiles[activeProfile] && promptProfiles[activeProfile].rephraseLanguages) {
-    rephraseLanguages = promptProfiles[activeProfile].rephraseLanguages;
-  } else if (promptProfiles && promptProfiles['Default'] && promptProfiles['Default'].rephraseLanguages) {
-    rephraseLanguages = promptProfiles['Default'].rephraseLanguages;
-  }
+  const currentProfile = promptProfiles?.[activeProfile] || promptProfiles?.['Default'] || {};
+  rephraseLanguages = currentProfile.rephraseLanguages || defaultLanguages;
+  
   const languages = rephraseLanguages.split(',').map(lang => lang.trim()).filter(lang => lang);
-
   if (languages.length > 0) {
     chrome.contextMenus.create({
-      id: "rephrase-parent",
-      parentId: "gemini-answer-parent",
-      title: "Rephrase Selection into...",
-      contexts: ["selection"]
+      id: "rephrase-parent", parentId: "gemini-text-parent",
+      title: "Rephrase Selection into...", contexts: ["selection"]
     });
     languages.forEach(lang => {
       chrome.contextMenus.create({
-        id: `rephrase-${lang}`,
-        parentId: "rephrase-parent",
-        title: lang,
-        contexts: ["selection"]
+        id: `rephrase-${lang}`, parentId: "rephrase-parent",
+        title: lang, contexts: ["selection"]
       });
     });
   }
+
+  // --- Image Selection Menus ---
+  chrome.contextMenus.create({
+    id: "gemini-image-parent",
+    title: "Gemini Image Actions",
+    contexts: ["image"]
+  });
+  
+  const imageActions = [
+      { id: 'image-quiz', title: 'Answer Quiz from Image' },
+      { id: 'image-analyze', title: 'Describe this Image' },
+      { id: 'image-translate', title: 'Translate Text in Image' }
+  ];
+  imageActions.forEach(action => {
+      chrome.contextMenus.create({
+          id: action.id, parentId: "gemini-image-parent",
+          title: action.title, contexts: ["image"]
+      });
+  });
 }
 
 chrome.runtime.onInstalled.addListener(updateContextMenus);
 chrome.runtime.onStartup.addListener(updateContextMenus);
 
 async function performApiCall(payload) {
-    const { apiKey, model, systemPrompt, userContent, generationConfig: baseGenerationConfig, originalUserContent, purpose } = payload;
+    const { apiKey, model, systemPrompt, userContent, base64ImageData, purpose } = payload;
     
+    // Determine temperature from stored settings
     const settings = await chrome.storage.sync.get(['promptProfiles', 'activeProfile', 'temperature']);
     const activeProfileName = settings.activeProfile || 'Default';
-    const activeProfile = settings.promptProfiles ? (settings.promptProfiles[activeProfileName] || {}) : {};
-    const globalTemp = settings.temperature !== undefined ? settings.temperature : 0.4;
-    
-    const purposeBase = purpose.startsWith('rephrase-') ? 'rephrase' : purpose;
+    const activeProfile = settings.promptProfiles?.[activeProfileName] || {};
+    const globalTemp = settings.temperature ?? 0.4;
+    const purposeBase = purpose.split('-')[0]; // 'image-quiz' -> 'image'
     const tempKey = `${purposeBase}_temp`;
+    const finalTemperature = activeProfile[tempKey] ?? globalTemp;
 
-    const finalTemperature = activeProfile[tempKey] !== undefined ? activeProfile[tempKey] : globalTemp;
-
-    const generationConfig = {
-        ...baseGenerationConfig,
-        temperature: finalTemperature
-    };
-
+    const generationConfig = { temperature: finalTemperature };
     const endpoint = 'streamGenerateContent';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}&alt=sse`;
   
+    // Build content parts based on whether it's a multimodal request
+    const contentParts = [{ text: userContent }];
+    if (base64ImageData && base64ImageData.startsWith('data:image')) {
+        const [meta, data] = base64ImageData.split(',');
+        const mimeType = meta.match(/:(.*?);/)[1];
+        contentParts.push({
+            inline_data: { mime_type: mimeType, data }
+        });
+    }
+
     const apiPayload = {
       system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: "user", parts: [{ text: userContent }] }],
+      contents: [{ role: "user", parts: contentParts }],
       generationConfig
     };
   
     const streamCallback = (streamData) => {
       chrome.runtime.sendMessage({
         action: 'geminiStreamUpdate',
-        payload: { ...streamData, originalUserContent },
+        payload: { ...streamData, originalUserContent: userContent },
         purpose: purpose
       });
     };
@@ -110,19 +141,12 @@ async function performApiCall(payload) {
         const errorBody = await response.json();
         const errorMessage = errorBody.error?.message || `Request failed with status ${response.status}`;
         let errorType = 'API_ERROR';
-        
-        if (errorMessage.includes("API key not valid")) {
-          errorType = 'INVALID_API_KEY';
-        } else if (errorBody.error?.status === 'RESOURCE_EXHAUSTED' || errorMessage.includes("quota")) {
-          errorType = 'QUOTA_EXCEEDED';
-        }
-
+        if (errorMessage.includes("API key not valid")) errorType = 'INVALID_API_KEY';
+        else if (errorBody.error?.status === 'RESOURCE_EXHAUSTED' || errorMessage.includes("quota")) errorType = 'QUOTA_EXCEEDED';
         throw { type: errorType, message: errorMessage };
       }
 
-      if (!response.body) {
-        throw { type: 'NETWORK_ERROR', message: 'Response body is empty.' };
-      }
+      if (!response.body) throw { type: 'NETWORK_ERROR', message: 'Response body is empty.' };
   
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -147,9 +171,7 @@ async function performApiCall(payload) {
             if (data.usageMetadata?.totalTokenCount) {
               totalTokenCount = data.usageMetadata.totalTokenCount;
             }
-          } catch (e) {
-            console.warn("Error parsing stream chunk:", e);
-          }
+          } catch (e) { console.warn("Error parsing stream chunk:", e); }
         }
       }
       streamCallback({ success: true, done: true, fullText, totalTokenCount });
@@ -179,37 +201,28 @@ function handleTestConnection(payload, sendResponse) {
     .then(res => res.ok ? res.json() : res.json().then(err => { throw new Error(err.error?.message || "An unknown error occurred."); }))
     .then(result => {
       const text = result.candidates?.[0]?.content?.parts?.[0]?.text.trim() || "";
-      if (text.toUpperCase() === 'OK') {
-        sendResponse({ success: true, text: "Connection successful!" });
-      } else {
-        sendResponse({ success: false, error: `Unexpected response: "${text}"` });
-      }
+      sendResponse({ success: text.toUpperCase() === 'OK', text: "Connection successful!", error: `Unexpected response: "${text}"`});
     })
     .catch(err => sendResponse({ success: false, error: err.message }));
 }
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-    if (info.selectionText && (info.parentMenuItemId === "gemini-answer-parent" || info.parentMenuItemId === "rephrase-parent")) {
-      handleContextAction(tab, info.menuItemId, info.selectionText);
-    }
+    handleContextAction(info, tab);
 });
   
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'callGeminiStream') {
-      performApiCall(request.payload);
-      // Jangan return true karena kita tidak memanggil sendResponse
-    }
-    if (request.action === 'testApiConnection') {
-      handleTestConnection(request.payload, sendResponse);
-      // Return true karena handleTestConnection adalah async dan memanggil sendResponse
-      return true;
-    }
-    if (request.action === 'updateContextMenus') {
-      updateContextMenus();
-       // Jangan return true karena ini adalah aksi sinkron
-    }
-    if (request.action === 'triggerContextMenuAction') {
-      handleContextAction(sender.tab, request.payload.action, request.payload.selectionText);
-       // Jangan return true karena kita tidak memanggil sendResponse
+    switch(request.action) {
+        case 'callGeminiStream':
+            performApiCall(request.payload);
+            break;
+        case 'testApiConnection':
+            handleTestConnection(request.payload, sendResponse);
+            return true;
+        case 'updateContextMenus':
+            updateContextMenus();
+            break;
+        case 'triggerContextMenuAction':
+            handleContextAction({ menuItemId: request.payload.action, selectionText: request.payload.selectionText }, sender.tab);
+            break;
     }
 });

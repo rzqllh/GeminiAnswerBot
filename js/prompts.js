@@ -30,7 +30,7 @@ CRITICAL LANGUAGE RULE: Respond in the EXACT SAME LANGUAGE as the quiz content y
 
 Follow these instructions precisely:
 1.  Acknowledge the user's correction.
-2.  Clear-ly state the correct answer.
+2.  Clearly state the correct answer.
 3.  Provide a detailed, step-by-step explanation for why this user-provided answer is correct.
 4.  Briefly explain why the other options (including your previous incorrect suggestion) are wrong.
 5.  IMPORTANT: Analyze the language of the provided text. Respond in the *exact same language* as the input text.
@@ -70,5 +70,30 @@ CRITICAL INSTRUCTIONS:
     2. Indonesian
     
     Important: if the default language is english, no need to translate to english. vice versa.`, 
-  rephrase: `Rephrase the following text into the specified languages. Present each rephrased version clearly under a heading for that language. For example: "Indonesian Version:", "English Version:", etc. IMPORTANT: Analyze the language of the provided text. Your response, including headings, should be in the *exact same language* as the input text. Do NOT translate anything other than the core text as requested.`, 
+  rephrase: `Rephrase the following text into the specified languages. Present each rephrased version clearly under a heading for that language. For example: "Indonesian Version:", "English Version:", etc. IMPORTANT: Analyze the language of the provided text. Your response, including headings, should be in the *exact same language* as the input text. Do NOT translate anything other than the core text as requested.`,
+
+  // Image-related prompts
+  imageQuiz: `You are an expert Optical Character Recognition (OCR) and quiz analyst. From the provided image, your tasks are:
+1.  Transcribe the main question visible in the image.
+2.  Transcribe ALL the answer options visible in the image.
+3.  Format the transcribed text as a standard Markdown quiz.
+
+Example Output:
+Question: What is the capital of France?
+
+Options:
+- London
+- Berlin
+- Paris
+- Madrid
+
+CRITICAL: Output ONLY the transcribed text. Do not add any conversational text, greetings, or explanations. Respond in the same language as the text in the image.`,
+  
+  imageAnalyze: `Analyze the provided image in detail. Describe its main subject, composition, colors, and any discernible text or objects. Provide a comprehensive summary of what the image depicts. Respond in the same language as the user's browser setting, if possible.`,
+  
+  imageTranslate: `You are an expert OCR and translator. Your tasks are:
+1.  Extract ALL visible text from the image.
+2.  Translate the extracted text into both English and Indonesian.
+3.  Present the result clearly, with headings for "Original Text", "English Translation", and "Indonesian Translation".
+If the original text is already in English or Indonesian, you do not need to provide a translation for that language.`
 };
