@@ -17,7 +17,7 @@
 - **Tindakan Teks Kontekstual**: Klik kanan untuk meringkas, menjelaskan, menerjemahkan, atau memparafrasekan.
 - **Dasbor Pengaturan Modern & Kustomisasi Penuh**: Atur kunci API, model, prompt, dan perilaku ekstensi.
 - **Kontrol Suhu Granular**: Atur tingkat kreativitas AI secara spesifik untuk setiap jenis tugas.
-- **Panel Riwayat Lokal**: Lihat semua interaksi AI sebelumnya di dalam dasbor.
+- **Panel Riwayat Terpusat**: Lihat dan kelola semua interaksi AI sebelumnya di dalam dasbor pengaturan.
 
 ---
 ## Skenario Penggunaan

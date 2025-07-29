@@ -223,28 +223,29 @@
       </section>
 
       <section id="history" class="content-pane">
-        <h1>History</h1>
-        <p class="section-description">Showing recent activity from your extension.</p>
+        <div class="pane-header">
+            <div class="pane-header-content">
+                <h1>Interaction History</h1>
+                <p class="section-description">Review all your past interactions with the extension.</p>
+            </div>
+            <div class="pane-header-actions">
+                <button id="exportHistoryButton" class="button button-secondary">Export</button>
+                <button id="clearHistoryButton" class="button button-danger">Clear All</button>
+            </div>
+        </div>
         <div id="history-list-container"></div>
       </section>
 
       <section id="data" class="content-pane">
-        <h1>Data & History</h1>
+        <h1>Data Management</h1>
         <p class="section-description">Manage your extension's stored data.</p>
         <fieldset>
-            <legend>Manage Data</legend>
+            <legend>Advanced</legend>
             <div class="form-group">
-              <label>Clear History</label>
-              <p class="form-hint">Permanently delete all of your saved answer history. This action cannot be undone.</p>
+              <label>Reset Settings</label>
+              <p class="form-hint">Reset all extension settings, including API key and custom prompts, to their default values. This action cannot be undone.</p>
               <div class="form-actions" style="justify-content: flex-start; margin-top: 10px;">
-                  <button id="clearHistoryButton" class="button button-danger">Clear All History</button>
-              </div>
-            </div>
-             <div class="form-group">
-              <label>Export History</label>
-              <p class="form-hint">Download a copy of your entire history as a JSON file.</p>
-              <div class="form-actions" style="justify-content: flex-start; margin-top: 10px;">
-                  <button id="exportHistoryButton" class="button button-secondary">Export Data</button>
+                  <button id="resetSettingsButton" class="button button-danger">Reset All Settings</button>
               </div>
             </div>
         </fieldset>

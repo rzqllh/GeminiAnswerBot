@@ -64,7 +64,7 @@ function escapeHtml(unsafe) {
         historyListContainer.innerHTML = `<div class="loading-message">Loading history...</div>`;
         const { history = [] } = await chrome.storage.local.get('history');
         if (history.length === 0) {
-            historyListContainer.innerHTML = `<div class="empty-state">No history found.</div>`;
+            historyListContainer.innerHTML = `<div class="empty-state">No history found. Start using the extension to see your activity here.</div>`;
             return;
         }
         historyListContainer.innerHTML = '';
@@ -83,7 +83,7 @@ function escapeHtml(unsafe) {
             const aiResponseHtml = item.answerHTML ? marked.parse(item.answerHTML) : 'No response captured.';
             itemElement.innerHTML = `
                 <div class="history-item-header">
-                    <div class="history-item-title"><a href="${item.url}" target="_blank" title="${item.title}">${item.title}</a></div>
+                    <div class="history-item-title"><a href="${item.url}" target="_blank" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</a></div>
                     <div class="history-item-meta">${actionLabel} • ${formattedDate}</div>
                 </div>
                 ${contentDisplay}
@@ -105,11 +105,24 @@ function escapeHtml(unsafe) {
             navLinks.forEach(navLink => navLink.classList.remove('active'));
             link.classList.add('active');
             contentPanes.forEach(pane => pane.classList.toggle('active', pane.id === targetId));
+            window.location.hash = targetId;
+
             if (targetId === 'history') {
                 loadHistory();
             }
         });
     });
+
+    function showInitialTab() {
+        const hash = window.location.hash;
+        const targetLink = document.querySelector(`.settings-sidebar a[href="${hash}"]`);
+        if (targetLink) {
+            targetLink.click();
+        } else {
+            document.querySelector('.settings-sidebar a[href="#general"]').click();
+        }
+    }
+
 
     const saveGeneralButton = document.getElementById('saveGeneralButton');
     const testButton = document.getElementById('testButton');
@@ -151,6 +164,7 @@ function escapeHtml(unsafe) {
             revealApiKey.querySelector('.icon-eye-slash').classList.toggle('hidden', !isPassword);
         });
     }
+
     if (saveGeneralButton) {
         saveGeneralButton.addEventListener('click', function() {
             const newGlobalTemp = parseFloat(temperatureSlider.value);
@@ -168,6 +182,7 @@ function escapeHtml(unsafe) {
             });
         });
     }
+
     if (testButton) {
         testButton.addEventListener('click', function() {
             const apiKey = apiKeyInput.value.trim();
@@ -371,6 +386,7 @@ function escapeHtml(unsafe) {
             showToast('Success', `Profile renamed to "${newName}".`, 'success');
         });
     }
+
     if (deleteProfileBtn) {
         deleteProfileBtn.addEventListener('click', async () => {
             let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
@@ -418,4 +434,6 @@ function escapeHtml(unsafe) {
             showToast('Success', 'History has been exported!', 'success');
         });
     }
+
+    showInitialTab();
 });
