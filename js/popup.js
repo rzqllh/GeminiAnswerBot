@@ -1,143 +1,224 @@
 // js/popup.js
 
-function simpleHash(str) {
-    let hash = 0;
-    if (str.length === 0) return hash;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash |= 0;
+/**
+ * Manages the entire lifecycle and UI of the popup.
+ * This class-based approach encapsulates state, centralizes DOM element access,
+ * and provides a structured, scalable way to manage the extension's popup logic.
+ */
+class PopupApp {
+    /**
+     * Caches DOM elements, initializes state, and binds event listeners.
+     */
+    constructor() {
+        this.state = {
+            tab: null,
+            config: {},
+            view: 'loading', // 'loading', 'quiz', 'summary', 'error', 'info'
+            error: null,
+            cleanedContent: null,
+            originalUserContent: null,
+            answerHTML: null,
+            explanationHTML: null,
+            totalTokenCount: 0,
+            cacheKey: null,
+            incorrectAnswer: null,
+        };
+
+        this.elements = {};
+        this.streamAccumulator = {};
+
+        this._queryElements();
+        this._bindEvents();
     }
-    return 'cache_' + new Uint32Array([hash])[0].toString(16);
-}
 
-function show(el) { if (el) el.classList.remove('hidden'); }
-function hide(el) { if (el) el.classList.add('hidden'); }
+    /**
+     * Queries and caches all necessary DOM elements for performance.
+     * @private
+     */
+    _queryElements() {
+        const ids = [
+            'settingsButton', 'analyzePageButton', 'rescanButton', 'explanationButton',
+            'aiActionsWrapper', 'pageSummaryContainer', 'quizModeContainer',
+            'contentDisplayWrapper', 'contentDisplay', 'answerContainer', 'answerDisplay',
+            'explanationContainer', 'explanationDisplay', 'messageArea',
+            'retryAnswer', 'retryExplanation', 'copyAnswer', 'copyExplanation',
+            'feedbackContainer', 'feedbackCorrect', 'feedbackIncorrect',
+            'correctionPanel', 'correctionOptions'
+        ];
+        ids.forEach(id => {
+            // Simple camelCase conversion for keys: retry-answer -> retryAnswer
+            const key = id.replace(/-([a-z])/g, g => g[1].toUpperCase());
+            this.elements[key] = document.getElementById(id);
+        });
+    }
 
-function escapeHtml(unsafe) {
-    if (typeof unsafe !== 'string') return '';
-    return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
+    /**
+     * Centralized method for all event bindings.
+     * @private
+     */
+    _bindEvents() {
+        this.elements.settingsButton.addEventListener('click', () => chrome.runtime.openOptionsPage());
+        this.elements.analyzePageButton.addEventListener('click', () => this._handlePageAnalysis());
+        this.elements.rescanButton.addEventListener('click', () => this._handleRescan());
+        this.elements.explanationButton.addEventListener('click', () => this._getExplanation());
+        this.elements.retryAnswer.addEventListener('click', () => this._getAnswer());
+        this.elements.retryExplanation.addEventListener('click', () => this._getExplanation());
+        this.elements.feedbackCorrect.addEventListener('click', () => this._handleFeedbackCorrect());
+        this.elements.feedbackIncorrect.addEventListener('click', () => this._handleFeedbackIncorrect());
 
-function sendMessageWithTimeout(tabId, message, timeout = 5000) {
-    return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-            reject(new Error('Content script did not respond in time. Please reload the page.'));
-        }, timeout);
+        // Copy buttons
+        this.elements.copyAnswer.addEventListener('click', e => this._copyToClipboard(e.currentTarget));
+        this.elements.copyExplanation.addEventListener('click', e => this._copyToClipboard(e.currentTarget));
 
-        chrome.tabs.sendMessage(tabId, message, (response) => {
-            clearTimeout(timer);
-            if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message || 'Failed to communicate with the page. Try reloading the page.'));
-            } else {
-                resolve(response);
+        // Listener for API stream updates from the background script
+        chrome.runtime.onMessage.addListener((request) => {
+            if (request.action === 'geminiStreamUpdate') {
+                this._handleStreamUpdate(request);
             }
         });
-    });
-}
+    }
 
-function isCode(str) {
-    const trimmed = String(str).trim();
-    return trimmed.startsWith('<') && trimmed.endsWith('>') || trimmed.includes('(') || trimmed.includes('{');
-}
+    /**
+     * Main entry point. Orchestrates the initial loading and logic flow.
+     */
+    async init() {
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (!tab || !tab.id) throw new Error('Cannot find the active tab.');
+            this.state.tab = tab;
 
-function formatQuestionContent(content) {
-    if (!content) return '';
-    let question = '';
-    let options = [];
-    const optionMarkers = ['\n- ', '\n* ', '\n• ', '\n1. ', '\na) ', '\nA. '];
-    let splitIndex = -1;
-    for (const marker of optionMarkers) {
-        const index = content.indexOf(marker);
-        if (index !== -1 && (splitIndex === -1 || index < splitIndex)) {
-            splitIndex = index;
+            const protectedUrls = ['chrome://', 'https://chrome.google.com/'];
+            if (protectedUrls.some(url => tab.url.startsWith(url))) {
+                this.state.view = 'info';
+                this.render();
+                return;
+            }
+
+            this.state.config = await chrome.storage.sync.get(null);
+            if (!this.state.config.geminiApiKey) {
+                throw { type: 'INVALID_API_KEY', message: 'API Key not set. Please go to the options page to set it up.' };
+            }
+
+            await this._injectScripts();
+
+            const contextKey = `context_action_${tab.id}`;
+            const contextData = (await chrome.storage.local.get(contextKey))[contextKey];
+
+            if (contextData?.action && contextData?.selectionText) {
+                await chrome.storage.local.remove(contextKey);
+                this.state.originalUserContent = contextData.selectionText;
+                this.state.view = 'quiz';
+                this.render(); // Show the loading state within the quiz view
+                this._callGeminiStream(contextData.action, contextData.selectionText, contextData.selectionText);
+            } else {
+                const persistedState = await this._getPersistedState();
+                Object.assign(this.state, persistedState);
+
+                if (this.state.cleanedContent) {
+                    this.state.view = 'quiz';
+                    this.render(); // This will render the quiz content immediately
+                } else {
+                    this.state.view = 'loading';
+                    this.render();
+                    const response = await this._sendMessageToContentScript({ action: "get_page_content" });
+                    if (!response || !response.content?.trim()) {
+                        throw new Error("No readable content found on this page.");
+                    }
+                    this.state.originalUserContent = response.content;
+                    this._callGeminiStream('cleaning', response.content);
+                }
+            }
+        } catch (error) {
+            console.error("Initialization failed:", error);
+            this.state.view = 'error';
+            this.state.error = error;
+            if (!error.type) {
+                this.state.error = { type: 'INTERNAL_ERROR', message: `Could not establish connection. ${error.message}` };
+            }
+            this.render();
         }
     }
-    if (splitIndex !== -1) {
-        question = content.substring(0, splitIndex).trim();
-        const optionsString = content.substring(splitIndex).trim();
-        options = optionsString.split('\n')
-            .map(opt => opt.trim().replace(/^[\*\-•]\s*|\d+\.\s*|[a-zA-Z]\)\s*/, ''))
-            .filter(opt => opt);
-    } else {
-        const lines = content.split('\n').filter(line => line.trim() !== '');
-        question = lines.shift() || '';
-        options = lines;
-    }
-    question = escapeHtml(question.replace(/^Question:\s*/i, '').trim());
-    const optionsHtml = options.map(option => {
-        const cleanOption = escapeHtml(option.trim());
-        return `<li>${cleanOption}</li>`;
-    }).join('');
-    return `<div class="question-text">${question}</div><ul>${optionsHtml}</ul>`;
-}
 
-function createQuizFingerprint(cleanedContent) {
-    if (!cleanedContent) return null;
-    const lines = cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
-    if (lines.length < 2) return null;
-    const normalizedLines = lines.map(l => l.toLowerCase().replace(/\s+/g, ' ').trim());
-    const joinedContent = normalizedLines.join('\n');
-    return joinedContent;
-}
+    /**
+     * Centralized UI render function based on the current state view.
+     */
+    render() {
+        // Hide all major containers initially
+        this.elements.messageArea.classList.add('hidden');
+        this.elements.quizModeContainer.classList.add('hidden');
+        this.elements.pageSummaryContainer.classList.add('hidden');
 
-document.addEventListener('DOMContentLoaded', () => {
-    if (typeof marked !== 'undefined') {
-        marked.setOptions({ sanitize: true });
-    }
+        switch (this.state.view) {
+            case 'loading':
+                this.elements.messageArea.classList.remove('hidden');
+                this.elements.messageArea.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Scanning for quiz...</p></div>`;
+                break;
 
-    const settingsButton = document.getElementById('settingsButton');
-    const analyzePageButton = document.getElementById('analyzePageButton');
-    const rescanButton = document.getElementById('rescanButton');
-    const explanationButton = document.getElementById('explanationButton');
-    const aiActionsWrapper = document.getElementById('aiActionsWrapper');
-    const pageSummaryContainer = document.getElementById('pageSummaryContainer');
-    const quizModeContainer = document.getElementById('quizModeContainer');
-    const contentDisplayWrapper = document.getElementById('contentDisplayWrapper');
-    const contentDisplay = document.getElementById('contentDisplay');
-    const answerContainer = document.getElementById('answerContainer');
-    const answerDisplay = document.getElementById('answerDisplay');
-    const explanationContainer = document.getElementById('explanationContainer');
-    const explanationDisplay = document.getElementById('explanationDisplay');
-    const messageArea = document.getElementById('messageArea');
-    const retryAnswerButton = document.getElementById('retryAnswer');
-    const retryExplanationButton = document.getElementById('retryExplanation');
-    const copyAnswerButton = document.getElementById('copyAnswer');
-    const copyExplanationButton = document.getElementById('copyExplanation');
-    const feedbackContainer = document.getElementById('feedbackContainer');
-    const feedbackCorrectBtn = document.getElementById('feedbackCorrect');
-    const feedbackIncorrectBtn = document.getElementById('feedbackIncorrect');
-    const correctionPanel = document.getElementById('correctionPanel');
-    const correctionOptionsContainer = document.getElementById('correctionOptions');
+            case 'info':
+                this.elements.messageArea.classList.remove('hidden');
+                this.elements.messageArea.innerHTML = `<div class="info-panel"><div class="info-panel-header">Page Not Supported</div><div class="info-panel-body"><p>For your security, Chrome extensions cannot run on this special page.</p></div></div>`;
+                break;
 
-    let currentTab = null;
-    let appConfig = {};
-    let currentCacheKey = null;
-    let currentIncorrectAnswer = null;
+            case 'error':
+                this.elements.messageArea.classList.remove('hidden');
+                this._renderErrorState();
+                break;
 
-    function displayInfoPanel(title, message) {
-        hide(quizModeContainer);
-        hide(pageSummaryContainer);
-        show(messageArea);
-        const infoHtml = `<div class="info-panel"><div class="info-panel-header">${title}</div><div class="info-panel-body"><p>${message}</p></div></div>`;
-        messageArea.innerHTML = infoHtml;
+            case 'summary':
+                this.elements.pageSummaryContainer.classList.remove('hidden');
+                // The content of the summary is rendered in _renderPageSummary
+                break;
+
+            case 'quiz':
+                this.elements.quizModeContainer.classList.remove('hidden');
+                this._renderQuizState();
+                break;
+        }
     }
 
-    async function displayError(error) {
-        hide(quizModeContainer);
-        hide(pageSummaryContainer);
-        show(messageArea);
+    /**
+     * Renders the UI for the 'quiz' view based on the current state.
+     * @private
+     */
+    _renderQuizState() {
+        // Show the main containers
+        this.elements.contentDisplayWrapper.classList.remove('hidden');
+        this.elements.answerContainer.classList.remove('hidden');
+
+        // Render Question content
+        if (this.state.cleanedContent) {
+            this.elements.contentDisplay.innerHTML = this._formatQuestionContent(this.state.cleanedContent);
+        } else if (this.state.originalUserContent) {
+            // For context menu actions where there's no "cleaning" step
+            this.elements.contentDisplay.innerHTML = `<div class="question-text">${this._escapeHtml(this.state.originalUserContent)}</div>`;
+        }
+
+        // Render Answer content
+        if (this.state.answerHTML) {
+            this._handleAnswerResult(this.state.answerHTML, false, this.state.totalTokenCount);
+        } else if (this.state.cleanedContent) {
+            this._getAnswer();
+        }
+
+        // Render Explanation content
+        if (this.state.explanationHTML) {
+            this._handleExplanationResult(this.state.explanationHTML);
+        } else {
+            this.elements.explanationContainer.classList.add('hidden');
+        }
+    }
+
+    /**
+     * Renders the detailed error panel.
+     * @private
+     */
+    _renderErrorState() {
         let title = 'An Error Occurred';
         let userMessage = 'Something went wrong. Please try again.';
         let actionsHtml = `<button id="error-retry-btn" class="button-error">Try Again</button>`;
-        const state = await getState();
-        const query = state.cleanedContent || state.originalUserContent || '';
-        switch (error.type) {
+        const query = this.state.cleanedContent || this.state.originalUserContent || '';
+
+        switch (this.state.error.type) {
             case 'INVALID_API_KEY': title = 'Invalid API Key'; userMessage = 'The provided API key is not valid or has been revoked. Please check your key in the settings.'; actionsHtml = `<button id="error-settings-btn" class="button-error primary">Open Settings</button>`; break;
             case 'QUOTA_EXCEEDED': title = 'API Quota Exceeded'; userMessage = 'You have exceeded your Google AI API quota. Please check your usage and billing in the Google AI Studio.'; actionsHtml = `<button id="error-quota-btn" class="button-error">Check Quota</button> <button id="error-retry-btn" class="button-error">Try Again</button>`; break;
             case 'NETWORK_ERROR': title = 'Network Error'; userMessage = 'Could not connect to the API. Please check your internet connection.'; break;
@@ -145,93 +226,228 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'INVALID_JSON': title = 'Analysis Failed'; userMessage = 'The AI returned an invalid response. You can try again.'; break;
             case 'API_ERROR': default: title = 'API Error'; userMessage = 'The API returned an error. See details below.'; if (query) actionsHtml += ` <button id="error-google-btn" class="button-error">Search on Google</button>`; break;
         }
-        const errorHtml = `<div class="error-panel"><div class="error-panel-header">${title}</div><div class="error-panel-body"><p>${userMessage}</p><details class="error-details"><summary>Technical Details</summary><code>${escapeHtml(error.message)}</code></details></div><div class="error-panel-actions">${actionsHtml}</div></div>`;
-        messageArea.innerHTML = errorHtml;
-        document.getElementById('error-retry-btn')?.addEventListener('click', initialize);
+
+        this.elements.messageArea.innerHTML = `<div class="error-panel"><div class="error-panel-header">${title}</div><div class="error-panel-body"><p>${userMessage}</p><details class="error-details"><summary>Technical Details</summary><code>${this._escapeHtml(this.state.error.message)}</code></details></div><div class="error-panel-actions">${actionsHtml}</div></div>`;
+
+        // Bind actions for the newly created buttons
+        document.getElementById('error-retry-btn')?.addEventListener('click', () => this.init());
         document.getElementById('error-settings-btn')?.addEventListener('click', () => chrome.runtime.openOptionsPage());
         document.getElementById('error-quota-btn')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://aistudio.google.com/billing' }));
         document.getElementById('error-google-btn')?.addEventListener('click', () => { if (!query) return; const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`; chrome.tabs.create({ url: searchUrl }); });
     }
 
-    function displayMessage(htmlContent) {
-        hide(quizModeContainer);
-        hide(pageSummaryContainer);
-        messageArea.innerHTML = `<div class="loading-state">${htmlContent}</div>`;
-        show(messageArea);
+    // --- Action Handlers ---
+
+    _handleRescan() {
+        if (!this.state.tab) return;
+        chrome.storage.local.remove(this.state.tab.id.toString());
+        // Reset state and re-initialize
+        Object.assign(this.state, {
+            view: 'loading', error: null, cleanedContent: null, answerHTML: null,
+            explanationHTML: null, originalUserContent: null, totalTokenCount: 0
+        });
+        this.init();
     }
 
-    async function callGeminiStream(purpose, contentText, originalUserContent = '') {
-        const { promptProfiles, activeProfile, selectedModel, geminiApiKey } = appConfig;
+    async _handlePageAnalysis() {
+        this.state.view = 'loading';
+        this.render(); // Show loading spinner
+        this.elements.messageArea.querySelector('p').textContent = 'Analyzing the entire page...';
+
+        try {
+            const response = await this._sendMessageToContentScript({ action: "get_page_content" });
+            if (!response || !response.content?.trim()) {
+                throw new Error("No readable content found on this page.");
+            }
+            this._callGeminiStream('pageAnalysis', response.content);
+        } catch (e) {
+            this.state.view = 'error';
+            this.state.error = e;
+            this.render();
+        }
+    }
+
+    _handleFeedbackCorrect() {
+        this.elements.feedbackCorrect.disabled = true;
+        this.elements.feedbackIncorrect.disabled = true;
+        this.elements.feedbackCorrect.classList.add('selected-correct');
+    }
+
+    async _handleFeedbackIncorrect() {
+        this.elements.feedbackIncorrect.disabled = true;
+        this.elements.feedbackCorrect.disabled = true;
+        this.elements.feedbackIncorrect.classList.add('selected-incorrect');
+
+        this.elements.aiActionsWrapper.classList.add('hidden');
+        this.elements.correctionPanel.classList.remove('hidden');
+        this.elements.correctionOptions.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Fetching options...</p></div>`;
+
+        try {
+            const response = await this._sendMessageToContentScript({ action: "get_quiz_options" });
+            if (response && response.options && response.options.length > 0) {
+                this._renderCorrectionOptions(response.options);
+            } else {
+                this.elements.correctionOptions.innerHTML = '<p class="text-center">Could not automatically find options on the page.</p>';
+            }
+        } catch (e) {
+            this.elements.correctionOptions.innerHTML = `<p class="text-center">Error fetching options: ${e.message}</p>`;
+        }
+    }
+
+    // --- API & Core Logic ---
+
+    _callGeminiStream(purpose, contentText, originalUserContent = '') {
+        const { promptProfiles, activeProfile, selectedModel, geminiApiKey } = this.state.config;
         const currentPrompts = (promptProfiles && promptProfiles[activeProfile]) || DEFAULT_PROMPTS;
+
         let systemPrompt = '';
         let userContent = contentText;
-        switch (purpose) {
-            case 'cleaning': systemPrompt = currentPrompts.cleaning || DEFAULT_PROMPTS.cleaning; break;
-            case 'answer': systemPrompt = currentPrompts.answer || DEFAULT_PROMPTS.answer; break;
-            case 'explanation': systemPrompt = currentPrompts.explanation || DEFAULT_PROMPTS.explanation; break;
-            case 'correction': systemPrompt = currentPrompts.correction || DEFAULT_PROMPTS.correction; break;
-            case 'pageAnalysis': systemPrompt = currentPrompts.pageAnalysis || DEFAULT_PROMPTS.pageAnalysis; break;
-            case 'summarize': systemPrompt = currentPrompts.summarize || DEFAULT_PROMPTS.summarize; break;
-            case 'explain': systemPrompt = currentPrompts.explanation || DEFAULT_PROMPTS.explanation; break;
-            case 'translate': systemPrompt = currentPrompts.translate || DEFAULT_PROMPTS.translate; break;
-            default: if (purpose.startsWith('rephrase-')) { const language = purpose.split('-')[1]; systemPrompt = currentPrompts.rephrase || DEFAULT_PROMPTS.rephrase; userContent = `Target Language: ${language}\n\nText to rephrase:\n${contentText}`; } break;
+
+        const promptMap = {
+            'cleaning': currentPrompts.cleaning,
+            'answer': currentPrompts.answer,
+            'explanation': currentPrompts.explanation,
+            'correction': currentPrompts.correction,
+            'pageAnalysis': currentPrompts.pageAnalysis,
+            'summarize': currentPrompts.summarize,
+            'explain': currentPrompts.explanation, // Re-use explanation prompt
+            'translate': currentPrompts.translate,
+        };
+
+        if (promptMap[purpose]) {
+            systemPrompt = promptMap[purpose] || DEFAULT_PROMPTS[purpose];
+        } else if (purpose.startsWith('rephrase-')) {
+            const language = purpose.split('-')[1];
+            systemPrompt = currentPrompts.rephrase || DEFAULT_PROMPTS.rephrase;
+            userContent = `Target Language: ${language}\n\nText to rephrase:\n${contentText}`;
         }
-        chrome.runtime.sendMessage({ action: 'callGeminiStream', payload: { apiKey: geminiApiKey, model: selectedModel, systemPrompt, userContent, generationConfig: {}, originalUserContent, purpose } });
+
+        chrome.runtime.sendMessage({
+            action: 'callGeminiStream',
+            payload: {
+                apiKey: geminiApiKey, model: selectedModel, systemPrompt,
+                userContent, generationConfig: {}, originalUserContent, purpose
+            }
+        });
     }
 
-    async function getAnswer() {
-        const state = await getState();
-        if (!state.cleanedContent) return;
-        const fingerprint = createQuizFingerprint(state.cleanedContent);
+    _getAnswer() {
+        if (!this.state.cleanedContent) return;
+
+        const fingerprint = this._createQuizFingerprint(this.state.cleanedContent);
         if (fingerprint) {
-            currentCacheKey = simpleHash(fingerprint);
-            const cachedResult = (await chrome.storage.local.get(currentCacheKey))[currentCacheKey];
-            const lines = state.cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
-            const rawQuestion = lines.length > 0 ? lines[0] : '';
-            if (cachedResult?.answerHTML && cachedResult.rawQuestion === rawQuestion) {
-                await _handleAnswerResult(cachedResult.answerHTML, true, cachedResult.totalTokenCount);
-                return;
+            this.state.cacheKey = this._simpleHash(fingerprint);
+            chrome.storage.local.get(this.state.cacheKey).then(cachedResult => {
+                const cacheData = cachedResult[this.state.cacheKey];
+                const lines = this.state.cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
+                const rawQuestion = lines.length > 0 ? lines[0] : '';
+                if (cacheData?.answerHTML && cacheData.rawQuestion === rawQuestion) {
+                    this._handleAnswerResult(cacheData.answerHTML, true, cacheData.totalTokenCount);
+                    return;
+                }
+                // If cache miss, proceed to API call
+                this._continueGetAnswer();
+            });
+        } else {
+            this._continueGetAnswer();
+        }
+    }
+
+    _continueGetAnswer() {
+        this.elements.retryAnswer.disabled = true;
+        this.elements.answerDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`;
+        this._callGeminiStream('answer', this.state.cleanedContent);
+    }
+
+    _getExplanation() {
+        if (!this.state.cleanedContent) return;
+        this.elements.explanationButton.disabled = true;
+        this.elements.retryExplanation.disabled = true;
+        this.elements.explanationContainer.classList.remove('hidden');
+        this.elements.explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`;
+        this._callGeminiStream('explanation', this.state.cleanedContent);
+    }
+
+    // --- Stream & Result Handlers ---
+
+    _handleStreamUpdate(request) {
+        const { payload, purpose } = request;
+        if (!payload.success) {
+            this.state.view = 'error';
+            this.state.error = payload.error;
+            this.render();
+            return;
+        }
+
+        // Handle full-text completion
+        if (payload.done) {
+            const fullText = payload.fullText || this.streamAccumulator[purpose] || '';
+            delete this.streamAccumulator[purpose];
+
+            const purposeHandlers = {
+                'cleaning': (text) => this._handleCleaningResult(text),
+                'answer': (text) => this._handleAnswerResult(text, false, payload.totalTokenCount),
+                'explanation': (text) => this._handleExplanationResult(text),
+                'correction': (text) => this._handleCorrectionResult(text),
+                'summarize': (text) => this._handleContextMenuResult(text, payload.originalUserContent, purpose),
+                'explain': (text) => this._handleContextMenuResult(text, payload.originalUserContent, purpose),
+                'translate': (text) => this._handleContextMenuResult(text, payload.originalUserContent, purpose),
+                'pageAnalysis': (text) => {
+                    const cleanJsonText = (text).replace(/```json|```/g, '').trim();
+                    try {
+                        const jsonData = JSON.parse(cleanJsonText);
+                        this._renderPageSummary(jsonData);
+                    } catch (e) {
+                        this.state.view = 'error';
+                        this.state.error = { type: 'INVALID_JSON', message: `Failed to parse AI response. Details: ${e.message}\n\nReceived: ${cleanJsonText}` };
+                        this.render();
+                    }
+                }
+            };
+
+            if (purposeHandlers[purpose]) {
+                purposeHandlers[purpose](fullText);
+            } else if (purpose.startsWith('rephrase-')) {
+                this._handleContextMenuResult(fullText, payload.originalUserContent, purpose);
+            }
+
+            // Handle stream chunk accumulation
+        } else if (payload.chunk) {
+            if (!this.streamAccumulator[purpose]) {
+                this.streamAccumulator[purpose] = '';
+            }
+            this.streamAccumulator[purpose] += payload.chunk;
+            // Optionally, render chunks live for certain purposes (e.g., pageAnalysis)
+            if (purpose === 'pageAnalysis') {
+                this.state.view = 'loading'; // Keep it in loading
+                this.render();
+                this.elements.messageArea.querySelector('p').textContent = 'Receiving analysis...';
             }
         }
-        retryAnswerButton.disabled = true;
-        answerDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`;
-        callGeminiStream('answer', state.cleanedContent);
     }
 
-    async function getExplanation() {
-        const state = await getState();
-        if (!state.cleanedContent) return;
-        explanationButton.disabled = true;
-        retryExplanationButton.disabled = true;
-        show(explanationContainer);
-        explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`;
-        callGeminiStream('explanation', state.cleanedContent);
+    _handleCleaningResult(fullText) {
+        this.state.cleanedContent = fullText;
+        this.state.view = 'quiz';
+        this.render();
+        this._savePersistedState({ cleanedContent: fullText });
     }
 
-    function _handleCleaningResult(fullText) {
-        hide(messageArea);
-        show(quizModeContainer);
-        show(contentDisplayWrapper);
-        show(answerContainer);
-        contentDisplay.innerHTML = formatQuestionContent(fullText);
-        answerDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`;
-        saveState({ cleanedContent: fullText }).then(getAnswer);
-    }
+    _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0) {
+        this.state.answerHTML = fullText;
+        this.state.totalTokenCount = totalTokenCount;
 
-    async function _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0) {
         const answerMatch = fullText.match(/Answer:(.*?)(Confidence:|Reason:|$)/is);
         const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
         const reasonMatch = fullText.match(/Reason:(.*)/is);
         let answerText = (answerMatch ? answerMatch[1].trim() : fullText.trim()).replace(/`/g, '');
-        let cleanAnswerText = escapeHtml(answerText);
-        let formattedHtml = `<p class="answer-highlight">${cleanAnswerText.replace(/\n/g, '<br>')}</p>`;
+
+        let formattedHtml = `<p class="answer-highlight">${this._escapeHtml(answerText).replace(/\n/g, '<br>')}</p>`;
         let confidenceWrapperHtml = '';
         if (confidenceMatch) {
             const confidence = confidenceMatch[1].toLowerCase();
             const reason = reasonMatch ? reasonMatch[1].trim() : "";
-            confidenceWrapperHtml += `<div class="confidence-level"><span class="confidence-level-label">Confidence ${fromCache ? '<span>⚡️ Cached</span>' : ''}</span><span class="confidence-badge confidence-${confidence}">${confidence.charAt(0).toUpperCase() + confidence.slice(1)}</span></div>${reason ? `<div class="confidence-reason">${escapeHtml(reason)}</div>` : ''}`;
-        } else if (fromCache) {
-            confidenceWrapperHtml += `<div class="confidence-level"><span class="confidence-level-label">⚡️ From Cache</span></div>`;
+            confidenceWrapperHtml += `<div class="confidence-level"><span class="confidence-level-label">Confidence ${fromCache ? '<span>⚡️ Cached</span>' : ''}</span><span class="confidence-badge confidence-${confidence}">${confidence.charAt(0).toUpperCase() + confidence.slice(1)}</span></div>${reason ? `<div class="confidence-reason">${this._escapeHtml(reason)}</div>` : ''}`;
         }
         if (totalTokenCount > 0) {
             confidenceWrapperHtml += `<div class="token-count"><span class="token-count-label">Tokens Used</span><span class="token-count-value">${totalTokenCount}</span></div>`;
@@ -239,298 +455,223 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confidenceWrapperHtml) {
             formattedHtml += `<div class="confidence-wrapper">${confidenceWrapperHtml}</div>`;
         }
-        answerDisplay.innerHTML = formattedHtml;
-        copyAnswerButton.dataset.copyText = answerText;
-        retryAnswerButton.disabled = false;
-        show(aiActionsWrapper);
-        hide(explanationContainer);
-        hide(correctionPanel);
-        show(feedbackContainer);
-        resetFeedbackButtons();
-        currentIncorrectAnswer = answerText;
 
-        if (appConfig.autoHighlight) {
-            chrome.tabs.sendMessage(currentTab.id, { action: 'highlight-answer', text: [answerText] });
+        this.elements.answerDisplay.innerHTML = formattedHtml;
+        this.elements.copyAnswer.dataset.copyText = answerText;
+        this.elements.retryAnswer.disabled = false;
+        this.elements.aiActionsWrapper.classList.remove('hidden');
+        this.elements.explanationContainer.classList.add('hidden');
+        this.elements.correctionPanel.classList.add('hidden');
+        this.elements.feedbackContainer.classList.remove('hidden');
+        this._resetFeedbackButtons();
+        this.state.incorrectAnswer = answerText;
+
+        if (this.state.config.autoHighlight) {
+            this._sendMessageToContentScript({ action: 'highlight-answer', text: [answerText] });
         }
-        if (!fromCache && currentCacheKey) {
-            const lines = fullText.split('\n').map(l => l.trim()).filter(l => l);
+
+        if (!fromCache && this.state.cacheKey) {
+            const lines = this.state.cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
             const rawQuestion = lines.length > 0 ? lines[0] : '';
-            await chrome.storage.local.set({ [currentCacheKey]: { answerHTML: fullText, totalTokenCount: totalTokenCount, rawQuestion } });
+            chrome.storage.local.set({ [this.state.cacheKey]: { answerHTML: fullText, totalTokenCount: totalTokenCount, rawQuestion } });
         }
-        await saveState({ answerHTML: fullText, totalTokenCount });
+
+        this._savePersistedState({ answerHTML: fullText, totalTokenCount });
         if (!fromCache) {
-            const state = await getState();
-            saveToHistory({ cleanedContent: state.cleanedContent, answerHTML: fullText }, 'quiz');
+            this._saveToHistory({ cleanedContent: this.state.cleanedContent, answerHTML: fullText }, 'quiz');
         }
     }
 
-    async function _handleExplanationResult(fullText) {
-        explanationDisplay.innerHTML = marked.parse(fullText);
-        copyExplanationButton.dataset.copyText = fullText;
-        explanationButton.disabled = false;
-        retryExplanationButton.disabled = false;
-        show(explanationContainer);
-        const state = await getState();
-        saveToHistory({ ...state, explanationHTML: fullText }, 'explanation');
+    _handleExplanationResult(fullText) {
+        this.state.explanationHTML = fullText;
+        this.elements.explanationDisplay.innerHTML = marked.parse(fullText);
+        this.elements.copyExplanation.dataset.copyText = fullText;
+        this.elements.explanationButton.disabled = false;
+        this.elements.retryExplanation.disabled = false;
+        this.elements.explanationContainer.classList.remove('hidden');
+        this._saveToHistory({ ...this.state }, 'explanation');
     }
 
-    async function _handleCorrectionResult(fullText) {
-        explanationDisplay.innerHTML = marked.parse(fullText);
-        copyExplanationButton.dataset.copyText = fullText;
-        explanationButton.disabled = false;
-        retryExplanationButton.disabled = false;
-        show(explanationContainer);
-        const state = await getState();
-        saveToHistory({ ...state, explanationHTML: fullText }, 'correction');
+    _handleCorrectionResult(fullText) {
+        this._handleExplanationResult(fullText); // Logic is identical
     }
 
-    function _handleContextMenuResult(fullText, originalUserContent, purpose) {
-        hide(pageSummaryContainer);
-        show(quizModeContainer);
-        show(contentDisplayWrapper);
-        show(answerContainer);
-        contentDisplay.innerHTML = `<div class="question-text">${escapeHtml(originalUserContent)}</div>`;
-        answerDisplay.innerHTML = marked.parse(fullText);
-        copyAnswerButton.dataset.copyText = fullText;
-        hide(aiActionsWrapper);
-        hide(explanationContainer);
-        hide(feedbackContainer);
+    _handleContextMenuResult(fullText, originalUserContent, purpose) {
+        this.state.view = 'quiz';
+        this.state.originalUserContent = originalUserContent;
+        this.state.answerHTML = fullText; // Re-use answerHTML for the result
+
+        this.render(); // This will call _renderQuizState
+
+        this.elements.answerDisplay.innerHTML = marked.parse(fullText);
+        this.elements.copyAnswer.dataset.copyText = fullText;
+        this.elements.aiActionsWrapper.classList.add('hidden');
+        this.elements.explanationContainer.classList.add('hidden');
+        this.elements.feedbackContainer.classList.add('hidden');
+
         const historyActionType = purpose.split('-')[0];
-        saveToHistory({ cleanedContent: originalUserContent, answerHTML: fullText }, historyActionType);
+        this._saveToHistory({ cleanedContent: originalUserContent, answerHTML: fullText }, historyActionType);
     }
 
-    async function getState() {
-        if (!currentTab) return {};
-        const key = currentTab.id.toString();
+    // --- UI Helpers ---
+
+    _renderPageSummary(data) {
+        this.state.view = 'summary';
+        const tldrHtml = data.tldr ? `<div class="summary-section summary-tldr"><h3 class="summary-section-title">TL;DR</h3><p>${this._escapeHtml(data.tldr)}</p></div>` : '';
+        const takeawaysHtml = (data.takeaways?.length > 0) ? `<div class="summary-section summary-takeaways"><h3 class="summary-section-title">Key Takeaways</h3><ul>${data.takeaways.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ul></div>` : '';
+        const renderEntities = (entities, label) => (entities?.length > 0) ? `<div class="entity-group"><span class="entity-label">${label}</span><div class="entity-tags">${entities.map(e => `<span class="entity-tag">${this._escapeHtml(e)}</span>`).join('')}</div></div>` : '';
+        const entitiesHtml = (data.entities && (data.entities.people?.length || data.entities.organizations?.length || data.entities.locations?.length)) ? `<div class="summary-section summary-entities"><h3 class="summary-section-title">Entities Mentioned</h3>${renderEntities(data.entities.people, 'People')}${renderEntities(data.entities.organizations, 'Organizations')}${renderEntities(data.entities.locations, 'Locations')}</div>` : '';
+
+        this.elements.pageSummaryContainer.innerHTML = tldrHtml + takeawaysHtml + entitiesHtml;
+        this.render(); // Call render to show the container
+    }
+
+    _renderCorrectionOptions(options) {
+        this.elements.correctionOptions.innerHTML = '';
+        options.forEach(optionText => {
+            const button = document.createElement('button');
+            button.className = 'correction-option-button';
+            button.innerHTML = this._escapeHtml(optionText);
+
+            button.addEventListener('click', () => {
+                const userCorrectAnswer = optionText;
+                const correctionContent = `The original quiz content was:\n${this.state.cleanedContent}\n\nMy previous incorrect answer was: \`${this.state.incorrectAnswer}\`\n\nThe user has indicated the correct answer is: \`${userCorrectAnswer}\``;
+                this.elements.correctionPanel.classList.add('hidden');
+                this.elements.explanationContainer.classList.remove('hidden');
+                this.elements.explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div><p>Generating corrected explanation...</p></div>`;
+                this._callGeminiStream('correction', correctionContent);
+            });
+            this.elements.correctionOptions.appendChild(button);
+        });
+    }
+
+    _resetFeedbackButtons() {
+        this.elements.feedbackCorrect.disabled = false;
+        this.elements.feedbackIncorrect.disabled = false;
+        this.elements.feedbackCorrect.classList.remove('selected-correct');
+        this.elements.feedbackIncorrect.classList.remove('selected-incorrect');
+    }
+
+    _copyToClipboard(button) {
+        const textToCopy = button.dataset.copyText;
+        if (textToCopy) {
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const originalTitle = button.title;
+                button.title = 'Copied!';
+                button.classList.add('copied');
+                setTimeout(() => {
+                    button.classList.remove('copied');
+                    button.title = originalTitle;
+                }, 1500);
+            });
+        }
+    }
+
+    // --- State & Storage ---
+
+    async _getPersistedState() {
+        if (!this.state.tab) return {};
+        const key = this.state.tab.id.toString();
         return (await chrome.storage.local.get(key))[key] || {};
     }
 
-    async function saveState(data) {
-        if (!currentTab) return;
-        const key = currentTab.id.toString();
-        const currentState = await getState();
+    async _savePersistedState(data) {
+        if (!this.state.tab) return;
+        const key = this.state.tab.id.toString();
+        const currentState = await this._getPersistedState();
         const newState = { ...currentState, ...data };
         await chrome.storage.local.set({ [key]: newState });
     }
 
-    async function saveToHistory(stateData, actionType) {
+    async _saveToHistory(stateData, actionType) {
         const { history = [] } = await chrome.storage.local.get('history');
-        const newEntry = { ...stateData, id: Date.now(), url: currentTab.url, title: currentTab.title, timestamp: new Date().toISOString(), actionType };
+        const newEntry = {
+            ...stateData,
+            id: Date.now(),
+            url: this.state.tab.url,
+            title: this.state.tab.title,
+            timestamp: new Date().toISOString(),
+            actionType
+        };
         history.unshift(newEntry);
         if (history.length > 100) history.pop();
         await chrome.storage.local.set({ history });
     }
 
-    function resetFeedbackButtons() {
-        feedbackCorrectBtn.disabled = false;
-        feedbackIncorrectBtn.disabled = false;
-        feedbackCorrectBtn.classList.remove('selected-correct');
-        feedbackIncorrectBtn.classList.remove('selected-incorrect');
+    // --- Scripting & Communication ---
+
+    async _injectScripts() {
+        await chrome.scripting.executeScript({
+            target: { tabId: this.state.tab.id },
+            files: ['js/vendor/marked.min.js', 'js/mark.min.js', 'js/content.js']
+        });
+        await this._sendMessageToContentScript({ action: "ping_content_script" });
     }
 
-    async function handleIncorrectFeedback() {
-        feedbackIncorrectBtn.disabled = true;
-        feedbackCorrectBtn.disabled = true;
-        feedbackIncorrectBtn.classList.add('selected-incorrect');
-
-        hide(aiActionsWrapper);
-        show(correctionPanel);
-        correctionOptionsContainer.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Fetching options...</p></div>`;
-
-        try {
-            const response = await sendMessageWithTimeout(currentTab.id, { action: "get_quiz_options" });
-            if (response && response.options && response.options.length > 0) {
-                renderCorrectionOptions(response.options);
-            } else {
-                correctionOptionsContainer.innerHTML = '<p class="text-center">Could not automatically find options on the page.</p>';
-            }
-        } catch (e) {
-            correctionOptionsContainer.innerHTML = `<p class="text-center">Error fetching options: ${e.message}</p>`;
-        }
-    }
-
-    function renderCorrectionOptions(options) {
-        correctionOptionsContainer.innerHTML = '';
-        options.forEach(optionText => {
-            const button = document.createElement('button');
-            button.className = 'correction-option-button';
-            button.innerHTML = escapeHtml(optionText);
-
-            button.addEventListener('click', async () => {
-                const state = await getState();
-                const userCorrectAnswer = optionText;
-                const correctionContent = `The original quiz content was:\n${state.cleanedContent}\n\nMy previous incorrect answer was: \`${currentIncorrectAnswer}\`\n\nThe user has indicated the correct answer is: \`${userCorrectAnswer}\``;
-                hide(correctionPanel);
-                show(explanationContainer);
-                explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div><p>Generating corrected explanation...</p></div>`;
-                callGeminiStream('correction', correctionContent);
+    _sendMessageToContentScript(message, timeout = 5000) {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('Content script did not respond in time.')), timeout);
+            chrome.tabs.sendMessage(this.state.tab.id, message, (response) => {
+                clearTimeout(timer);
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message || 'Failed to communicate with the page.'));
+                } else {
+                    resolve(response);
+                }
             });
-            correctionOptionsContainer.appendChild(button);
         });
     }
 
-    function renderPageSummary(data) {
-        hide(messageArea);
-        hide(quizModeContainer);
-        show(pageSummaryContainer);
-        const tldrHtml = data.tldr ? `<div class="summary-section summary-tldr"><h3 class="summary-section-title">TL;DR</h3><p>${escapeHtml(data.tldr)}</p></div>` : '';
-        const takeawaysHtml = (data.takeaways && data.takeaways.length > 0) ? `<div class="summary-section summary-takeaways"><h3 class="summary-section-title">Key Takeaways</h3><ul>${data.takeaways.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>` : '';
-        const renderEntities = (entities, label) => (entities && entities.length > 0) ? `<div class="entity-group"><span class="entity-label">${label}</span><div class="entity-tags">${entities.map(e => `<span class="entity-tag">${escapeHtml(e)}</span>`).join('')}</div></div>` : '';
-        const entitiesHtml = (data.entities && (data.entities.people?.length || data.entities.organizations?.length || data.entities.locations?.length)) ? `<div class="summary-section summary-entities"><h3 class="summary-section-title">Entities Mentioned</h3>${renderEntities(data.entities.people, 'People')}${renderEntities(data.entities.organizations, 'Organizations')}${renderEntities(data.entities.locations, 'Locations')}</div>` : '';
-        pageSummaryContainer.innerHTML = tldrHtml + takeawaysHtml + entitiesHtml;
+    // --- Formatters & Utilities ---
+
+    _escapeHtml(unsafe) {
+        if (typeof unsafe !== 'string') return '';
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 
-    async function handlePageAnalysis() {
-        displayMessage(`<div class="spinner"></div><p>Analyzing the entire page...</p>`);
-        try {
-            const response = await sendMessageWithTimeout(currentTab.id, { action: "get_page_content" });
-            if (!response || !response.content?.trim()) {
-                throw new Error("No readable content found on this page.");
-            }
-            callGeminiStream('pageAnalysis', response.content);
-        } catch (e) {
-            displayError({ type: 'INTERNAL_ERROR', message: e.message });
-        }
+
+    _formatQuestionContent(content) {
+        if (!content) return '';
+        const lines = content.split('\n').filter(line => line.trim() !== '');
+        if (lines.length === 0) return '';
+        const question = this._escapeHtml(lines.shift().replace(/^Question:\s*/i, ''));
+        const optionsHtml = lines.map(option => {
+            const cleanedOption = this._escapeHtml(option.trim().replace(/^[\*\-•]\s*|\d+\.\s*|[a-zA-Z]\)\s*/, ''));
+            return `<li>${cleanedOption}</li>`;
+        }).join('');
+        return `<div class="question-text">${question}</div><ul>${optionsHtml}</ul>`;
     }
 
-    async function initialize() {
-        [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (!currentTab || !currentTab.id) {
-            displayError({ type: 'INTERNAL_ERROR', message: 'Cannot find the active tab.' });
-            return;
-        }
-        const protectedUrls = ['chrome://', 'https://chrome.google.com/'];
-        if (protectedUrls.some(url => currentTab.url.startsWith(url))) {
-            displayInfoPanel('Page Not Supported', 'For your security, Chrome extensions cannot run on this special page.');
-            return;
-        }
-        appConfig = await chrome.storage.sync.get(null);
-        if (!appConfig.geminiApiKey) {
-            displayError({ type: 'INVALID_API_KEY', message: 'API Key not set. Please go to the options page to set it up.' });
-            return;
-        }
-
-        try {
-            await chrome.scripting.executeScript({ target: { tabId: currentTab.id }, files: ['js/vendor/marked.min.js', 'js/mark.min.js', 'js/content.js'] });
-            await sendMessageWithTimeout(currentTab.id, { action: "ping_content_script" });
-            const contextKey = `context_action_${currentTab.id}`;
-            const contextData = (await chrome.storage.local.get(contextKey))[contextKey];
-            if (contextData?.action && contextData?.selectionText) {
-                hide(pageSummaryContainer);
-                show(quizModeContainer);
-                await chrome.storage.local.remove(contextKey);
-                const displayAction = contextData.action.split('-')[0];
-                displayMessage(`<div class="spinner"></div><p>Getting ${displayAction}...</p>`);
-                saveState({ originalUserContent: contextData.selectionText });
-                callGeminiStream(contextData.action, contextData.selectionText, contextData.selectionText);
-            } else {
-                hide(pageSummaryContainer);
-                show(quizModeContainer);
-                const state = await getState();
-                if (state.cleanedContent) {
-                    hide(messageArea);
-                    show(contentDisplayWrapper);
-                    show(answerContainer);
-                    contentDisplay.innerHTML = formatQuestionContent(state.cleanedContent);
-                    if (state.answerHTML) {
-                        await _handleAnswerResult(state.answerHTML, false, state.totalTokenCount);
-                    } else {
-                        getAnswer();
-                    }
-                    if (state.explanationHTML) {
-                        await _handleExplanationResult(state.explanationHTML);
-                    }
-                } else {
-                    displayMessage(`<div class="spinner"></div><p>Scanning for quiz...</p>`);
-                    const response = await sendMessageWithTimeout(currentTab.id, { action: "get_page_content" });
-                    if (!response || !response.content?.trim()) {
-                        throw new Error("No readable content found on this page.");
-                    }
-                    saveState({ originalUserContent: response.content });
-                    callGeminiStream('cleaning', response.content);
-                }
-            }
-        } catch (e) {
-            console.error("Initialization failed:", e);
-            displayError({ type: 'INTERNAL_ERROR', message: `Could not establish connection. ${e.message}` });
-        }
+    _createQuizFingerprint(cleanedContent) {
+        if (!cleanedContent) return null;
+        const lines = cleanedContent.split('\n').map(l => l.trim()).filter(l => l);
+        if (lines.length < 2) return null;
+        return lines.map(l => l.toLowerCase().replace(/\s+/g, ' ').trim()).join('\n');
     }
 
-    settingsButton.addEventListener('click', () => chrome.runtime.openOptionsPage());
-    analyzePageButton.addEventListener('click', handlePageAnalysis);
-    rescanButton.addEventListener('click', async () => {
-        if (!currentTab) return;
-        await chrome.storage.local.remove(currentTab.id.toString());
-        hide(pageSummaryContainer);
-        show(quizModeContainer);
-        initialize();
-    });
-    explanationButton.addEventListener('click', getExplanation);
-    retryAnswerButton.addEventListener('click', getAnswer);
-    retryExplanationButton.addEventListener('click', getExplanation);
-    feedbackCorrectBtn.addEventListener('click', () => {
-        feedbackCorrectBtn.disabled = true;
-        feedbackIncorrectBtn.disabled = true;
-        feedbackCorrectBtn.classList.add('selected-correct');
-    });
-    feedbackIncorrectBtn.addEventListener('click', handleIncorrectFeedback);
-
-    let streamAccumulator = {};
-    chrome.runtime.onMessage.addListener((request) => {
-        if (request.action !== 'geminiStreamUpdate') return;
-        const { payload, purpose } = request;
-        if (!payload.success) { displayError(payload.error); return; }
-
-        if (purpose === 'pageAnalysis') {
-            const targetDisplay = messageArea.querySelector('.loading-state');
-            if (payload.chunk) {
-                if (targetDisplay) {
-                    if (!targetDisplay.dataset.fullText) targetDisplay.dataset.fullText = '';
-                    targetDisplay.dataset.fullText += payload.chunk;
-                }
-            } else if (payload.done) {
-                const fullText = (payload.fullText || targetDisplay?.dataset.fullText || '').replace(/```json|```/g, '').trim();
-                try {
-                    const jsonData = JSON.parse(fullText);
-                    renderPageSummary(jsonData);
-                } catch (e) {
-                    displayError({ type: 'INVALID_JSON', message: `Failed to parse AI response. Details: ${e.message}\n\nReceived: ${fullText}` });
-                }
-            }
-            return;
+    _simpleHash(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash |= 0;
         }
+        return 'cache_' + new Uint32Array([hash])[0].toString(16);
+    }
+}
 
-        hide(messageArea);
-        show(quizModeContainer);
+// Initialize the app once the DOM is ready.
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize the Markdown parser with sanitization enabled.
+    if (typeof marked !== 'undefined') {
+        marked.setOptions({ sanitize: true });
+    }
 
-        if (payload.chunk && !streamAccumulator[purpose]) {
-            streamAccumulator[purpose] = '';
-        }
-
-        if (payload.chunk) {
-            streamAccumulator[purpose] += payload.chunk;
-        }
-
-        if (payload.done) {
-            const fullText = payload.fullText || streamAccumulator[purpose] || '';
-            delete streamAccumulator[purpose];
-
-            switch (purpose) {
-                case 'cleaning': _handleCleaningResult(fullText); break;
-                case 'answer': _handleAnswerResult(fullText, false, payload.totalTokenCount); break;
-                case 'explanation': _handleExplanationResult(fullText); break;
-                case 'correction': _handleCorrectionResult(fullText); break;
-                case 'summarize': case 'explain': case 'translate':
-                    _handleContextMenuResult(fullText, payload.originalUserContent, purpose);
-                    break;
-                default:
-                    if (purpose.startsWith('rephrase-')) {
-                        _handleContextMenuResult(fullText, payload.originalUserContent, purpose);
-                    }
-                    break;
-            }
-        }
-    });
-
-    initialize();
+    const app = new PopupApp();
+    app.init();
 });
