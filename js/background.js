@@ -22,7 +22,14 @@ async function handleContextAction(info, tab) {
     [`context_action_${tab.id}`]: actionData
   });
 
-  chrome.action.openPopup();
+  // Check if a popup is already open. If not, open it.
+  const views = chrome.extension.getViews({ type: 'popup' });
+  if (views.length === 0) {
+    chrome.action.openPopup();
+  } else {
+    // If popup is open, send a message to re-initialize it
+    chrome.runtime.sendMessage({ action: 're_initialize_popup' });
+  }
 }
 
 async function updateContextMenus() {
@@ -49,9 +56,8 @@ async function updateContextMenus() {
 
   const { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
   const defaultLanguages = 'English, Indonesian';
-  let rephraseLanguages = defaultLanguages;
   const currentProfile = promptProfiles?.[activeProfile] || promptProfiles?.['Default'] || {};
-  rephraseLanguages = currentProfile.rephraseLanguages || defaultLanguages;
+  const rephraseLanguages = currentProfile.rephraseLanguages || defaultLanguages;
   
   const languages = rephraseLanguages.split(',').map(lang => lang.trim()).filter(lang => lang);
   if (languages.length > 0) {
@@ -93,12 +99,11 @@ chrome.runtime.onStartup.addListener(updateContextMenus);
 async function performApiCall(payload) {
     const { apiKey, model, systemPrompt, userContent, base64ImageData, purpose } = payload;
     
-    // Determine temperature from stored settings
     const settings = await chrome.storage.sync.get(['promptProfiles', 'activeProfile', 'temperature']);
     const activeProfileName = settings.activeProfile || 'Default';
     const activeProfile = settings.promptProfiles?.[activeProfileName] || {};
     const globalTemp = settings.temperature ?? 0.4;
-    const purposeBase = purpose.split('-')[0]; // 'image-quiz' -> 'image'
+    const purposeBase = purpose.split('-')[0];
     const tempKey = `${purposeBase}_temp`;
     const finalTemperature = activeProfile[tempKey] ?? globalTemp;
 
@@ -106,7 +111,6 @@ async function performApiCall(payload) {
     const endpoint = 'streamGenerateContent';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}&alt=sse`;
   
-    // Build content parts based on whether it's a multimodal request
     const contentParts = [{ text: userContent }];
     if (base64ImageData && base64ImageData.startsWith('data:image')) {
         const [meta, data] = base64ImageData.split(',');
@@ -150,8 +154,7 @@ async function performApiCall(payload) {
   
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let fullText = "";
-      let totalTokenCount = 0;
+      let fullText = "", totalTokenCount = 0;
   
       while (true) {
         const { value, done } = await reader.read();
@@ -178,37 +181,34 @@ async function performApiCall(payload) {
 
     } catch (error) {
       console.error("API call error:", error);
-      const errorPayload = {
+      streamCallback({ success: false, error: {
         type: error.type || 'NETWORK_ERROR',
         message: error.message || 'Check your internet connection or the browser console for more details.'
-      };
-      streamCallback({ success: false, error: errorPayload });
+      }});
     }
 }
   
 function handleTestConnection(payload, sendResponse) {
     const { apiKey } = payload;
     const testModel = 'gemini-1.5-flash-latest';
-    const testContent = "Reply with only 'OK'.";
-    const endpoint = 'generateContent';
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${testModel}:${endpoint}?key=${apiKey}`;
-  
-    fetch(apiUrl, {
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${testModel}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: testContent }] }] })
+      body: JSON.stringify({ contents: [{ parts: [{ text: "Reply with only 'OK'." }] }] })
     })
     .then(res => res.ok ? res.json() : res.json().then(err => { throw new Error(err.error?.message || "An unknown error occurred."); }))
     .then(result => {
       const text = result.candidates?.[0]?.content?.parts?.[0]?.text.trim() || "";
-      sendResponse({ success: text.toUpperCase() === 'OK', text: "Connection successful!", error: `Unexpected response: "${text}"`});
+      if (text.toUpperCase() === 'OK') {
+        sendResponse({ success: true, text: "Connection successful!" });
+      } else {
+        sendResponse({ success: false, error: `Unexpected response: "${text}"` });
+      }
     })
     .catch(err => sendResponse({ success: false, error: err.message }));
 }
 
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-    handleContextAction(info, tab);
-});
+chrome.contextMenus.onClicked.addListener(handleContextAction);
   
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     switch(request.action) {

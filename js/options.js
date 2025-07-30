@@ -36,25 +36,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     const historyListContainer = document.getElementById('history-list-container');
-    
-function escapeHtml(unsafe) {
-    if (typeof unsafe !== 'string') return '';
-    return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
 
     function formatQuestionContent(content) {
         if (!content) return '';
         const lines = content.split('\n').filter(line => line.trim() !== '');
         if (lines.length === 0) return '';
-        const question = escapeHtml(lines.shift().replace(/^Question:\s*/i, ''));
+        const question = _escapeHtml(lines.shift().replace(/^Question:\s*/i, ''));
         const optionsHtml = lines.map(option => {
             const cleanedOption = option.trim().replace(/^[\*\-]\s*Options:\s*|^\s*[\*\-]\s*/, '');
-            return `<li>${escapeHtml(cleanedOption)}</li>`;
+            return `<li>${_escapeHtml(cleanedOption)}</li>`;
         }).join('');
         return `<p class="history-question">${question}</p><ul class="history-options">${optionsHtml}</ul>`;
     }
@@ -80,10 +70,10 @@ function escapeHtml(unsafe) {
                     <div class="answer-block">${formatQuestionContent(item.cleanedContent)}</div>
                 </div>
             ` : '';
-            const aiResponseHtml = item.answerHTML ? marked.parse(item.answerHTML) : 'No response captured.';
+            const aiResponseHtml = item.answerHTML ? DOMPurify.sanitize(marked.parse(item.answerHTML)) : 'No response captured.';
             itemElement.innerHTML = `
                 <div class="history-item-header">
-                    <div class="history-item-title"><a href="${item.url}" target="_blank" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</a></div>
+                    <div class="history-item-title"><a href="${item.url}" target="_blank" title="${_escapeHtml(item.title)}">${_escapeHtml(item.title)}</a></div>
                     <div class="history-item-meta">${actionLabel} • ${formattedDate}</div>
                 </div>
                 ${contentDisplay}

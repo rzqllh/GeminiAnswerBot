@@ -62,16 +62,6 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
           firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
   }
-  
-  function escapeHtml(unsafe) {
-    if (typeof unsafe !== 'string') return '';
-    return unsafe
-        .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-  }
 
   function findQuizContainer() {
       const highlight = document.querySelector('mark.gemini-answer-highlight');
@@ -104,8 +94,8 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
       dialogOverlay.id = 'gemini-dialog-overlay';
       dialogOverlay.className = 'gemini-answer-bot-dialog-overlay';
 
-      const safeUserAnswer = escapeHtml(userAnswer);
-      const safeAiAnswer = escapeHtml(typeof aiAnswer === 'string' ? aiAnswer.replace(/`/g, '') : aiAnswer);
+      const safeUserAnswer = _escapeHtml(userAnswer);
+      const safeAiAnswer = _escapeHtml(typeof aiAnswer === 'string' ? aiAnswer.replace(/`/g, '') : aiAnswer);
 
       dialogOverlay.innerHTML = `
         <div class="gemini-answer-bot-dialog-box">
@@ -258,7 +248,7 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
       return bodyClone.innerText.trim();
   }
 
-  // Toolbar injection logic (unchanged)
+  // Toolbar injection logic
   if (typeof window.geminiAnswerBotToolbarInjected === 'undefined') {
     window.geminiAnswerBotToolbarInjected = true;
     let toolbarElement = null;
@@ -296,13 +286,7 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
       });
       document.body.appendChild(toolbarElement);
     }
-    function injectToolbarCSS() {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.type = 'text/css';
-      link.href = chrome.runtime.getURL('assets/toolbar.css');
-      document.head.appendChild(link);
-    }
+    
     function showToolbar() {
       const selection = window.getSelection();
       if (!selection || selection.isCollapsed) { hideToolbar(); return; }
@@ -321,7 +305,7 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
       toolbarElement.style.left = `${left}px`;
     }
     function hideToolbar() { if (toolbarElement) { toolbarElement.classList.remove('visible'); } }
-    injectToolbarCSS();
+    
     createToolbar();
     document.addEventListener('mouseup', () => setTimeout(() => {
       const selectionText = window.getSelection().toString().trim();

@@ -1,188 +1,114 @@
 # GeminiAnswerBot
 
-![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.9.3-brightgreen)
+![Version](https://img.shields.io/badge/version-1.9.8-blue)
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 
-**GeminiAnswerBot** adalah ekstensi Chrome cerdas yang mengutamakan privasi, didukung oleh Google Gemini API. Ekstensi ini menganalisis konten pada halaman untuk secara cerdas menyelesaikan kuis, menyempurnakan teks yang dipilih, dan menyediakan alat konteks bertenaga AI—semuanya langsung di browser Anda.
-
----
-
-## Fitur Utama
-
-- **Analisis Halaman Penuh**: Dengan satu klik, dapatkan ringkasan komprehensif dari halaman web mana pun, termasuk TL;DR, poin-poin kunci, dan entitas penting yang disebutkan.
-- **Penyelesai Kuis Cerdas**: Mendeteksi dan menyelesaikan soal kuis secara otomatis.
-- **Feedback Loop Interaktif**: Koreksi jawaban AI yang salah dan dapatkan penjelasan baru secara instan.
-- **Sistem Fallback Cerdas**: Mendeteksi error API spesifik dan memberikan umpan balik yang jelas.
-- **Toolbar Aksi Mengambang (Inline Toolbar)**: Akses AI super cepat saat menyeleksi teks.
-- **Tindakan Teks Kontekstual**: Klik kanan untuk meringkas, menjelaskan, menerjemahkan, atau memparafrasekan.
-- **Dasbor Pengaturan Modern & Kustomisasi Penuh**: Atur kunci API, model, prompt, dan perilaku ekstensi.
-- **Kontrol Suhu Granular**: Atur tingkat kreativitas AI secara spesifik untuk setiap jenis tugas.
-- **Panel Riwayat Terpusat**: Lihat dan kelola semua interaksi AI sebelumnya di dalam dasbor pengaturan.
-
----
-## Skenario Penggunaan
-
-- **Mendapatkan intisari artikel panjang dalam hitungan detik** sebelum memutuskan untuk membacanya.
-- Secara instan menyelesaikan dan menyorot jawaban kuis di platform e-learning.
-- **Memberikan koreksi jika AI salah menjawab**, dan secara instan mendapatkan penjelasan baru berdasarkan jawaban yang benar.
-- Meringkas, menjelaskan, atau menerjemahkan teks dengan cepat menggunakan toolbar mengambang.
-- Mendapat notifikasi yang jelas jika kunci API salah atau kuota habis.
-- Menerjemahkan atau memparafrasekan teks yang dipilih secara real-time.
-- Menyesuaikan perilaku AI untuk berbagai tugas dengan kontrol suhu.
-- Membangun sistem prompt Anda sendiri melalui kustomisasi.
-
----
-## Memulai
-
-### Prasyarat
-
-- Browser berbasis Chromium (Chrome, Edge, Brave, dll.)
-- Kunci API Google Gemini yang valid
-
-### Instalasi
-
-1.  Unduh atau klon repositori ini.
-2.  Buka `chrome://extensions/` di browser Anda.
-3.  Aktifkan **Developer Mode**.
-4.  Klik **Load Unpacked** dan pilih folder proyek yang telah diekstrak.
-5.  Ikon ekstensi sekarang akan muncul di toolbar Anda.
+**GeminiAnswerBot** is a smart, privacy-first Chrome extension that leverages the Google Gemini API to supercharge your browsing experience. It intelligently analyzes web page content to solve quizzes, summarize articles, and provides a suite of contextual AI tools directly in your browser.
 
 ---
 
-## Konfigurasi
+## Core Features
 
-1.  Pergi ke [Google AI Studio](https://aistudio.google.com/).
-2.  Klik **"Get API key"** → **"Create API key in new project"**.
-3.  Salin kuncinya.
-4.  Buka Opsi GeminiAnswerBot (klik kanan ikon > Opsi).
-5.  Tempelkan kunci API Anda di tab **General**, lalu klik **Save**.
-6.  Gunakan tombol **"Test Connection"** untuk memvalidasi kunci Anda.
-
----
-
-## Troubleshooting
-
-**Kunci API tidak berfungsi?**
-- Pastikan kunci berasal dari AI Studio, bukan kredensial OAuth.
-- Gunakan tombol "Test Connection" untuk memvalidasi kunci.
-- Coba buat kunci baru dari proyek baru jika diperlukan.
-
-**Deteksi kuis tidak berfungsi?**
-- Halaman mungkin menggunakan shadow DOM atau iframe (dukungan terbatas).
-- Segarkan halaman setelah menginstal atau mengaktifkan ekstensi.
+-   **Intelligent Quiz Solver**: Automatically detects and solves quiz questions from page content, whether text-based or within images.
+-   **Full Page Analysis**: Get a comprehensive, structured summary of any webpage with a single click, including a TL;DR, key takeaways, and mentioned entities.
+-   **Multimodal Image Actions**: Right-click any image to:
+    -   **Answer a Quiz**: Transcribes and solves questions embedded in images.
+    -   **Describe Image**: Provides a detailed description of the image's content.
+    -   **Translate Text**: Extracts and translates any text found within the image.
+-   **Floating Action Toolbar**: Select any text on a page to instantly bring up a sleek, floating toolbar for quick actions like summarizing, explaining, or translating.
+-   **Persistent State UI**: The popup remembers its last state on a per-tab basis. If you get an answer or a summary, it will be there when you reopen the popup without needing to rescan.
+-   **Interactive Feedback Loop**: Correct the AI's answers and instantly receive a new, updated explanation based on the correct information.
+-   **Robust Error Handling**: Intelligently detects specific API errors (e.g., `INVALID_API_KEY`, `QUOTA_EXCEEDED`) and provides clear, actionable feedback to the user.
+-   **Advanced Customization**: A full-featured options page allows you to:
+    -   Manage your API Key and select your preferred Gemini model.
+    -   Create and switch between multiple custom prompt profiles.
+    -   Fine-tune AI creativity with granular temperature controls for each specific task.
+-   **Pre-Submission Safety Check**: Optionally warns you if you're about to submit a quiz answer that differs from the AI's suggestion.
 
 ---
 
-## Struktur Proyek
+## Getting Started
 
-Proyek ini diatur dengan pemisahan tugas yang jelas untuk skalabilitas dan pemeliharaan.
+### Prerequisites
+
+-   A Chromium-based browser (Chrome, Edge, Brave, etc.)
+-   A valid Google Gemini API key.
+
+### Installation
+
+1.  Clone or download this repository and unzip it.
+2.  Open your browser and navigate to `chrome://extensions/`.
+3.  Enable **Developer Mode** using the toggle in the top-right corner.
+4.  Click **Load Unpacked** and select the project folder you unzipped.
+5.  The GeminiAnswerBot icon will now appear in your browser's toolbar.
+
+### Configuration
+
+1.  Visit [Google AI Studio](https://aistudio.google.com/) to get your API key.
+2.  Right-click the extension icon in your toolbar and select **Options**.
+3.  In the **General** tab, paste your API key and click **Save Settings**.
+4.  Use the **Test Connection** button to validate your key.
+
+---
+
+## Development & Architecture
+
+This extension is built using Manifest V3 and follows a modern, modular architecture.
+
+### Key Scripts
+
+-   `js/background.js`: The service worker. It acts as the central router and orchestrator. It manages context menus, handles all communication with the Google Gemini API, and routes events between different parts of the extension.
+-   `js/content.js`: The content script. It is the only part of the extension with direct access to the webpage's DOM. Its responsibilities include:
+    -   Extracting text content (either for quizzes or full-page analysis).
+    -   Highlighting answers on the page using `Mark.js`.
+    -   Implementing the floating action toolbar for text selection.
+    -   Displaying the "Pre-Submission Check" confirmation modal.
+-   `js/popup.js`: Manages the entire UI and state of the default popup window. It is built as a self-contained class (`PopupApp`) that handles rendering different views (loading, quiz, summary, error), managing user interactions, and orchestrating communication with the content and background scripts.
+-   `js/options.js`: Contains all the logic for the feature-rich options page, including saving settings, managing prompt profiles, and displaying interaction history.
+
+### Core Concepts
+
+-   **Dynamic Script Injection**: To keep the extension lightweight, `content.js` and its dependencies are not persistently injected into every page via the manifest. Instead, they are programmatically injected by `popup.js` using the `chrome.scripting.executeScript` API only when the user opens the popup. A handshake mechanism ensures the content script is ready before communication begins.
+-   **Per-Tab State Persistence**: The popup's state is saved to `chrome.storage.local` keyed by the tab's ID. This allows the UI to be restored to its last known state (e.g., showing a previous answer) when the user reopens the popup on the same page, providing a seamless experience.
+
+### Project Structure
+
 ```
 GeminiAnswerBot/
 ├── assets/
 │ ├── options.css
 │ ├── popup.css
-│ ├── toolbar.css
-│ └── icon.png
+│ ├── dialog.css
+│ └── ... (icons, images)
 ├── js/
 │ ├── vendor/
 │ │ └── marked.min.js
-│ ├── background.js
-│ ├── content.js
-│ ├── options.js
-│ ├── prompts.js
-│ └── mark.min.js
+│ │ └── mark.min.js
+│ ├── background.js # Service Worker, API calls, routing
+│ ├── content.js # DOM interaction, text extraction
+│ ├── popup.js # UI logic for the main popup
+│ ├── options.js # UI logic for the settings page
+│ └── prompts.js # Default system prompts for the AI
 ├── ui/
 │ ├── options.html
 │ └── popup.html
 ├── .gitignore
-├── LICENSE
 ├── manifest.json
 └── README.md
 ```
 
----
-
-## Privasi & Keamanan
-
-GeminiAnswerBot **tidak mengumpulkan data pribadi apa pun**. Semua pemrosesan terjadi secara lokal di browser Anda. Kunci API Gemini Anda hanya disimpan di penyimpanan lokal browser Anda dan tidak pernah dikirim ke pihak eksternal.
-
-## Masalah yang Diketahui
-
-- Di beberapa situs web dinamis (misalnya, yang menggunakan React atau Shadow DOM), ekstraksi kuis mungkin tertunda.
-- Google Gemini API dapat mengembalikan hasil yang sedikit tidak konsisten tergantung pada latensi model.
 
 ---
 
-## Catatan Pengembangan
+## Privacy & Security
 
-- `content.js` digunakan untuk logika pemindaian halaman, penyorotan, dan inline toolbar.
-- `background.js` menangani komunikasi dengan Gemini API.
-- Semua logika UI untuk pengaturan ditangani di `options.js`.
-- Prompt dapat diedit langsung melalui `prompts.js` atau halaman Opsi.
+GeminiAnswerBot is designed with privacy as a priority.
 
-Setelah melakukan perubahan, buka `chrome://extensions/` dan klik **Reload** pada GeminiAnswerBot.
+-   **No Data Collection**: The extension does not collect, store, or transmit any personal data or browsing history to any external servers.
+-   **Local Storage**: Your Gemini API key and interaction history are stored exclusively in your browser's local storage (`chrome.storage.sync` and `chrome.storage.local`). They are never sent anywhere except directly to the Google Gemini API from your browser.
 
 ---
 
-## Changelog
+## License
 
-### [1.9.7] - 2025-08-03
-#### Added
-- **Full Page Analysis:** Introduced a new "Analyze Page" feature, accessible from the popup header. This allows users to get a comprehensive, structured summary of the entire webpage content.
-- **Structured JSON Output:** The analysis provides a TL;DR, key takeaways, and a list of mentioned entities (people, places, etc.), powered by a new, robust prompt designed to ensure the AI returns a valid JSON format.
-- **Dynamic Summary UI:** The popup UI has been enhanced to beautifully render the structured analysis, making complex information easy to digest at a glance.
-
-### [1.9.6] - 2025-08-02
-#### Added
-- **Interactive Feedback Loop:** Users can now provide feedback on the AI's answer by marking it as "Correct" (👍) or "Incorrect" (👎).
-- **Answer Correction Flow:** If an answer is marked as incorrect, the user is prompted to select the correct option, which is then sent back to the API to generate a new, corrected explanation.
-
-### [1.9.5] - 2025-08-01
-#### Added
-- **Protected Page Detection:** The extension now proactively detects when it's activated on a protected browser page (e.g., `chrome://extensions`, New Tab Page, Chrome Webstore).
-- **Informational UI Panel:** Instead of showing a generic connection error on protected pages, the extension now displays a clear, user-friendly informational panel explaining why it cannot run, improving user trust and reducing confusion.
-
-### [1.9.4] - 2025-07-31
-#### Added
-- **Smart Fallback System:** Implemented intelligent error handling for API calls. The extension now detects specific API failures (e.g., `INVALID_API_KEY`, `QUOTA_EXCEEDED`, `TIMEOUT`) and displays a user-friendly error panel in the popup.
-- **Contextual Error Actions:** The new error panel includes relevant action buttons based on the error type, such as "Open Settings" for an invalid key, or "Search on Google" for a general failure, guiding the user toward a resolution.
-
-### [1.9.3] - 2025-07-30
-#### Added
-- **Per-Action Temperature Control:** Users can now set the AI's creativity level (temperature) individually for each specific task (Answering, Explaining, Summarizing, etc.) in the "Prompts" tab of the options page.
-
-### [1.9.2] - 2025-07-29
-#### Added
-- **Inline Action Toolbar:** Implemented a sleek, floating toolbar that appears on text selection. This provides instant access to AI actions (Summarize, Explain, Translate) without needing to right-click, significantly speeding up a user's workflow.
-#### Fixed
-- **Development Stability:** Added a defensive `try...catch` block around message passing in the content script to gracefully handle the "Extension context invalidated" error during development.
-#### Changed
-- **Code Refactoring:** Refactored the context action logic in `background.js` into a reusable function (`handleContextAction`) to be used by both the context menu and the new toolbar.
-
-### [1.9.1] - 2025-07-28
-#### Fixed
-- **Critical Rendering Bug:** Fixed a major issue that caused the extension popup to break or hang when encountering quiz questions with HTML code in the answers.
-- **Context Menu:** Corrected the right-click context menu to properly display all available actions.
-- **Stability:** Improved stability by preventing the popup from freezing if the connection to the web page is lost.
-
-### [1.9.0] - 2025-07-27
-#### Fixed
-- Resolved a critical error that caused the extension popup to crash when attempting to display AI-generated results due to a Markdown rendering library issue.
-- Improved security by sanitizing all Markdown-rendered content.
-
-... (Changelog lama lainnya)
-
----
-
-## Lisensi
-
-Proyek ini dilisensikan di bawah Lisensi MIT — lihat file `LICENSE` untuk detailnya.
-
----
-
-## Kontak & Kredit
-
-Dibuat dengan 💡 oleh [Hafizh Rizqullah](https://github.com/rzqllh18)
-Terinspirasi oleh alat seperti ChatGPT Sidebar, Gemini Studio, dan lainnya.
-
-Untuk masukan, hubungi melalui GitHub Issues atau buka PR 🙌
+This project is licensed under the MIT License - see the `LICENSE` file for details.

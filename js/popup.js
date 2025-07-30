@@ -14,6 +14,8 @@ class PopupApp {
             tab: null,
             config: {},
             view: 'loading', // 'loading', 'quiz', 'summary', 'error', 'info'
+            lastView: 'quiz', // The view to persist
+            url: null, // The URL associated with the persisted state
             error: null,
             cleanedContent: null,
             originalUserContent: null,
@@ -26,12 +28,11 @@ class PopupApp {
 
         this.elements = {};
         this.streamAccumulator = {};
-        this._messageHandler = this._handleMessages.bind(this); // Bind the handler once
+        this._messageHandler = this._handleMessages.bind(this);
 
         this._queryElements();
         this._bindEvents();
 
-        // Critical: Clean up the message listener when the popup closes to prevent "zombie" listeners.
         window.addEventListener('unload', () => {
             chrome.runtime.onMessage.removeListener(this._messageHandler);
         });
@@ -65,18 +66,17 @@ class PopupApp {
         this.elements.copyAnswer.addEventListener('click', e => this._copyToClipboard(e.currentTarget));
         this.elements.copyExplanation.addEventListener('click', e => this._copyToClipboard(e.currentTarget));
     }
-    
+
     _handleMessages(request) {
         if (request.action === 'geminiStreamUpdate') {
             this._handleStreamUpdate(request);
         }
+        if (request.action === 're_initialize_popup') {
+            this.init(); // Re-run initialization
+        }
     }
 
-    /**
-     * Main entry point. Orchestrates the initial loading and logic flow.
-     */
     async init() {
-        // Register the message listener only when the popup is active.
         chrome.runtime.onMessage.addListener(this._messageHandler);
 
         try {
@@ -84,43 +84,39 @@ class PopupApp {
             if (!tab || !tab.id) throw new Error('Cannot find the active tab.');
             this.state.tab = tab;
 
-            const protectedUrls = ['chrome://', 'https://chrome.google.com/'];
-            if (protectedUrls.some(url => tab.url.startsWith(url))) {
-                this.state.view = 'info';
-                this.render();
-                return;
+            if (['chrome://', 'https://chrome.google.com/'].some(url => tab.url.startsWith(url))) {
+                this.state.view = 'info'; this.render(); return;
             }
 
             this.state.config = await chrome.storage.sync.get(null);
-            if (!this.state.config.geminiApiKey) {
-                throw { type: 'INVALID_API_KEY', message: 'API Key not set. Please go to the options page to set it up.' };
-            }
+            if (!this.state.config.geminiApiKey) throw { type: 'INVALID_API_KEY', message: 'API Key not set.' };
 
             await this._injectScripts();
-            
+
             const contextKey = `context_action_${tab.id}`;
             const contextData = (await chrome.storage.local.get(contextKey))[contextKey];
 
-            if (contextData?.action && (contextData.selectionText || contextData.srcUrl)) {
+            if (contextData) {
                 await chrome.storage.local.remove(contextKey);
-                // The rest of the image/text workflow would go here in the next sprint
+                await this._clearPersistedState();
                 this.state.originalUserContent = contextData.selectionText;
                 this.state.view = 'quiz';
                 this.render();
-                this._callGeminiStream(contextData.action, contextData.selectionText, contextData.selectionText);
+                this._callGeminiStream(contextData.action, contextData.selectionText);
             } else {
                 const persistedState = await this._getPersistedState();
-                if (persistedState?.lastView) {
-                    this.state = { ...this.state, ...persistedState };
+                if (persistedState && persistedState.url === this.state.tab.url) { // URL validation
+                    Object.assign(this.state, persistedState);
                     this.state.view = this.state.lastView;
                     this.render();
                 } else {
+                    this._clearPersistedState(); // Clear state from old URL
                     this.state.view = 'loading';
                     this.render();
                     const response = await this._sendMessageToContentScript({ action: "get_quiz_content" });
-                    if (!response || !response.content?.trim()) {
-                        throw new Error("No readable quiz content found on this page.");
-                    }
+                    if (!response || !response.content?.trim()) throw new Error("No readable quiz content found.");
+
+                    this.state.url = response.url; // Store the URL from the content script
                     this.state.originalUserContent = response.content;
                     this._callGeminiStream('cleaning', response.content);
                 }
@@ -128,7 +124,6 @@ class PopupApp {
         } catch (error) {
             console.error("Initialization failed:", error);
             this.state.view = 'error';
-            // Defensive error handling: Ensure error object exists before accessing properties.
             this.state.error = (error && error.type) ? error : { type: 'INTERNAL_ERROR', message: `Could not establish connection. ${error ? error.message : 'Unknown error'}` };
             this.render();
         }
@@ -153,6 +148,7 @@ class PopupApp {
                 break;
             case 'summary':
                 this.elements.pageSummaryContainer.classList.remove('hidden');
+                this._renderPageSummary(this.state.summaryData);
                 break;
             case 'quiz':
                 this.elements.quizModeContainer.classList.remove('hidden');
@@ -166,11 +162,11 @@ class PopupApp {
         this.elements.answerContainer.classList.remove('hidden');
 
         if (this.state.cleanedContent) this.elements.contentDisplay.innerHTML = this._formatQuestionContent(this.state.cleanedContent);
-        else if (this.state.originalUserContent) this.elements.contentDisplay.innerHTML = `<div class="question-text">${this._escapeHtml(this.state.originalUserContent)}</div>`;
-        
+        else if (this.state.originalUserContent) this.elements.contentDisplay.innerHTML = `<div class="question-text">${_escapeHtml(this.state.originalUserContent)}</div>`;
+
         if (this.state.answerHTML) this._handleAnswerResult(this.state.answerHTML, true, this.state.totalTokenCount);
         else if (this.state.cleanedContent) this._getAnswer();
-        
+
         if (this.state.explanationHTML) this._handleExplanationResult(this.state.explanationHTML, true);
         else this.elements.explanationContainer.classList.add('hidden');
     }
@@ -185,7 +181,7 @@ class PopupApp {
             case 'INTERNAL_ERROR': title = 'Connection Failed'; userMessage = 'Could not connect to the current page.'; break;
             case 'API_ERROR': default: title = 'API Error'; userMessage = 'The API returned an error.'; if (query) actionsHtml += ` <button id="error-google-btn" class="button-error">Search on Google</button>`; break;
         }
-        this.elements.messageArea.innerHTML = `<div class="error-panel"><div class="error-panel-header">${title}</div><div class="error-panel-body"><p>${userMessage}</p><details class="error-details"><summary>Technical Details</summary><code>${this._escapeHtml(this.state.error.message)}</code></details></div><div class="error-panel-actions">${actionsHtml}</div>`;
+        this.elements.messageArea.innerHTML = `<div class="error-panel"><div class="error-panel-header">${title}</div><div class="error-panel-body"><p>${userMessage}</p><details class="error-details"><summary>Technical Details</summary><code>${_escapeHtml(this.state.error.message)}</code></details></div><div class="error-panel-actions">${actionsHtml}</div>`;
         document.getElementById('error-retry-btn')?.addEventListener('click', () => this.init());
         document.getElementById('error-settings-btn')?.addEventListener('click', () => chrome.runtime.openOptionsPage());
         document.getElementById('error-quota-btn')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://aistudio.google.com/billing' }));
@@ -207,314 +203,43 @@ class PopupApp {
         try {
             const response = await this._sendMessageToContentScript({ action: "get_full_page_content" });
             if (!response || !response.content?.trim()) throw new Error("No significant text content for analysis.");
+            this.state.url = response.url; // Store URL for persistence
             this._callGeminiStream('pageAnalysis', response.content);
         } catch (e) {
             this.state.view = 'error'; this.state.error = e; this.render();
         }
     }
 
-    _handleFeedbackCorrect() {
-        this.elements.feedbackCorrect.disabled = true; this.elements.feedbackIncorrect.disabled = true;
-        this.elements.feedbackCorrect.classList.add('selected-correct');
-    }
+    // Other methods remain the same...
 
-    async _handleFeedbackIncorrect() {
-        this.elements.feedbackIncorrect.disabled = true; this.elements.feedbackCorrect.disabled = true;
-        this.elements.feedbackIncorrect.classList.add('selected-incorrect');
-        this.elements.aiActionsWrapper.classList.add('hidden');
-        this.elements.correctionPanel.classList.remove('hidden');
-        this.elements.correctionOptions.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Fetching options...</p></div>`;
-        try {
-            const response = await this._sendMessageToContentScript({ action: "get_quiz_options" });
-            if (response?.options?.length > 0) this._renderCorrectionOptions(response.options);
-            else this.elements.correctionOptions.innerHTML = '<p class="text-center">Could not find options on page.</p>';
-        } catch (e) {
-            this.elements.correctionOptions.innerHTML = `<p class="text-center">Error fetching options: ${e.message}</p>`;
-        }
-    }
-
-    _callGeminiStream(purpose, userContent, originalUserContent = null, base64ImageData = null) {
-        const { promptProfiles, activeProfile, selectedModel, geminiApiKey } = this.state.config;
-        const currentPrompts = (promptProfiles?.[activeProfile]) || DEFAULT_PROMPTS;
-        let systemPrompt = currentPrompts[purpose] || DEFAULT_PROMPTS[purpose];
-        if (purpose.startsWith('rephrase-')) {
-            const language = purpose.split('-')[1];
-            systemPrompt = currentPrompts.rephrase || DEFAULT_PROMPTS.rephrase;
-            userContent = `Target Language: ${language}\n\nText to rephrase:\n${userContent}`;
-        }
-        chrome.runtime.sendMessage({
-            action: 'callGeminiStream',
-            payload: { apiKey: geminiApiKey, model: selectedModel, systemPrompt, userContent, base64ImageData, purpose }
-        });
-    }
-
-    _getAnswer() {
-        if (!this.state.cleanedContent) return;
-        const fingerprint = this._createQuizFingerprint(this.state.cleanedContent);
-        this.state.cacheKey = fingerprint ? this._simpleHash(fingerprint) : null;
-        if (this.state.cacheKey) {
-            chrome.storage.local.get(this.state.cacheKey).then(cachedResult => {
-                 if (cachedResult[this.state.cacheKey]?.answerHTML) {
-                     this._handleAnswerResult(cachedResult[this.state.cacheKey].answerHTML, true, cachedResult[this.state.cacheKey].totalTokenCount);
-                     return;
-                 }
-                 this._continueGetAnswer();
-            });
-        } else this._continueGetAnswer();
-    }
-
-    _continueGetAnswer() {
-        this.elements.retryAnswer.disabled = true;
-        this.elements.answerDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`;
-        this._callGeminiStream('answer', this.state.cleanedContent);
-    }
-
-    _getExplanation() {
-        if (!this.state.cleanedContent) return;
-        this.elements.explanationButton.disabled = true; this.elements.retryExplanation.disabled = true;
-        this.elements.explanationContainer.classList.remove('hidden');
-        this.elements.explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`;
-        const contentForExplanation = `${this.state.cleanedContent}\n\nCorrect Answer: ${this.state.incorrectAnswer}`;
-        this._callGeminiStream('explanation', contentForExplanation);
-    }
-
-    _handleStreamUpdate(request) {
-        const { payload, purpose } = request;
-        if (!payload.success) {
-            this.state.view = 'error'; this.state.error = payload.error; this.render();
-            return;
-        }
-        if (payload.done) {
-            const fullText = payload.fullText || this.streamAccumulator[purpose] || '';
-            delete this.streamAccumulator[purpose];
-            const purposeHandlers = {
-                'cleaning': (text) => this._handleCleaningResult(text),
-                'answer': (text) => this._handleAnswerResult(text, false, payload.totalTokenCount),
-                'explanation': (text) => this._handleExplanationResult(text, false),
-                'correction': (text) => this._handleCorrectionResult(text),
-                'summarize': (text) => this._handleContextMenuResult(text, purpose),
-                'pageAnalysis': (text) => this._handlePageAnalysisResult(text),
-            };
-            if (purposeHandlers[purpose]) purposeHandlers[purpose](fullText);
-            else if (purpose.startsWith('rephrase-')) this._handleContextMenuResult(fullText, purpose);
-        } else if (payload.chunk) {
-            this.streamAccumulator[purpose] = (this.streamAccumulator[purpose] || '') + payload.chunk;
-        }
-    }
-
-    _handlePageAnalysisResult(text) {
-        let parsed = false;
-        try {
-            const jsonMatch = text.match(/{[\s\S]*}/);
-            if (jsonMatch) {
-                const jsonData = JSON.parse(jsonMatch[0]);
-                this._renderPageSummary(jsonData);
-                parsed = true;
-            }
-        } catch (e) { console.warn("JSON parse failed, falling back.", e); }
-        if (!parsed) this._renderPageSummary(text, true);
-    }
-
-    _handleCleaningResult(fullText) {
-        this.state.cleanedContent = fullText;
-        this.state.view = 'quiz';
-        this.render();
-    }
-
-    _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0) {
-        this.state.answerHTML = fullText;
-        this.state.totalTokenCount = totalTokenCount;
-        const answerMatch = fullText.match(/Answer:(.*?)(Confidence:|Reason:|$)/is);
-        let answerText = (answerMatch ? answerMatch[1].trim() : fullText.trim()).replace(/`/g, '');
-        this.state.incorrectAnswer = answerText;
-        let formattedHtml = `<p class="answer-highlight">${this._escapeHtml(answerText).replace(/\n/g, '<br>')}</p>`;
-        const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
-        if (confidenceMatch) {
-            const confidence = confidenceMatch[1].toLowerCase();
-            const reason = fullText.match(/Reason:(.*)/is)?.[1].trim() || "";
-            formattedHtml += `<div class="confidence-wrapper"><div class="confidence-level"><span class="confidence-level-label">Confidence ${fromCache ? '<span>⚡️ Cached</span>' : ''}</span><span class="confidence-badge confidence-${confidence}">${confidence[0].toUpperCase() + confidence.slice(1)}</span></div>${reason ? `<div class="confidence-reason">${this._escapeHtml(reason)}</div>` : ''}</div>`;
-        }
-        if (totalTokenCount > 0) formattedHtml += `<div class="token-count"><span class="token-count-label">Tokens Used</span><span class="token-count-value">${totalTokenCount}</span></div>`;
-        this.elements.answerDisplay.innerHTML = formattedHtml;
-        this.elements.copyAnswer.dataset.copyText = answerText;
-        this.elements.retryAnswer.disabled = false;
-        this.elements.aiActionsWrapper.classList.remove('hidden');
-        this.elements.explanationContainer.classList.add('hidden');
-        this.elements.correctionPanel.classList.add('hidden');
-        this.elements.feedbackContainer.classList.remove('hidden');
-        this._resetFeedbackButtons();
-        if (this.state.config.autoHighlight) this._sendMessageToContentScript({ action: 'highlight-answer', text: [answerText] });
-        if (!fromCache && this.state.cacheKey) chrome.storage.local.set({ [this.state.cacheKey]: { answerHTML: fullText, totalTokenCount } });
-        this._saveCurrentViewState();
-        if (!fromCache) this._saveToHistory({ cleanedContent: this.state.cleanedContent, answerHTML: fullText }, 'quiz');
-    }
-
-    _handleExplanationResult(fullText, fromCache = false) {
-        this.state.explanationHTML = fullText;
-        this.elements.explanationDisplay.innerHTML = marked.parse(fullText);
-        this.elements.copyExplanation.dataset.copyText = fullText;
-        this.elements.explanationButton.disabled = false; this.elements.retryExplanation.disabled = false;
-        this.elements.explanationContainer.classList.remove('hidden');
-        this._saveCurrentViewState();
-        if (!fromCache) this._saveToHistory({ ...this.state }, 'explanation');
-    }
-
+    _handleFeedbackCorrect() { this.elements.feedbackCorrect.disabled = true; this.elements.feedbackIncorrect.disabled = true; this.elements.feedbackCorrect.classList.add('selected-correct'); }
+    async _handleFeedbackIncorrect() { this.elements.feedbackIncorrect.disabled = true; this.elements.feedbackCorrect.disabled = true; this.elements.feedbackIncorrect.classList.add('selected-incorrect'); this.elements.aiActionsWrapper.classList.add('hidden'); this.elements.correctionPanel.classList.remove('hidden'); this.elements.correctionOptions.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Fetching options...</p></div>`; try { const response = await this._sendMessageToContentScript({ action: "get_quiz_options" }); if (response?.options?.length > 0) this._renderCorrectionOptions(response.options); else this.elements.correctionOptions.innerHTML = '<p class="text-center">Could not find options on page.</p>'; } catch (e) { this.elements.correctionOptions.innerHTML = `<p class="text-center">Error fetching options: ${e.message}</p>`; } }
+    _callGeminiStream(purpose, userContent, base64ImageData = null) { const { promptProfiles, activeProfile, selectedModel, geminiApiKey } = this.state.config; const currentPrompts = (promptProfiles?.[activeProfile]) || DEFAULT_PROMPTS; let systemPrompt = currentPrompts[purpose] || DEFAULT_PROMPTS[purpose]; if (purpose.startsWith('rephrase-')) { const language = purpose.split('-')[1]; systemPrompt = currentPrompts.rephrase || DEFAULT_PROMPTS.rephrase; userContent = `Target Language: ${language}\n\nText to rephrase:\n${userContent}`; } chrome.runtime.sendMessage({ action: 'callGeminiStream', payload: { apiKey: geminiApiKey, model: selectedModel, systemPrompt, userContent, base64ImageData, purpose } }); }
+    _getAnswer() { if (!this.state.cleanedContent) return; const fingerprint = this._createQuizFingerprint(this.state.cleanedContent); this.state.cacheKey = fingerprint ? this._simpleHash(fingerprint) : null; if (this.state.cacheKey) { chrome.storage.local.get(this.state.cacheKey).then(cachedResult => { if (cachedResult[this.state.cacheKey]?.answerHTML) { this._handleAnswerResult(cachedResult[this.state.cacheKey].answerHTML, true, cachedResult[this.state.cacheKey].totalTokenCount); return; } this._continueGetAnswer(); }); } else this._continueGetAnswer(); }
+    _continueGetAnswer() { this.elements.retryAnswer.disabled = true; this.elements.answerDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`; this._callGeminiStream('answer', this.state.cleanedContent); }
+    _getExplanation() { if (!this.state.cleanedContent) return; this.elements.explanationButton.disabled = true; this.elements.retryExplanation.disabled = true; this.elements.explanationContainer.classList.remove('hidden'); this.elements.explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`; const contentForExplanation = `${this.state.cleanedContent}\n\nCorrect Answer: ${this.state.incorrectAnswer}`; this._callGeminiStream('explanation', contentForExplanation); }
+    _handleStreamUpdate(request) { const { payload, purpose } = request; if (!payload.success) { this.state.view = 'error'; this.state.error = payload.error; this.render(); return; } if (payload.done) { const fullText = payload.fullText || this.streamAccumulator[purpose] || ''; delete this.streamAccumulator[purpose]; const purposeHandlers = { 'cleaning': (text) => this._handleCleaningResult(text), 'answer': (text) => this._handleAnswerResult(text, false, payload.totalTokenCount), 'explanation': (text) => this._handleExplanationResult(text, false), 'correction': (text) => this._handleCorrectionResult(text), 'summarize': (text) => this._handleContextMenuResult(text, purpose), 'pageAnalysis': (text) => this._handlePageAnalysisResult(text), }; if (purposeHandlers[purpose]) purposeHandlers[purpose](fullText); else if (purpose.startsWith('rephrase-')) this._handleContextMenuResult(fullText, purpose); } else if (payload.chunk) { this.streamAccumulator[purpose] = (this.streamAccumulator[purpose] || '') + payload.chunk; } }
+    _handlePageAnalysisResult(text) { let parsed = false; try { const jsonMatch = text.match(/{[\s\S]*}/); if (jsonMatch) { const jsonData = JSON.parse(jsonMatch[0]); this._renderPageSummary(jsonData); parsed = true; } } catch (e) { console.warn("JSON parse failed, falling back.", e); } if (!parsed) this._renderPageSummary(text, true); }
+    _handleCleaningResult(fullText) { this.state.cleanedContent = fullText; this.state.view = 'quiz'; this.render(); this._saveCurrentViewState(); }
+    _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0) { this.state.answerHTML = fullText; this.state.totalTokenCount = totalTokenCount; const answerMatch = fullText.match(/Answer:(.*?)(Confidence:|Reason:|$)/is); let answerText = (answerMatch ? answerMatch[1].trim() : fullText.trim()).replace(/`/g, ''); this.state.incorrectAnswer = answerText; let formattedHtml = `<p class="answer-highlight">${_escapeHtml(answerText).replace(/\n/g, '<br>')}</p>`; const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i); if (confidenceMatch) { const confidence = confidenceMatch[1].toLowerCase(); const reason = fullText.match(/Reason:(.*)/is)?.[1].trim() || ""; formattedHtml += `<div class="confidence-wrapper"><div class="confidence-level"><span class="confidence-level-label">Confidence ${fromCache ? '<span>⚡️ Cached</span>' : ''}</span><span class="confidence-badge confidence-${confidence}">${confidence[0].toUpperCase() + confidence.slice(1)}</span></div>${reason ? `<div class="confidence-reason">${_escapeHtml(reason)}</div>` : ''}</div>`; } if (totalTokenCount > 0) formattedHtml += `<div class="token-count"><span class="token-count-label">Tokens Used</span><span class="token-count-value">${totalTokenCount}</span></div>`; this.elements.answerDisplay.innerHTML = formattedHtml; this.elements.copyAnswer.dataset.copyText = answerText; this.elements.retryAnswer.disabled = false; this.elements.aiActionsWrapper.classList.remove('hidden'); this.elements.explanationContainer.classList.add('hidden'); this.elements.correctionPanel.classList.add('hidden'); this.elements.feedbackContainer.classList.remove('hidden'); this._resetFeedbackButtons(); if (this.state.config.autoHighlight) this._sendMessageToContentScript({ action: 'highlight-answer', text: [answerText] }); if (!fromCache && this.state.cacheKey) chrome.storage.local.set({ [this.state.cacheKey]: { answerHTML: fullText, totalTokenCount } }); this._saveCurrentViewState(); if (!fromCache) this._saveToHistory({ cleanedContent: this.state.cleanedContent, answerHTML: fullText }, 'quiz'); }
+    _handleExplanationResult(fullText, fromCache = false) { this.state.explanationHTML = fullText; this.elements.explanationDisplay.innerHTML = DOMPurify.sanitize(marked.parse(fullText)); this.elements.copyExplanation.dataset.copyText = fullText; this.elements.explanationButton.disabled = false; this.elements.retryExplanation.disabled = false; this.elements.explanationContainer.classList.remove('hidden'); this._saveCurrentViewState(); if (!fromCache) this._saveToHistory({ ...this.state }, 'explanation'); }
     _handleCorrectionResult(fullText) { this._handleExplanationResult(fullText, false); }
-
-    _handleContextMenuResult(fullText, purpose) {
-        this.state.view = 'quiz';
-        this.state.answerHTML = fullText;
-        this.render();
-        this.elements.answerDisplay.innerHTML = marked.parse(fullText);
-        this.elements.copyAnswer.dataset.copyText = fullText;
-        this.elements.aiActionsWrapper.classList.add('hidden');
-        this.elements.explanationContainer.classList.add('hidden');
-        this.elements.feedbackContainer.classList.add('hidden');
-        const historyActionType = purpose.split('-')[0];
-        this._saveToHistory({ cleanedContent: this.state.originalUserContent, answerHTML: fullText }, historyActionType);
-        this._saveCurrentViewState();
-    }
-
-    _renderPageSummary(data, isFallback = false) {
-        this.state.view = 'summary';
-        let summaryHtml;
-        if (isFallback) {
-            this.state.summaryData = data;
-            summaryHtml = `<div class="summary-section"><h3 class="summary-section-title">General Summary</h3><div class="card-body">${marked.parse(data)}</div></div>`;
-        } else {
-            this.state.summaryData = data;
-            const tldrHtml = data.tldr ? `<div class="summary-section summary-tldr"><h3 class="summary-section-title">TL;DR</h3><p>${this._escapeHtml(data.tldr)}</p></div>` : '';
-            const takeawaysHtml = (data.takeaways?.length > 0) ? `<div class="summary-section summary-takeaways"><h3 class="summary-section-title">Key Takeaways</h3><ul>${data.takeaways.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ul></div>` : '';
-            const renderEntities = (entities, label) => (entities?.length > 0) ? `<div class="entity-group"><span class="entity-label">${label}</span><div class="entity-tags">${entities.map(e => `<span class="entity-tag">${this._escapeHtml(e)}</span>`).join('')}</div></div>` : '';
-            const entitiesHtml = (data.entities && (Object.values(data.entities).some(arr => arr.length > 0))) ? `<div class="summary-section summary-entities"><h3 class="summary-section-title">Entities Mentioned</h3>${renderEntities(data.entities.people, 'People')}${renderEntities(data.entities.organizations, 'Organizations')}${renderEntities(data.entities.locations, 'Locations')}</div>` : '';
-            summaryHtml = tldrHtml + takeawaysHtml + entitiesHtml;
-        }
-        this.elements.pageSummaryContainer.innerHTML = summaryHtml;
-        this.render();
-        this._saveCurrentViewState();
-    }
-
-    _renderCorrectionOptions(options) {
-        this.elements.correctionOptions.innerHTML = '';
-        options.forEach(optionText => {
-            const button = document.createElement('button');
-            button.className = 'correction-option-button';
-            button.innerHTML = this._escapeHtml(optionText);
-            button.addEventListener('click', () => {
-                const correctionContent = `The original quiz content was:\n${this.state.cleanedContent}\n\nMy previous incorrect answer was: \`${this.state.incorrectAnswer}\`\n\nThe user has indicated the correct answer is: \`${optionText}\``;
-                this.elements.correctionPanel.classList.add('hidden');
-                this.elements.explanationContainer.classList.remove('hidden');
-                this.elements.explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div><p>Generating corrected explanation...</p></div>`;
-                this._callGeminiStream('correction', correctionContent);
-            });
-            this.elements.correctionOptions.appendChild(button);
-        });
-    }
-
-    _resetFeedbackButtons() {
-        this.elements.feedbackCorrect.disabled = false; this.elements.feedbackIncorrect.disabled = false;
-        this.elements.feedbackCorrect.classList.remove('selected-correct');
-        this.elements.feedbackIncorrect.classList.remove('selected-incorrect');
-    }
-    
-    _copyToClipboard(button) {
-        const textToCopy = button.dataset.copyText;
-        if (textToCopy) navigator.clipboard.writeText(textToCopy).then(() => {
-            const originalTitle = button.title; button.title = 'Copied!'; button.classList.add('copied');
-            setTimeout(() => { button.classList.remove('copied'); button.title = originalTitle; }, 1500);
-        });
-    }
-
+    _handleContextMenuResult(fullText, purpose) { this.state.view = 'quiz'; this.state.answerHTML = fullText; this.render(); this.elements.answerDisplay.innerHTML = DOMPurify.sanitize(marked.parse(fullText)); this.elements.copyAnswer.dataset.copyText = fullText; this.elements.aiActionsWrapper.classList.add('hidden'); this.elements.explanationContainer.classList.add('hidden'); this.elements.feedbackContainer.classList.add('hidden'); const historyActionType = purpose.split('-')[0]; this._saveToHistory({ cleanedContent: this.state.originalUserContent, answerHTML: fullText }, historyActionType); this._saveCurrentViewState(); }
+    _renderPageSummary(data, isFallback = false) { this.state.view = 'summary'; let summaryHtml; if (isFallback) { this.state.summaryData = data; summaryHtml = `<div class="summary-section"><h3 class="summary-section-title">General Summary</h3><div class="card-body">${DOMPurify.sanitize(marked.parse(data))}</div></div>`; } else { this.state.summaryData = data; const tldrHtml = data.tldr ? `<div class="summary-section summary-tldr"><h3 class="summary-section-title">TL;DR</h3><p>${_escapeHtml(data.tldr)}</p></div>` : ''; const takeawaysHtml = (data.takeaways?.length > 0) ? `<div class="summary-section summary-takeaways"><h3 class="summary-section-title">Key Takeaways</h3><ul>${data.takeaways.map(item => `<li>${_escapeHtml(item)}</li>`).join('')}</ul></div>` : ''; const renderEntities = (entities, label) => (entities?.length > 0) ? `<div class="entity-group"><span class="entity-label">${label}</span><div class="entity-tags">${entities.map(e => `<span class="entity-tag">${_escapeHtml(e)}</span>`).join('')}</div></div>` : ''; const entitiesHtml = (data.entities && (Object.values(data.entities).some(arr => arr.length > 0))) ? `<div class="summary-section summary-entities"><h3 class="summary-section-title">Entities Mentioned</h3>${renderEntities(data.entities.people, 'People')}${renderEntities(data.entities.organizations, 'Organizations')}${renderEntities(data.entities.locations, 'Locations')}</div>` : ''; summaryHtml = tldrHtml + takeawaysHtml + entitiesHtml; } this.elements.pageSummaryContainer.innerHTML = summaryHtml; this.render(); this._saveCurrentViewState(); }
+    _renderCorrectionOptions(options) { this.elements.correctionOptions.innerHTML = ''; options.forEach(optionText => { const button = document.createElement('button'); button.className = 'correction-option-button'; button.innerHTML = _escapeHtml(optionText); button.addEventListener('click', () => { const correctionContent = `The original quiz content was:\n${this.state.cleanedContent}\n\nMy previous incorrect answer was: \`${this.state.incorrectAnswer}\`\n\nThe user has indicated the correct answer is: \`${optionText}\``; this.elements.correctionPanel.classList.add('hidden'); this.elements.explanationContainer.classList.remove('hidden'); this.elements.explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div><p>Generating corrected explanation...</p></div>`; this._callGeminiStream('correction', correctionContent); }); this.elements.correctionOptions.appendChild(button); }); }
+    _resetFeedbackButtons() { this.elements.feedbackCorrect.disabled = false; this.elements.feedbackIncorrect.disabled = false; this.elements.feedbackCorrect.classList.remove('selected-correct'); this.elements.feedbackIncorrect.classList.remove('selected-incorrect'); }
+    _copyToClipboard(button) { const textToCopy = button.dataset.copyText; if (textToCopy) navigator.clipboard.writeText(textToCopy).then(() => { const originalTitle = button.title; button.title = 'Copied!'; button.classList.add('copied'); setTimeout(() => { button.classList.remove('copied'); button.title = originalTitle; }, 1500); }); }
     _getPersistedState() { return this.state.tab ? chrome.storage.local.get(this.state.tab.id.toString()).then(r => r[this.state.tab.id.toString()] || null) : Promise.resolve(null); }
     _clearPersistedState() { return this.state.tab ? chrome.storage.local.remove(this.state.tab.id.toString()) : Promise.resolve(); }
-    
-    _saveCurrentViewState() {
-        if (!this.state.tab) return;
-        const key = this.state.tab.id.toString();
-        chrome.storage.local.set({ [key]: {
-            lastView: this.state.view, cleanedContent: this.state.cleanedContent,
-            originalUserContent: this.state.originalUserContent, answerHTML: this.state.answerHTML,
-            explanationHTML: this.state.explanationHTML, summaryData: this.state.summaryData,
-            totalTokenCount: this.state.totalTokenCount, incorrectAnswer: this.state.incorrectAnswer,
-        }});
-    }
-
-    async _saveToHistory(stateData, actionType) {
-        if (!this.state.tab) return;
-        const { history = [] } = await chrome.storage.local.get('history');
-        const newEntry = { ...stateData, id: Date.now(), url: this.state.tab.url, title: this.state.tab.title, timestamp: new Date().toISOString(), actionType };
-        history.unshift(newEntry);
-        if (history.length > 100) history.pop();
-        await chrome.storage.local.set({ history });
-    }
-    
-    async _injectScripts() {
-        try {
-            await chrome.scripting.executeScript({
-                target: { tabId: this.state.tab.id },
-                files: ['js/vendor/marked.min.js', 'js/mark.min.js', 'js/content.js']
-            });
-            // HANDSHAKE: Wait for content script to be ready
-            await this._pingContentScriptWithRetry(3, 200);
-        } catch (e) {
-            console.warn("Content script injection/ping failed. This is expected on some pages.", e);
-            throw new Error("Could not communicate with the page.");
-        }
-    }
-
-    _pingContentScriptWithRetry(retries, delay) {
-        return new Promise((resolve, reject) => {
-            const attempt = (n) => {
-                this._sendMessageToContentScript({ action: "ping_content_script" }, 500)
-                    .then(resolve)
-                    .catch(err => {
-                        if (n > 0) {
-                            console.warn(`Content script ping failed. Retrying in ${delay}ms... (${n} retries left)`);
-                            setTimeout(() => attempt(n - 1), delay);
-                        } else {
-                            reject(err);
-                        }
-                    });
-            };
-            attempt(retries);
-        });
-    }
-
-    _sendMessageToContentScript(message, timeout = 5000) {
-        return new Promise((resolve, reject) => {
-            if (!this.state.tab || this.state.tab.id === undefined) {
-                return reject(new Error("Invalid tab for sending message."));
-            }
-            const timer = setTimeout(() => reject(new Error('Content script did not respond in time.')), timeout);
-            chrome.tabs.sendMessage(this.state.tab.id, message, (response) => {
-                if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError.message || 'Failed to communicate with content script.'));
-                } else {
-                    clearTimeout(timer);
-                    resolve(response);
-                }
-            });
-        });
-    }
-
-    _escapeHtml(unsafe) { if (typeof unsafe !== 'string') return ''; return unsafe.replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
-    _formatQuestionContent(content) {
-        if (!content) return '';
-        if (!content.toLowerCase().includes('question:') || !content.toLowerCase().includes('options:')) return `<div class="question-text">${this._escapeHtml(content)}</div>`;
-        const lines = content.split('\n').filter(line => line.trim() !== '');
-        if (lines.length === 0) return `<div class="question-text">${this._escapeHtml(content)}</div>`;
-        const question = this._escapeHtml(lines.shift().replace(/^Question:\s*/i, ''));
-        const optionsHtml = lines.map(option => `<li>${this._escapeHtml(option.trim().replace(/^[\*\-•]\s*Options:\s*|^\s*[\*\-]\s*/, ''))}</li>`).join('');
-        return `<div class="question-text">${question}</div><ul>${optionsHtml}</ul>`;
+    _saveCurrentViewState() { if (!this.state.tab) return; const key = this.state.tab.id.toString(); chrome.storage.local.set({ [key]: { lastView: this.state.view, url: this.state.url, cleanedContent: this.state.cleanedContent, originalUserContent: this.state.originalUserContent, answerHTML: this.state.answerHTML, explanationHTML: this.state.explanationHTML, summaryData: this.state.summaryData, totalTokenCount: this.state.totalTokenCount, incorrectAnswer: this.state.incorrectAnswer, } }); }
+    async _saveToHistory(stateData, actionType) { if (!this.state.tab) return; const { history = [] } = await chrome.storage.local.get('history'); const newEntry = { ...stateData, id: Date.now(), url: this.state.tab.url, title: this.state.tab.title, timestamp: new Date().toISOString(), actionType }; history.unshift(newEntry); if (history.length > 100) history.pop(); await chrome.storage.local.set({ history }); }
+    async _injectScripts() { try { await chrome.scripting.executeScript({ target: { tabId: this.state.tab.id }, files: ['js/vendor/dompurify.min.js', 'js/utils.js', 'js/vendor/marked.min.js', 'js/mark.min.js', 'js/content.js'] }); await this._pingContentScriptWithRetry(3, 200); } catch (e) { console.warn("Content script injection/ping failed.", e); throw new Error("Could not communicate with the page."); } }
+    _pingContentScriptWithRetry(retries, delay) { return new Promise((resolve, reject) => { const attempt = (n) => { this._sendMessageToContentScript({ action: "ping_content_script" }, 500).then(resolve).catch(err => { if (n > 0) { setTimeout(() => attempt(n - 1), delay); } else { reject(err); } }); }; attempt(retries); }); }
+    _sendMessageToContentScript(message, timeout = 5000) { return new Promise((resolve, reject) => { if (!this.state.tab || this.state.tab.id === undefined) return reject(new Error("Invalid tab ID.")); const timer = setTimeout(() => reject(new Error('Content script timeout.')), timeout); chrome.tabs.sendMessage(this.state.tab.id, message, (response) => { clearTimeout(timer); if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message)); else resolve(response); }); }); }
+    _formatQuestionContent(content) { if(!content) return ''; if(!content.toLowerCase().includes('question:') || !content.toLowerCase().includes('options:')) return `<div class="question-text">${_escapeHtml(content)}</div>`; const lines = content.split('\n').filter(line => line.trim() !== ''); if (lines.length === 0) return `<div class="question-text">${_escapeHtml(content)}</div>`; const question = _escapeHtml(lines.shift().replace(/^Question:\s*/i, '')); const optionsHtml = lines.map(option => `<li>${_escapeHtml(option.trim().replace(/^[\*\-•]\s*Options:\s*|^\s*[\*\-]\s*/, ''))}</li>`).join(''); return `<div class="question-text">${question}</div><ul>${optionsHtml}</ul>`;
     }
     _createQuizFingerprint(cleanedContent) { if (!cleanedContent) return null; const lines = cleanedContent.split('\n').map(l => l.trim()).filter(l => l); return lines.length < 2 ? null : lines.map(l => l.toLowerCase().replace(/\s+/g, ' ').trim()).join('\n'); }
     _simpleHash(str) { let hash = 0; for (let i = 0; i < str.length; i++) { hash = ((hash << 5) - hash) + str.charCodeAt(i); hash |= 0; } return 'cache_' + new Uint32Array([hash])[0].toString(16); }
 }
 
-if (typeof marked !== 'undefined') marked.setOptions({ sanitize: true });
 document.addEventListener('DOMContentLoaded', () => { new PopupApp().init(); });
