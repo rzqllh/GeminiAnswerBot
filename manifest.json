@@ -31,7 +31,9 @@
       "resources": [
         "assets/highlighter.css",
         "assets/dialog.css",
-        "assets/toolbar.css"
+        "assets/toolbar.css",
+        "js/vendor/dompurify.min.js",
+        "js/utils.js"
       ],
       "matches": [
         "<all_urls>"
