@@ -91,7 +91,8 @@ class PopupApp {
             this.state.config = await chrome.storage.sync.get(null);
             if (!this.state.config.geminiApiKey) throw { type: 'INVALID_API_KEY', message: 'API Key not set.' };
 
-            await this._injectScripts();
+            // Ensure content script is ready before proceeding
+            await this._pingContentScriptWithRetry(3, 200);
 
             const contextKey = `context_action_${tab.id}`;
             const contextData = (await chrome.storage.local.get(contextKey))[contextKey];
@@ -116,7 +117,7 @@ class PopupApp {
                     const response = await this._sendMessageToContentScript({ action: "get_quiz_content" });
                     if (!response || !response.content?.trim()) throw new Error("No readable quiz content found.");
 
-                    this.state.url = response.url; // Store the URL from the content script
+                    this.state.url = this.state.tab.url; // Store the current URL
                     this.state.originalUserContent = response.content;
                     this._callGeminiStream('cleaning', response.content);
                 }
@@ -203,14 +204,12 @@ class PopupApp {
         try {
             const response = await this._sendMessageToContentScript({ action: "get_full_page_content" });
             if (!response || !response.content?.trim()) throw new Error("No significant text content for analysis.");
-            this.state.url = response.url; // Store URL for persistence
+            this.state.url = this.state.tab.url; // Store URL for persistence
             this._callGeminiStream('pageAnalysis', response.content);
         } catch (e) {
             this.state.view = 'error'; this.state.error = e; this.render();
         }
     }
-
-    // Other methods remain the same...
 
     _handleFeedbackCorrect() { this.elements.feedbackCorrect.disabled = true; this.elements.feedbackIncorrect.disabled = true; this.elements.feedbackCorrect.classList.add('selected-correct'); }
     async _handleFeedbackIncorrect() { this.elements.feedbackIncorrect.disabled = true; this.elements.feedbackCorrect.disabled = true; this.elements.feedbackIncorrect.classList.add('selected-incorrect'); this.elements.aiActionsWrapper.classList.add('hidden'); this.elements.correctionPanel.classList.remove('hidden'); this.elements.correctionOptions.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Fetching options...</p></div>`; try { const response = await this._sendMessageToContentScript({ action: "get_quiz_options" }); if (response?.options?.length > 0) this._renderCorrectionOptions(response.options); else this.elements.correctionOptions.innerHTML = '<p class="text-center">Could not find options on page.</p>'; } catch (e) { this.elements.correctionOptions.innerHTML = `<p class="text-center">Error fetching options: ${e.message}</p>`; } }
@@ -233,8 +232,7 @@ class PopupApp {
     _clearPersistedState() { return this.state.tab ? chrome.storage.local.remove(this.state.tab.id.toString()) : Promise.resolve(); }
     _saveCurrentViewState() { if (!this.state.tab) return; const key = this.state.tab.id.toString(); chrome.storage.local.set({ [key]: { lastView: this.state.view, url: this.state.url, cleanedContent: this.state.cleanedContent, originalUserContent: this.state.originalUserContent, answerHTML: this.state.answerHTML, explanationHTML: this.state.explanationHTML, summaryData: this.state.summaryData, totalTokenCount: this.state.totalTokenCount, incorrectAnswer: this.state.incorrectAnswer, } }); }
     async _saveToHistory(stateData, actionType) { if (!this.state.tab) return; const { history = [] } = await chrome.storage.local.get('history'); const newEntry = { ...stateData, id: Date.now(), url: this.state.tab.url, title: this.state.tab.title, timestamp: new Date().toISOString(), actionType }; history.unshift(newEntry); if (history.length > 100) history.pop(); await chrome.storage.local.set({ history }); }
-    async _injectScripts() { try { await chrome.scripting.executeScript({ target: { tabId: this.state.tab.id }, files: ['js/vendor/dompurify.min.js', 'js/utils.js', 'js/vendor/marked.min.js', 'js/mark.min.js', 'js/content.js'] }); await this._pingContentScriptWithRetry(3, 200); } catch (e) { console.warn("Content script injection/ping failed.", e); throw new Error("Could not communicate with the page."); } }
-    _pingContentScriptWithRetry(retries, delay) { return new Promise((resolve, reject) => { const attempt = (n) => { this._sendMessageToContentScript({ action: "ping_content_script" }, 500).then(resolve).catch(err => { if (n > 0) { setTimeout(() => attempt(n - 1), delay); } else { reject(err); } }); }; attempt(retries); }); }
+    _pingContentScriptWithRetry(retries, delay) { return new Promise((resolve, reject) => { const attempt = (n) => { this._sendMessageToContentScript({ action: "ping_content_script" }, 500).then(resolve).catch(err => { if (n > 0) { setTimeout(() => attempt(n - 1), delay); } else { reject(new Error("Could not communicate with the page. Please reload the page and try again.")); } }); }; attempt(retries); }); }
     _sendMessageToContentScript(message, timeout = 5000) { return new Promise((resolve, reject) => { if (!this.state.tab || this.state.tab.id === undefined) return reject(new Error("Invalid tab ID.")); const timer = setTimeout(() => reject(new Error('Content script timeout.')), timeout); chrome.tabs.sendMessage(this.state.tab.id, message, (response) => { clearTimeout(timer); if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message)); else resolve(response); }); }); }
     _formatQuestionContent(content) { if(!content) return ''; if(!content.toLowerCase().includes('question:') || !content.toLowerCase().includes('options:')) return `<div class="question-text">${_escapeHtml(content)}</div>`; const lines = content.split('\n').filter(line => line.trim() !== ''); if (lines.length === 0) return `<div class="question-text">${_escapeHtml(content)}</div>`; const question = _escapeHtml(lines.shift().replace(/^Question:\s*/i, '')); const optionsHtml = lines.map(option => `<li>${_escapeHtml(option.trim().replace(/^[\*\-•]\s*Options:\s*|^\s*[\*\-]\s*/, ''))}</li>`).join(''); return `<div class="question-text">${question}</div><ul>${optionsHtml}</ul>`;
     }
