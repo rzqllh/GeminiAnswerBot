@@ -33,7 +33,10 @@
         "assets/dialog.css",
         "assets/toolbar.css",
         "js/vendor/dompurify.min.js",
-        "js/utils.js"
+        "js/utils.js",
+        "js/vendor/marked.min.js",
+        "js/mark.min.js",
+        "js/content.js"
       ],
       "matches": [
         "<all_urls>"
