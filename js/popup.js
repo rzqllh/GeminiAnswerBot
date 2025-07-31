@@ -451,11 +451,18 @@ class PopupApp {
         this.elements.feedbackContainer.classList.remove('hidden');
         this._resetFeedbackButtons();
         
-        if (this.state.config.autoHighlight) this._sendMessageToContentScript({ action: 'highlight-answer', text: [answerText] });
-        if (!fromCache && this.state.cacheKey) chrome.storage.local.set({ [this.state.cacheKey]: { answerHTML: fullText, totalTokenCount } });
+        if (this.state.config.autoHighlight) {
+            this._sendMessageToContentScript({ action: 'highlight-answer', text: [answerText] })
+                .catch(err => console.warn('Could not highlight answer on page:', err.message));
+        }
+        if (!fromCache && this.state.cacheKey) {
+            chrome.storage.local.set({ [this.state.cacheKey]: { answerHTML: fullText, totalTokenCount } });
+        }
         
         this._saveCurrentViewState();
-        if (!fromCache) this._saveToHistory({ cleanedContent: this.state.cleanedContent, answerHTML: fullText }, 'quiz');
+        if (!fromCache) {
+            this._saveToHistory({ cleanedContent: this.state.cleanedContent, answerHTML: fullText }, 'quiz');
+        }
     }
 
     _handleExplanationResult(fullText, fromCache = false) { this.state.explanationHTML = fullText; this.elements.explanationDisplay.innerHTML = DOMPurify.sanitize(marked.parse(fullText)); this.elements.copyExplanation.dataset.copyText = fullText; this.elements.explanationButton.disabled = false; this.elements.retryExplanation.disabled = false; this.elements.explanationContainer.classList.remove('hidden'); this._saveCurrentViewState(); if (!fromCache) this._saveToHistory({ ...this.state }, 'explanation'); }
@@ -484,4 +491,10 @@ class PopupApp {
     _simpleHash(str) { let hash = 0; for (let i = 0; i < str.length; i++) { hash = ((hash << 5) - hash) + str.charCodeAt(i); hash |= 0; } return 'cache_' + new Uint32Array([hash])[0].toString(16); }
 }
 
-document.addEventListener('DOMContentLoaded', () => { new PopupApp().init(); });
+document.addEventListener('DOMContentLoaded', () => {
+    new PopupApp().init().catch(err => {
+        // This is a global failsafe for any unhandled rejection during init.
+        console.error("Critical initialization error:", err);
+        // Optionally, render a failsafe error message here.
+    });
+});
