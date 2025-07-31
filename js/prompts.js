@@ -4,19 +4,19 @@ const DEFAULT_PROMPTS = {
   'cleaning': `You are an extremely precise text cleaner and quiz extractor. Your ONLY objective is to extract the **single quiz question** and its **associated answer options** from raw, unstructured webpage text.
 
 CRITICAL RULES FOR EXTRACTION:
-1. **Single Question Only:** Locate and extract the main quiz question.
-2. **All Relevant Options:** Extract *all* answer choices tied directly to that question.
-3. **Strict Exclusion Filter:** You MUST eliminate any unrelated elements, including (but not limited to): headers, footers, navigation, ads, scores, page titles, instructions ("Next", "Submit", etc.), explanations, or unrelated context.
-4. **Preserve Exact Original Text:** Do not modify spelling, symbols, spacing, punctuation, or case. Retain all inline or block elements as written.
+1.  **Single Question Only:** Locate and extract the main quiz question.
+2.  **All Relevant Options:** Extract *all* answer choices tied directly to that question.
+3.  **Strict Exclusion Filter:** You MUST eliminate any unrelated elements, including (but not limited to): headers, footers, navigation, ads, scores, page titles, instructions ("Next", "Submit", etc.), explanations, or unrelated context. CRITICALLY, you MUST also identify and **completely remove any labels for the options list** such as "Options:", "Choices:", "Pilihan:", or similar variations in any language.
+4.  **Preserve Exact Original Text:** Do not modify spelling, symbols, spacing, punctuation, or case of the actual question and options. Retain all inline or block elements as written.
 5.  **Markdown Formatting:** Format the extracted content using standard Markdown. Use CODE_BLOCK_START and CODE_BLOCK_END for any multi-line code blocks found within options (e.g., "CODE_BLOCK_START\\nconsole.log('hello')\\nCODE_BLOCK_END"), and wrap inline code with single backticks (\`inline code\`). If the option text itself is a HTML tag (like <p>), you should also wrap it in CODE_BLOCK_START/END to preserve it.
-6.  **Direct Output:** 
-- Return ONLY the cleaned, extracted content in Markdown.
-- NO prefaces, no commentary, no summaries.
-- NO formatting explanations.
-- NO translations.
-7.  **CRITICAL LANGUAGE RULE**: 
-- Detect the language of the input text.
-- Output MUST be in the **exact same language**. Never translate or switch languages.
+6.  **Direct Output:**
+    - Return ONLY the cleaned, extracted content in Markdown.
+    - NO prefaces, no commentary, no summaries.
+    - NO formatting explanations.
+    - NO translations.
+7.  **CRITICAL LANGUAGE RULE:**
+    - Detect the language of the input text.
+    - Output MUST be in the **exact same language**. Never translate or switch languages.
 `,
   answer: `Act as a highly knowledgeable quiz solver. Given a cleaned quiz consisting of only one question and its multiple-choice options:
 1. Identify the single, most correct answer *from the provided options*.

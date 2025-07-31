@@ -81,6 +81,38 @@ class PopupApp {
         }
     }
 
+    /**
+     * Injects content scripts and CSS into the active tab if they haven't been already.
+     * This is a core performance optimization.
+     * @param {number} tabId - The ID of the tab to inject scripts into.
+     * @returns {Promise<void>}
+     */
+    async _injectContentScripts(tabId) {
+        try {
+            await Promise.all([
+                chrome.scripting.insertCSS({
+                    target: { tabId },
+                    files: ['assets/highlighter.css', 'assets/dialog.css', 'assets/toolbar.css'],
+                }),
+                chrome.scripting.executeScript({
+                    target: { tabId },
+                    files: [
+                        'js/utils.js',
+                        'js/vendor/dompurify.min.js',
+                        'js/vendor/marked.min.js',
+                        'js/vendor/mark.min.js',
+                        'js/content.js'
+                    ],
+                })
+            ]);
+        } catch (error) {
+            // This can happen on special pages (e.g., chrome://) or if the page has a strict CSP.
+            console.error(`Failed to inject content scripts into tab ${tabId}:`, error);
+            // The error will be caught in the main init block, which will render an appropriate message.
+            throw new Error('Script injection failed. This page may not be supported.');
+        }
+    }
+
     async init() {
         chrome.runtime.onMessage.addListener(this._messageHandler);
 
@@ -95,7 +127,9 @@ class PopupApp {
 
             this.state.config = await chrome.storage.sync.get(null);
             if (!this.state.config.geminiApiKey) throw { type: 'INVALID_API_KEY', message: 'API Key not set.' };
-
+            
+            // Programmatically inject scripts and wait for them to be ready.
+            await this._injectContentScripts(tab.id);
             await this._pingContentScriptWithRetry(3, 200);
 
             const contextKey = `context_action_${tab.id}`;
@@ -383,8 +417,27 @@ class PopupApp {
     async _saveToHistory(stateData, actionType) { if (!this.state.tab) return; const { history = [] } = await chrome.storage.local.get('history'); const newEntry = { ...stateData, id: Date.now(), url: this.state.tab.url, title: this.state.tab.title, timestamp: new Date().toISOString(), actionType }; history.unshift(newEntry); if (history.length > 100) history.pop(); await chrome.storage.local.set({ history }); }
     _pingContentScriptWithRetry(retries, delay) { return new Promise((resolve, reject) => { const attempt = (n) => { this._sendMessageToContentScript({ action: "ping_content_script" }, 500).then(resolve).catch(err => { if (n > 0) { setTimeout(() => attempt(n - 1), delay); } else { reject(new Error("Could not communicate with the page. Please reload the page and try again.")); } }); }; attempt(retries); }); }
     _sendMessageToContentScript(message, timeout = 5000) { return new Promise((resolve, reject) => { if (!this.state.tab || this.state.tab.id === undefined) return reject(new Error("Invalid tab ID.")); const timer = setTimeout(() => reject(new Error('Content script timeout.')), timeout); chrome.tabs.sendMessage(this.state.tab.id, message, (response) => { clearTimeout(timer); if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message)); else resolve(response); }); }); }
-    _formatQuestionContent(content) { if(!content) return ''; if(!content.toLowerCase().includes('question:') || !content.toLowerCase().includes('options:')) return `<div class="question-text">${_escapeHtml(content)}</div>`; const lines = content.split('\n').filter(line => line.trim() !== ''); if (lines.length === 0) return `<div class="question-text">${_escapeHtml(content)}</div>`; const question = _escapeHtml(lines.shift().replace(/^Question:\s*/i, '')); const optionsHtml = lines.map(option => `<li>${_escapeHtml(option.trim().replace(/^[\*\-•]\s*Options:\s*|^\s*[\*\-]\s*/, ''))}</li>`).join(''); return `<div class="question-text">${question}</div><ul>${optionsHtml}</ul>`;
+    
+    _formatQuestionContent(content) {
+        if(!content) return '';
+        if(!content.toLowerCase().includes('question:') || !content.toLowerCase().includes('options:')) return `<div class="question-text">${_escapeHtml(content)}</div>`;
+
+        const lines = content.split('\n').filter(line => line.trim() !== '');
+        if (lines.length === 0) return `<div class="question-text">${_escapeHtml(content)}</div>`;
+
+        const question = _escapeHtml(lines.shift().replace(/^Question:\s*/i, ''));
+        
+        // Safety net: Filter out any lines that are just option labels.
+        const optionLines = lines.filter(line => {
+            const trimmedLine = line.trim().toLowerCase();
+            return !/^options?:?$/.test(trimmedLine) && !/^pilihan?:?$/.test(trimmedLine);
+        });
+        
+        const optionsHtml = optionLines.map(option => `<li>${_escapeHtml(option.trim().replace(/^[\*\-•]\s*Options:\s*|^\s*[\*\-]\s*/, ''))}</li>`).join('');
+        
+        return `<div class="question-text">${question}</div><ul>${optionsHtml}</ul>`;
     }
+
     _createQuizFingerprint(cleanedContent) { if (!cleanedContent) return null; const lines = cleanedContent.split('\n').map(l => l.trim()).filter(l => l); return lines.length < 2 ? null : lines.map(l => l.toLowerCase().replace(/\s+/g, ' ').trim()).join('\n'); }
     _simpleHash(str) { let hash = 0; for (let i = 0; i < str.length; i++) { hash = ((hash << 5) - hash) + str.charCodeAt(i); hash |= 0; } return 'cache_' + new Uint32Array([hash])[0].toString(16); }
 }
