@@ -11,27 +11,34 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         const toast = document.createElement('div');
         toast.className = 'custom-toast';
-        const icon = {
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+
+        const iconMap = {
           success: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
           error: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
           info: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
         };
+
         toast.innerHTML = `
-          <div class="toast-icon toast-icon-${type}">${icon[type] || icon.info}</div>
+          <div class="toast-icon toast-icon-${type}">${iconMap[type] || iconMap.info}</div>
           <div class="toast-text-content">
-            <strong>${title}</strong>
-            <div class="toast-message">${message}</div>
+            <strong>${_escapeHtml(title)}</strong>
+            <div class="toast-message">${_escapeHtml(message)}</div>
           </div>
         `;
+
         notificationContainer.appendChild(toast);
         activeToast = toast;
-        setTimeout(() => { toast.classList.add('show'); }, 10);
+
+        setTimeout(() => { toast.classList.add('show'); }, 100);
+
         setTimeout(() => {
           toast.classList.remove('show');
-          setTimeout(() => {
+          toast.addEventListener('transitionend', () => {
             if(toast.parentElement) { toast.remove(); }
             if (activeToast === toast) { activeToast = null; }
-          }, 500);
+          }, { once: true });
         }, 4000);
     }
 
@@ -168,7 +175,7 @@ document.addEventListener('DOMContentLoaded', function() {
             chrome.storage.sync.set(settingsToSave, () => {
                 globalTemperature = newGlobalTemp;
                 loadPromptsForActiveProfile();
-                showToast('Success', 'General settings have been saved!', 'success');
+                showToast('Success', 'General settings have been saved.', 'success');
             });
         });
     }
@@ -338,7 +345,7 @@ document.addEventListener('DOMContentLoaded', function() {
             await chrome.storage.sync.set({ promptProfiles });
             
             chrome.runtime.sendMessage({ action: 'updateContextMenus' });
-            showToast('Success', `Prompts for "${activeProfile}" have been saved!`, 'success');
+            showToast('Success', `Prompts for "${activeProfile}" have been saved.`, 'success');
         });
     }
 
