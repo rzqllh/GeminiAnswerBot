@@ -28,6 +28,7 @@ class PopupApp {
             imageUrl: null,
             base64ImageData: null,
             action: null, // To store the specific action, e.g., 'image-quiz'
+            summaryData: null, // To store summary results
         };
 
         this.elements = {};
@@ -139,7 +140,7 @@ class PopupApp {
                     this.state.originalUserContent = contextData.srcUrl;
                     this.state.view = 'quiz';
                     this.render();
-                    this._callGeminiStream(contextData.action, '', contextData.base64ImageData);
+                    this._callGeminiStream('answer', '', this.state.base64ImageData);
                 } else {
                     this.state.originalUserContent = contextData.selectionText;
                     this.state.view = 'quiz';
@@ -173,33 +174,31 @@ class PopupApp {
     }
 
     render() {
+        // Hide all major containers by default
         this.elements.messageArea.classList.add('hidden');
         this.elements.quizModeContainer.classList.add('hidden');
         this.elements.pageSummaryContainer.classList.add('hidden');
         
-        // Always show the main container unless there's a fullscreen message
-        if (['loading', 'info', 'error'].includes(this.state.view)) {
-             this.elements.messageArea.classList.remove('hidden');
-        } else {
-             this.elements.quizModeContainer.classList.remove('hidden');
-        }
-
+        // Show the correct container based on the view state
         switch (this.state.view) {
             case 'loading':
+                this.elements.messageArea.classList.remove('hidden');
                 this.elements.messageArea.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Scanning for quiz...</p></div>`;
                 break;
             case 'info':
+                this.elements.messageArea.classList.remove('hidden');
                 this.elements.messageArea.innerHTML = `<div class="info-panel"><div class="info-panel-header">Page Not Supported</div><div class="info-panel-body"><p>For your security, Chrome extensions cannot run on this special page.</p></div></div>`;
                 break;
             case 'error':
+                this.elements.messageArea.classList.remove('hidden');
                 this._renderErrorState();
                 break;
             case 'summary':
                 this.elements.pageSummaryContainer.classList.remove('hidden');
-                this.elements.quizModeContainer.classList.add('hidden');
                 this._renderPageSummary(this.state.summaryData);
                 break;
             case 'quiz':
+                this.elements.quizModeContainer.classList.remove('hidden');
                 this._renderQuizState();
                 break;
         }
@@ -209,7 +208,6 @@ class PopupApp {
         const titleText = this._getActionTitle(this.state.action) || 'Answer';
         this.elements.answerCardTitle.textContent = titleText;
 
-        // Manage visibility based on image mode
         this.elements.imagePreviewContainer.classList.toggle('hidden', !this.state.isImageMode);
         this.elements.contentDisplayWrapper.classList.toggle('hidden', this.state.isImageMode);
 
@@ -231,7 +229,6 @@ class PopupApp {
         if (this.state.answerHTML) {
             this._handleAnswerResult(this.state.answerHTML, true, this.state.totalTokenCount);
         } else if ((this.state.cleanedContent || this.state.isImageMode) && !this.state.error) {
-            // If we have content but no answer yet, trigger the call
             this._getAnswer();
         }
         
@@ -278,17 +275,23 @@ class PopupApp {
     }
 
     async _handlePageAnalysis() {
-        this._clearPersistedState();
+        await this._clearPersistedState();
         this.state.view = 'loading';
+        // Manually update loading text for this specific action
         this.render();
-        this.elements.messageArea.querySelector('p').textContent = 'Analyzing the entire page...';
+        const loadingText = this.elements.messageArea.querySelector('p');
+        if (loadingText) loadingText.textContent = 'Analyzing the entire page...';
+        
         try {
             const response = await this._sendMessageToContentScript({ action: "get_full_page_content" });
             if (!response || !response.content?.trim()) throw new Error("No significant text content for analysis.");
+            
             this.state.url = this.state.tab.url;
             this._callGeminiStream('pageAnalysis', response.content);
         } catch (e) {
-            this.state.view = 'error'; this.state.error = e; this.render();
+            this.state.view = 'error'; 
+            this.state.error = e; 
+            this.render();
         }
     }
 
@@ -300,21 +303,18 @@ class PopupApp {
         const currentPrompts = (promptProfiles?.[activeProfile]) || DEFAULT_PROMPTS;
         let systemPrompt = currentPrompts[purpose] || DEFAULT_PROMPTS[purpose];
     
-        // Special handling for rephrase to include the target language
         if (purpose.startsWith('rephrase-')) {
             const language = purpose.split('-')[1];
             systemPrompt = currentPrompts.rephrase || DEFAULT_PROMPTS.rephrase;
             userContent = `Target Language: ${language}\n\nText to rephrase:\n${userContent}`;
         }
     
-        // Show loading state in the appropriate container
         const targetContainer = {
-            'answer': this.elements.answerDisplay,
-            'explanation': this.elements.explanationDisplay,
+            'answer': this.elements.answerDisplay, 'explanation': this.elements.explanationDisplay,
             'correction': this.elements.explanationDisplay,
         }[purpose];
     
-        if (targetContainer) {
+        if (targetContainer && targetContainer.parentElement.classList.contains('hidden')) {
             targetContainer.parentElement.classList.remove('hidden');
             targetContainer.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`;
         }
@@ -336,13 +336,9 @@ class PopupApp {
             chrome.storage.local.get(this.state.cacheKey).then(cachedResult => {
                 if (cachedResult[this.state.cacheKey]?.answerHTML) {
                     this._handleAnswerResult(cachedResult[this.state.cacheKey].answerHTML, true, cachedResult[this.state.cacheKey].totalTokenCount);
-                } else {
-                    this._continueGetAnswer();
-                }
+                } else { this._continueGetAnswer(); }
             });
-        } else {
-            this._continueGetAnswer();
-        }
+        } else { this._continueGetAnswer(); }
     }
     
     _continueGetAnswer() {
@@ -374,7 +370,7 @@ class PopupApp {
                 'answer': text => this._handleAnswerResult(text, false, payload.totalTokenCount),
                 'explanation': text => this._handleExplanationResult(text, false),
                 'correction': text => this._handleCorrectionResult(text),
-                'pageAnalysis': text => this._handlePageAnalysisResult(text),
+                'pageAnalysis': text => this._handlePageAnalysisResult(text)
             };
             
             if (purpose.startsWith('image-')) this._handleImageModeResult(fullText, purpose);
@@ -389,8 +385,43 @@ class PopupApp {
     _handleCleaningResult(fullText) {
         this.state.cleanedContent = fullText;
         this.state.view = 'quiz';
-        this.render(); // This will trigger _getAnswer() via _renderQuizState
+        this.render();
         this._saveCurrentViewState();
+    }
+
+    _handlePageAnalysisResult(text) {
+        let parsedData;
+        try {
+            const jsonMatch = text.match(/{[\s\S]*}/);
+            if (jsonMatch) {
+                parsedData = JSON.parse(jsonMatch[0]);
+            } else {
+                throw new Error("No JSON object found in response.");
+            }
+        } catch (e) {
+            console.warn("Could not parse page analysis JSON, showing as raw text.", e);
+            parsedData = text; // Fallback to raw text
+        }
+        this.state.summaryData = parsedData;
+        this.state.view = 'summary';
+        this.render();
+        this._saveCurrentViewState();
+    }
+
+    _renderPageSummary(data) {
+        let summaryHtml;
+        // Check if data is an object (parsed JSON) or a string (fallback)
+        if (typeof data === 'object' && data !== null && data.tldr) {
+            const tldrHtml = data.tldr ? `<div class="summary-section summary-tldr"><h3 class="summary-section-title">TL;DR</h3><p>${_escapeHtml(data.tldr)}</p></div>` : '';
+            const takeawaysHtml = (data.takeaways?.length > 0) ? `<div class="summary-section summary-takeaways"><h3 class="summary-section-title">Key Takeaways</h3><ul>${data.takeaways.map(item => `<li>${_escapeHtml(item)}</li>`).join('')}</ul></div>` : '';
+            const renderEntities = (entities, label) => (entities?.length > 0) ? `<div class="entity-group"><span class="entity-label">${label}</span><div class="entity-tags">${entities.map(e => `<span class="entity-tag">${_escapeHtml(e)}</span>`).join('')}</div></div>` : '';
+            const entitiesHtml = (data.entities && (Object.values(data.entities).some(arr => arr && arr.length > 0))) ? `<div class="summary-section summary-entities"><h3 class="summary-section-title">Entities Mentioned</h3>${renderEntities(data.entities.people, 'People')}${renderEntities(data.entities.organizations, 'Organizations')}${renderEntities(data.entities.locations, 'Locations')}</div>` : '';
+            summaryHtml = tldrHtml + takeawaysHtml + entitiesHtml;
+        } else {
+            // Fallback for raw text
+            summaryHtml = `<div class="summary-section"><h3 class="summary-section-title">General Summary</h3><div class="panel-content">${DOMPurify.sanitize(marked.parse(String(data)))}</div></div>`;
+        }
+        this.elements.pageSummaryContainer.innerHTML = summaryHtml;
     }
     
     _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0) {
@@ -429,10 +460,8 @@ class PopupApp {
 
     _handleExplanationResult(fullText, fromCache = false) { this.state.explanationHTML = fullText; this.elements.explanationDisplay.innerHTML = DOMPurify.sanitize(marked.parse(fullText)); this.elements.copyExplanation.dataset.copyText = fullText; this.elements.explanationButton.disabled = false; this.elements.retryExplanation.disabled = false; this.elements.explanationContainer.classList.remove('hidden'); this._saveCurrentViewState(); if (!fromCache) this._saveToHistory({ ...this.state }, 'explanation'); }
     _handleCorrectionResult(fullText) { this._handleExplanationResult(fullText, false); }
-    _handlePageAnalysisResult(text) { /* ... implementation ... */ }
     _handleContextMenuResult(fullText, purpose) { /* ... implementation ... */ }
     _handleImageModeResult(fullText, purpose) { /* ... implementation ... */ }
-
     _formatQuestionContent(content) {
         if(!content) return '';
         const lines = content.split('\n').filter(line => line.trim() !== '');
@@ -442,8 +471,6 @@ class PopupApp {
         const optionsHtml = optionLines.map(option => `<li>${_escapeHtml(option.trim().replace(/^[\*\-•]\s*|^\s*[\*\-]\s*/, ''))}</li>`).join('');
         return `<div class="question-text">${question}</div><ul>${optionsHtml}</ul>`;
     }
-    
-    // ... other helper methods (_saveToHistory, _pingContentScriptWithRetry, etc.)
     _renderCorrectionOptions(options) { this.elements.correctionOptions.innerHTML = ''; options.forEach(optionText => { const button = document.createElement('button'); button.className = 'correction-option-button'; button.innerHTML = _escapeHtml(optionText); button.addEventListener('click', () => { const correctionContent = `The original quiz content was:\n${this.state.cleanedContent}\n\nMy previous incorrect answer was: \`${this.state.incorrectAnswer}\`\n\nThe user has indicated the correct answer is: \`${optionText}\``; this.elements.correctionPanel.classList.add('hidden'); this.elements.explanationContainer.classList.remove('hidden'); this.elements.explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div><p>Generating corrected explanation...</p></div>`; this._callGeminiStream('correction', correctionContent); }); this.elements.correctionOptions.appendChild(button); }); }
     _resetFeedbackButtons() { this.elements.feedbackCorrect.disabled = false; this.elements.feedbackIncorrect.disabled = false; this.elements.feedbackCorrect.classList.remove('selected-correct'); this.elements.feedbackIncorrect.classList.remove('selected-incorrect'); }
     _copyToClipboard(button) { const textToCopy = button.dataset.copyText; if (textToCopy) navigator.clipboard.writeText(textToCopy).then(() => { const originalTitle = button.title; button.title = 'Copied!'; button.classList.add('copied'); setTimeout(() => { button.classList.remove('copied'); button.title = originalTitle; }, 1500); }); }
