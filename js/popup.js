@@ -24,6 +24,10 @@ class PopupApp {
             totalTokenCount: 0,
             cacheKey: null,
             incorrectAnswer: null,
+            isImageMode: false,
+            imageUrl: null,
+            base64ImageData: null,
+            action: null, // To store the specific action, e.g., 'image-quiz'
         };
 
         this.elements = {};
@@ -46,7 +50,8 @@ class PopupApp {
             'explanationContainer', 'explanationDisplay', 'messageArea',
             'retryAnswer', 'retryExplanation', 'copyAnswer', 'copyExplanation',
             'feedbackContainer', 'feedbackCorrect', 'feedbackIncorrect',
-            'correctionPanel', 'correctionOptions'
+            'correctionPanel', 'correctionOptions', 'imagePreviewContainer',
+            'imagePreview', 'imageStatusText', 'answerCardTitle'
         ];
         ids.forEach(id => {
             const key = id.replace(/-([a-z])/g, g => g[1].toUpperCase());
@@ -91,33 +96,48 @@ class PopupApp {
             this.state.config = await chrome.storage.sync.get(null);
             if (!this.state.config.geminiApiKey) throw { type: 'INVALID_API_KEY', message: 'API Key not set.' };
 
-            // Ensure content script is ready before proceeding
             await this._pingContentScriptWithRetry(3, 200);
 
             const contextKey = `context_action_${tab.id}`;
             const contextData = (await chrome.storage.local.get(contextKey))[contextKey];
 
             if (contextData) {
+                // A new context action was triggered, so we always start fresh.
                 await chrome.storage.local.remove(contextKey);
                 await this._clearPersistedState();
-                this.state.originalUserContent = contextData.selectionText;
-                this.state.view = 'quiz';
-                this.render();
-                this._callGeminiStream(contextData.action, contextData.selectionText);
+                this.state.action = contextData.action;
+                this.state.url = this.state.tab.url;
+
+                if (contextData.action.startsWith('image-')) {
+                    this.state.isImageMode = true;
+                    this.state.imageUrl = contextData.srcUrl;
+                    this.state.base64ImageData = contextData.base64ImageData;
+                    this.state.originalUserContent = contextData.srcUrl; // For history
+                    this.state.view = 'quiz';
+                    this.render();
+                    this._callGeminiStream(contextData.action, '', contextData.base64ImageData);
+                } else {
+                    this.state.originalUserContent = contextData.selectionText;
+                    this.state.view = 'quiz';
+                    this.render();
+                    this._callGeminiStream(contextData.action, contextData.selectionText);
+                }
             } else {
+                // No new action, try to restore previous state.
                 const persistedState = await this._getPersistedState();
-                if (persistedState && persistedState.url === this.state.tab.url) { // URL validation
+                if (persistedState && persistedState.url === this.state.tab.url) {
                     Object.assign(this.state, persistedState);
                     this.state.view = this.state.lastView;
                     this.render();
                 } else {
-                    this._clearPersistedState(); // Clear state from old URL
+                    // No valid persisted state, so start a new scan.
+                    this._clearPersistedState();
                     this.state.view = 'loading';
                     this.render();
                     const response = await this._sendMessageToContentScript({ action: "get_quiz_content" });
                     if (!response || !response.content?.trim()) throw new Error("No readable quiz content found.");
 
-                    this.state.url = this.state.tab.url; // Store the current URL
+                    this.state.url = this.state.tab.url;
                     this.state.originalUserContent = response.content;
                     this._callGeminiStream('cleaning', response.content);
                 }
@@ -158,15 +178,49 @@ class PopupApp {
         }
     }
 
+    _getActionTitle(action) {
+        const titleMap = {
+            'image-quiz': 'Quiz from Image',
+            'image-analyze': 'Image Analysis',
+            'image-translate': 'Translate Image',
+            'summarize': 'Summary',
+            'explain': 'Explanation',
+            'translate': 'Translation',
+            'rephrase': 'Rephrased Text'
+        };
+        const baseAction = action?.startsWith('rephrase-') ? 'rephrase' : action;
+        return titleMap[baseAction] || 'Quick Answer';
+    }
+
     _renderQuizState() {
-        this.elements.contentDisplayWrapper.classList.remove('hidden');
-        this.elements.answerContainer.classList.remove('hidden');
+        const titleText = this._getActionTitle(this.state.action);
+        this.elements.answerCardTitle.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L14.472 9.528L22 12L14.472 14.472L12 22L9.528 14.472L2 12L9.528 9.528L12 2Z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"></path></svg> ${titleText}`;
+
+        if (this.state.isImageMode) {
+            this.elements.imagePreviewContainer.classList.remove('hidden');
+            this.elements.imagePreview.src = this.state.imageUrl;
+            this.elements.contentDisplayWrapper.classList.add('hidden');
+            this.elements.answerContainer.classList.remove('hidden');
+            this.elements.retryAnswer.classList.add('hidden');
+            this.elements.aiActionsWrapper.classList.add('hidden');
+            this.elements.feedbackContainer.classList.add('hidden');
+            if (!this.state.answerHTML) {
+                this.elements.answerDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`;
+            } else {
+                this.elements.answerDisplay.innerHTML = DOMPurify.sanitize(marked.parse(this.state.answerHTML));
+            }
+        } else {
+            this.elements.imagePreviewContainer.classList.add('hidden');
+            this.elements.contentDisplayWrapper.classList.remove('hidden');
+            this.elements.answerContainer.classList.remove('hidden');
+            this.elements.retryAnswer.classList.remove('hidden');
+        }
 
         if (this.state.cleanedContent) this.elements.contentDisplay.innerHTML = this._formatQuestionContent(this.state.cleanedContent);
-        else if (this.state.originalUserContent) this.elements.contentDisplay.innerHTML = `<div class="question-text">${_escapeHtml(this.state.originalUserContent)}</div>`;
+        else if (this.state.originalUserContent && !this.state.isImageMode) this.elements.contentDisplay.innerHTML = `<div class="question-text">${_escapeHtml(this.state.originalUserContent)}</div>`;
 
-        if (this.state.answerHTML) this._handleAnswerResult(this.state.answerHTML, true, this.state.totalTokenCount);
-        else if (this.state.cleanedContent) this._getAnswer();
+        if (this.state.answerHTML && !this.state.isImageMode) this._handleAnswerResult(this.state.answerHTML, true, this.state.totalTokenCount);
+        else if (this.state.cleanedContent && !this.state.isImageMode) this._getAnswer();
 
         if (this.state.explanationHTML) this._handleExplanationResult(this.state.explanationHTML, true);
         else this.elements.explanationContainer.classList.add('hidden');
@@ -198,13 +252,14 @@ class PopupApp {
     }
 
     async _handlePageAnalysis() {
+        this._clearPersistedState();
         this.state.view = 'loading';
         this.render();
         this.elements.messageArea.querySelector('p').textContent = 'Analyzing the entire page...';
         try {
             const response = await this._sendMessageToContentScript({ action: "get_full_page_content" });
             if (!response || !response.content?.trim()) throw new Error("No significant text content for analysis.");
-            this.state.url = this.state.tab.url; // Store URL for persistence
+            this.state.url = this.state.tab.url;
             this._callGeminiStream('pageAnalysis', response.content);
         } catch (e) {
             this.state.view = 'error'; this.state.error = e; this.render();
@@ -214,23 +269,117 @@ class PopupApp {
     _handleFeedbackCorrect() { this.elements.feedbackCorrect.disabled = true; this.elements.feedbackIncorrect.disabled = true; this.elements.feedbackCorrect.classList.add('selected-correct'); }
     async _handleFeedbackIncorrect() { this.elements.feedbackIncorrect.disabled = true; this.elements.feedbackCorrect.disabled = true; this.elements.feedbackIncorrect.classList.add('selected-incorrect'); this.elements.aiActionsWrapper.classList.add('hidden'); this.elements.correctionPanel.classList.remove('hidden'); this.elements.correctionOptions.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Fetching options...</p></div>`; try { const response = await this._sendMessageToContentScript({ action: "get_quiz_options" }); if (response?.options?.length > 0) this._renderCorrectionOptions(response.options); else this.elements.correctionOptions.innerHTML = '<p class="text-center">Could not find options on page.</p>'; } catch (e) { this.elements.correctionOptions.innerHTML = `<p class="text-center">Error fetching options: ${e.message}</p>`; } }
     _callGeminiStream(purpose, userContent, base64ImageData = null) { const { promptProfiles, activeProfile, selectedModel, geminiApiKey } = this.state.config; const currentPrompts = (promptProfiles?.[activeProfile]) || DEFAULT_PROMPTS; let systemPrompt = currentPrompts[purpose] || DEFAULT_PROMPTS[purpose]; if (purpose.startsWith('rephrase-')) { const language = purpose.split('-')[1]; systemPrompt = currentPrompts.rephrase || DEFAULT_PROMPTS.rephrase; userContent = `Target Language: ${language}\n\nText to rephrase:\n${userContent}`; } chrome.runtime.sendMessage({ action: 'callGeminiStream', payload: { apiKey: geminiApiKey, model: selectedModel, systemPrompt, userContent, base64ImageData, purpose } }); }
-    _getAnswer() { if (!this.state.cleanedContent) return; const fingerprint = this._createQuizFingerprint(this.state.cleanedContent); this.state.cacheKey = fingerprint ? this._simpleHash(fingerprint) : null; if (this.state.cacheKey) { chrome.storage.local.get(this.state.cacheKey).then(cachedResult => { if (cachedResult[this.state.cacheKey]?.answerHTML) { this._handleAnswerResult(cachedResult[this.state.cacheKey].answerHTML, true, cachedResult[this.state.cacheKey].totalTokenCount); return; } this._continueGetAnswer(); }); } else this._continueGetAnswer(); }
+    _getAnswer() { if (this.state.isImageMode) { this._callGeminiStream(this.state.action, '', this.state.base64ImageData); return; } if (!this.state.cleanedContent) return; const fingerprint = this._createQuizFingerprint(this.state.cleanedContent); this.state.cacheKey = fingerprint ? this._simpleHash(fingerprint) : null; if (this.state.cacheKey) { chrome.storage.local.get(this.state.cacheKey).then(cachedResult => { if (cachedResult[this.state.cacheKey]?.answerHTML) { this._handleAnswerResult(cachedResult[this.state.cacheKey].answerHTML, true, cachedResult[this.state.cacheKey].totalTokenCount); return; } this._continueGetAnswer(); }); } else this._continueGetAnswer(); }
     _continueGetAnswer() { this.elements.retryAnswer.disabled = true; this.elements.answerDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`; this._callGeminiStream('answer', this.state.cleanedContent); }
     _getExplanation() { if (!this.state.cleanedContent) return; this.elements.explanationButton.disabled = true; this.elements.retryExplanation.disabled = true; this.elements.explanationContainer.classList.remove('hidden'); this.elements.explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`; const contentForExplanation = `${this.state.cleanedContent}\n\nCorrect Answer: ${this.state.incorrectAnswer}`; this._callGeminiStream('explanation', contentForExplanation); }
-    _handleStreamUpdate(request) { const { payload, purpose } = request; if (!payload.success) { this.state.view = 'error'; this.state.error = payload.error; this.render(); return; } if (payload.done) { const fullText = payload.fullText || this.streamAccumulator[purpose] || ''; delete this.streamAccumulator[purpose]; const purposeHandlers = { 'cleaning': (text) => this._handleCleaningResult(text), 'answer': (text) => this._handleAnswerResult(text, false, payload.totalTokenCount), 'explanation': (text) => this._handleExplanationResult(text, false), 'correction': (text) => this._handleCorrectionResult(text), 'summarize': (text) => this._handleContextMenuResult(text, purpose), 'pageAnalysis': (text) => this._handlePageAnalysisResult(text), }; if (purposeHandlers[purpose]) purposeHandlers[purpose](fullText); else if (purpose.startsWith('rephrase-')) this._handleContextMenuResult(fullText, purpose); } else if (payload.chunk) { this.streamAccumulator[purpose] = (this.streamAccumulator[purpose] || '') + payload.chunk; } }
+    
+    _handleStreamUpdate(request) {
+        const { payload, purpose } = request;
+        if (!payload.success) {
+            this.state.view = 'error';
+            this.state.error = payload.error;
+            this.render();
+            return;
+        }
+        if (payload.done) {
+            const fullText = payload.fullText || this.streamAccumulator[purpose] || '';
+            delete this.streamAccumulator[purpose];
+
+            if (purpose.startsWith('image-')) {
+                this._handleImageModeResult(fullText, purpose);
+            } else if (purpose.startsWith('rephrase-') || ['summarize', 'explain', 'translate'].includes(purpose)) {
+                this._handleContextMenuResult(fullText, purpose);
+            } else {
+                const purposeHandlers = {
+                    'cleaning': (text) => this._handleCleaningResult(text),
+                    'answer': (text) => this._handleAnswerResult(text, false, payload.totalTokenCount),
+                    'explanation': (text) => this._handleExplanationResult(text, false),
+                    'correction': (text) => this._handleCorrectionResult(text),
+                    'pageAnalysis': (text) => this._handlePageAnalysisResult(text),
+                };
+                if (purposeHandlers[purpose]) {
+                    purposeHandlers[purpose](fullText);
+                }
+            }
+        } else if (payload.chunk) {
+            this.streamAccumulator[purpose] = (this.streamAccumulator[purpose] || '') + payload.chunk;
+        }
+    }
+
     _handlePageAnalysisResult(text) { let parsed = false; try { const jsonMatch = text.match(/{[\s\S]*}/); if (jsonMatch) { const jsonData = JSON.parse(jsonMatch[0]); this._renderPageSummary(jsonData); parsed = true; } } catch (e) { console.warn("JSON parse failed, falling back.", e); } if (!parsed) this._renderPageSummary(text, true); }
     _handleCleaningResult(fullText) { this.state.cleanedContent = fullText; this.state.view = 'quiz'; this.render(); this._saveCurrentViewState(); }
-    _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0) { this.state.answerHTML = fullText; this.state.totalTokenCount = totalTokenCount; const answerMatch = fullText.match(/Answer:(.*?)(Confidence:|Reason:|$)/is); let answerText = (answerMatch ? answerMatch[1].trim() : fullText.trim()).replace(/`/g, ''); this.state.incorrectAnswer = answerText; let formattedHtml = `<p class="answer-highlight">${_escapeHtml(answerText).replace(/\n/g, '<br>')}</p>`; const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i); if (confidenceMatch) { const confidence = confidenceMatch[1].toLowerCase(); const reason = fullText.match(/Reason:(.*)/is)?.[1].trim() || ""; formattedHtml += `<div class="confidence-wrapper"><div class="confidence-level"><span class="confidence-level-label">Confidence ${fromCache ? '<span>⚡️ Cached</span>' : ''}</span><span class="confidence-badge confidence-${confidence}">${confidence[0].toUpperCase() + confidence.slice(1)}</span></div>${reason ? `<div class="confidence-reason">${_escapeHtml(reason)}</div>` : ''}</div>`; } if (totalTokenCount > 0) formattedHtml += `<div class="token-count"><span class="token-count-label">Tokens Used</span><span class="token-count-value">${totalTokenCount}</span></div>`; this.elements.answerDisplay.innerHTML = formattedHtml; this.elements.copyAnswer.dataset.copyText = answerText; this.elements.retryAnswer.disabled = false; this.elements.aiActionsWrapper.classList.remove('hidden'); this.elements.explanationContainer.classList.add('hidden'); this.elements.correctionPanel.classList.add('hidden'); this.elements.feedbackContainer.classList.remove('hidden'); this._resetFeedbackButtons(); if (this.state.config.autoHighlight) this._sendMessageToContentScript({ action: 'highlight-answer', text: [answerText] }); if (!fromCache && this.state.cacheKey) chrome.storage.local.set({ [this.state.cacheKey]: { answerHTML: fullText, totalTokenCount } }); this._saveCurrentViewState(); if (!fromCache) this._saveToHistory({ cleanedContent: this.state.cleanedContent, answerHTML: fullText }, 'quiz'); }
+    
+    _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0) {
+        this.state.answerHTML = fullText;
+        this.state.totalTokenCount = totalTokenCount;
+        
+        const answerMatch = fullText.match(/Answer:(.*?)(Confidence:|Reason:|$)/is);
+        let answerText = (answerMatch ? answerMatch[1].trim() : fullText.trim()).replace(/`/g, '');
+        this.state.incorrectAnswer = answerText;
+        
+        let formattedHtml = `<p class="answer-highlight">${_escapeHtml(answerText).replace(/\n/g, '<br>')}</p>`;
+        const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
+        if (confidenceMatch) {
+            const confidence = confidenceMatch[1].toLowerCase();
+            const reason = fullText.match(/Reason:(.*)/is)?.[1].trim() || "";
+            formattedHtml += `<div class="confidence-wrapper"><div class="confidence-level"><span class="confidence-level-label">Confidence ${fromCache ? '<span>⚡️ Cached</span>' : ''}</span><span class="confidence-badge confidence-${confidence}">${confidence[0].toUpperCase() + confidence.slice(1)}</span></div>${reason ? `<div class="confidence-reason">${_escapeHtml(reason)}</div>` : ''}</div>`;
+        }
+        if (totalTokenCount > 0) {
+            formattedHtml += `<div class="token-count"><span class="token-count-label">Tokens Used</span><span class="token-count-value">${totalTokenCount}</span></div>`;
+        }
+        
+        this.elements.answerDisplay.innerHTML = formattedHtml;
+        this.elements.copyAnswer.dataset.copyText = answerText;
+        this.elements.retryAnswer.disabled = false;
+        this.elements.aiActionsWrapper.classList.remove('hidden');
+        this.elements.explanationContainer.classList.add('hidden');
+        this.elements.correctionPanel.classList.add('hidden');
+        this.elements.feedbackContainer.classList.remove('hidden');
+        this._resetFeedbackButtons();
+        
+        if (this.state.config.autoHighlight) this._sendMessageToContentScript({ action: 'highlight-answer', text: [answerText] });
+        if (!fromCache && this.state.cacheKey) chrome.storage.local.set({ [this.state.cacheKey]: { answerHTML: fullText, totalTokenCount } });
+        
+        this._saveCurrentViewState();
+        if (!fromCache) this._saveToHistory({ cleanedContent: this.state.cleanedContent, answerHTML: fullText }, 'quiz');
+    }
+
     _handleExplanationResult(fullText, fromCache = false) { this.state.explanationHTML = fullText; this.elements.explanationDisplay.innerHTML = DOMPurify.sanitize(marked.parse(fullText)); this.elements.copyExplanation.dataset.copyText = fullText; this.elements.explanationButton.disabled = false; this.elements.retryExplanation.disabled = false; this.elements.explanationContainer.classList.remove('hidden'); this._saveCurrentViewState(); if (!fromCache) this._saveToHistory({ ...this.state }, 'explanation'); }
     _handleCorrectionResult(fullText) { this._handleExplanationResult(fullText, false); }
-    _handleContextMenuResult(fullText, purpose) { this.state.view = 'quiz'; this.state.answerHTML = fullText; this.render(); this.elements.answerDisplay.innerHTML = DOMPurify.sanitize(marked.parse(fullText)); this.elements.copyAnswer.dataset.copyText = fullText; this.elements.aiActionsWrapper.classList.add('hidden'); this.elements.explanationContainer.classList.add('hidden'); this.elements.feedbackContainer.classList.add('hidden'); const historyActionType = purpose.split('-')[0]; this._saveToHistory({ cleanedContent: this.state.originalUserContent, answerHTML: fullText }, historyActionType); this._saveCurrentViewState(); }
+    
+    _handleContextMenuResult(fullText, purpose) {
+        this.state.answerHTML = fullText;
+        this.state.view = 'quiz';
+        this.state.action = purpose;
+        this.render();
+        this.elements.answerDisplay.innerHTML = DOMPurify.sanitize(marked.parse(fullText));
+        this.elements.copyAnswer.dataset.copyText = fullText;
+        this.elements.aiActionsWrapper.classList.add('hidden');
+        this.elements.explanationContainer.classList.add('hidden');
+        this.elements.feedbackContainer.classList.add('hidden');
+        const historyActionType = purpose.split('-')[0];
+        this._saveToHistory({ cleanedContent: this.state.originalUserContent, answerHTML: fullText }, historyActionType);
+        this._saveCurrentViewState();
+    }
+
+    _handleImageModeResult(fullText, purpose) {
+        this.state.answerHTML = fullText;
+        this.state.view = 'quiz';
+        this.state.action = purpose;
+        this.render(); // This will now correctly render the image result without looping
+        this.elements.copyAnswer.dataset.copyText = fullText;
+        const historyActionType = purpose.split('-')[0]; // 'image'
+        this._saveToHistory({ originalUserContent: this.state.originalUserContent, answerHTML: fullText }, historyActionType);
+        this._saveCurrentViewState();
+    }
+
     _renderPageSummary(data, isFallback = false) { this.state.view = 'summary'; let summaryHtml; if (isFallback) { this.state.summaryData = data; summaryHtml = `<div class="summary-section"><h3 class="summary-section-title">General Summary</h3><div class="card-body">${DOMPurify.sanitize(marked.parse(data))}</div></div>`; } else { this.state.summaryData = data; const tldrHtml = data.tldr ? `<div class="summary-section summary-tldr"><h3 class="summary-section-title">TL;DR</h3><p>${_escapeHtml(data.tldr)}</p></div>` : ''; const takeawaysHtml = (data.takeaways?.length > 0) ? `<div class="summary-section summary-takeaways"><h3 class="summary-section-title">Key Takeaways</h3><ul>${data.takeaways.map(item => `<li>${_escapeHtml(item)}</li>`).join('')}</ul></div>` : ''; const renderEntities = (entities, label) => (entities?.length > 0) ? `<div class="entity-group"><span class="entity-label">${label}</span><div class="entity-tags">${entities.map(e => `<span class="entity-tag">${_escapeHtml(e)}</span>`).join('')}</div></div>` : ''; const entitiesHtml = (data.entities && (Object.values(data.entities).some(arr => arr.length > 0))) ? `<div class="summary-section summary-entities"><h3 class="summary-section-title">Entities Mentioned</h3>${renderEntities(data.entities.people, 'People')}${renderEntities(data.entities.organizations, 'Organizations')}${renderEntities(data.entities.locations, 'Locations')}</div>` : ''; summaryHtml = tldrHtml + takeawaysHtml + entitiesHtml; } this.elements.pageSummaryContainer.innerHTML = summaryHtml; this.render(); this._saveCurrentViewState(); }
     _renderCorrectionOptions(options) { this.elements.correctionOptions.innerHTML = ''; options.forEach(optionText => { const button = document.createElement('button'); button.className = 'correction-option-button'; button.innerHTML = _escapeHtml(optionText); button.addEventListener('click', () => { const correctionContent = `The original quiz content was:\n${this.state.cleanedContent}\n\nMy previous incorrect answer was: \`${this.state.incorrectAnswer}\`\n\nThe user has indicated the correct answer is: \`${optionText}\``; this.elements.correctionPanel.classList.add('hidden'); this.elements.explanationContainer.classList.remove('hidden'); this.elements.explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div><p>Generating corrected explanation...</p></div>`; this._callGeminiStream('correction', correctionContent); }); this.elements.correctionOptions.appendChild(button); }); }
     _resetFeedbackButtons() { this.elements.feedbackCorrect.disabled = false; this.elements.feedbackIncorrect.disabled = false; this.elements.feedbackCorrect.classList.remove('selected-correct'); this.elements.feedbackIncorrect.classList.remove('selected-incorrect'); }
     _copyToClipboard(button) { const textToCopy = button.dataset.copyText; if (textToCopy) navigator.clipboard.writeText(textToCopy).then(() => { const originalTitle = button.title; button.title = 'Copied!'; button.classList.add('copied'); setTimeout(() => { button.classList.remove('copied'); button.title = originalTitle; }, 1500); }); }
     _getPersistedState() { return this.state.tab ? chrome.storage.local.get(this.state.tab.id.toString()).then(r => r[this.state.tab.id.toString()] || null) : Promise.resolve(null); }
     _clearPersistedState() { return this.state.tab ? chrome.storage.local.remove(this.state.tab.id.toString()) : Promise.resolve(); }
-    _saveCurrentViewState() { if (!this.state.tab) return; const key = this.state.tab.id.toString(); chrome.storage.local.set({ [key]: { lastView: this.state.view, url: this.state.url, cleanedContent: this.state.cleanedContent, originalUserContent: this.state.originalUserContent, answerHTML: this.state.answerHTML, explanationHTML: this.state.explanationHTML, summaryData: this.state.summaryData, totalTokenCount: this.state.totalTokenCount, incorrectAnswer: this.state.incorrectAnswer, } }); }
+    _saveCurrentViewState() { if (!this.state.tab) return; const key = this.state.tab.id.toString(); const stateToSave = { lastView: this.state.view, url: this.state.url, cleanedContent: this.state.cleanedContent, originalUserContent: this.state.originalUserContent, answerHTML: this.state.answerHTML, explanationHTML: this.state.explanationHTML, summaryData: this.state.summaryData, totalTokenCount: this.state.totalTokenCount, incorrectAnswer: this.state.incorrectAnswer, isImageMode: this.state.isImageMode, imageUrl: this.state.imageUrl, action: this.state.action, }; chrome.storage.local.set({ [key]: stateToSave }); }
     async _saveToHistory(stateData, actionType) { if (!this.state.tab) return; const { history = [] } = await chrome.storage.local.get('history'); const newEntry = { ...stateData, id: Date.now(), url: this.state.tab.url, title: this.state.tab.title, timestamp: new Date().toISOString(), actionType }; history.unshift(newEntry); if (history.length > 100) history.pop(); await chrome.storage.local.set({ history }); }
     _pingContentScriptWithRetry(retries, delay) { return new Promise((resolve, reject) => { const attempt = (n) => { this._sendMessageToContentScript({ action: "ping_content_script" }, 500).then(resolve).catch(err => { if (n > 0) { setTimeout(() => attempt(n - 1), delay); } else { reject(new Error("Could not communicate with the page. Please reload the page and try again.")); } }); }; attempt(retries); }); }
     _sendMessageToContentScript(message, timeout = 5000) { return new Promise((resolve, reject) => { if (!this.state.tab || this.state.tab.id === undefined) return reject(new Error("Invalid tab ID.")); const timer = setTimeout(() => reject(new Error('Content script timeout.')), timeout); chrome.tabs.sendMessage(this.state.tab.id, message, (response) => { clearTimeout(timer); if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message)); else resolve(response); }); }); }

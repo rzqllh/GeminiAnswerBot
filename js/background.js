@@ -1,5 +1,27 @@
 // js/background.js
 
+async function fetchImageAsBase64(url) {
+  try {
+    // Use no-cors mode for potentially cross-origin images, though this has limitations.
+    // For many public images, this will work.
+    const response = await fetch(url, { mode: 'cors' });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error(`Error fetching image as Base64 from ${url}:`, error);
+    // Fallback for CORS issues if possible, but often not feasible from background script.
+    return null;
+  }
+}
+
 async function handleContextAction(info, tab) {
   if (!tab || !tab.id) {
     console.error("Context action triggered without a valid tab.");
@@ -16,20 +38,24 @@ async function handleContextAction(info, tab) {
   
   if (info.mediaType === 'image' && info.srcUrl) {
     actionData.srcUrl = info.srcUrl;
+    const base64Data = await fetchImageAsBase64(info.srcUrl);
+    if (base64Data) {
+      actionData.base64ImageData = base64Data;
+    } else {
+      console.error("Could not fetch and convert image. Aborting action.");
+      // Optionally, we could notify the user here, but for now, we just abort.
+      return;
+    }
   }
   
   await chrome.storage.local.set({
     [`context_action_${tab.id}`]: actionData
   });
 
-  // Check if a popup is already open. If not, open it.
-  const views = chrome.extension.getViews({ type: 'popup' });
-  if (views.length === 0) {
-    chrome.action.openPopup();
-  } else {
-    // If popup is open, send a message to re-initialize it
-    chrome.runtime.sendMessage({ action: 're_initialize_popup' });
-  }
+  // In Manifest V3, we cannot reliably check if a popup is open.
+  // The modern approach is to simply call openPopup. If it's already open,
+  // it will likely just focus. The popup's init logic will handle the rest.
+  chrome.action.openPopup();
 }
 
 async function updateContextMenus() {
@@ -121,10 +147,14 @@ async function performApiCall(payload) {
     }
 
     const apiPayload = {
-      system_instruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: "user", parts: contentParts }],
       generationConfig
     };
+
+    // Conditionally add system_instruction only if systemPrompt is valid
+    if (systemPrompt && typeof systemPrompt === 'string' && systemPrompt.trim() !== '') {
+      apiPayload.system_instruction = { parts: [{ text: systemPrompt }] };
+    }
   
     const streamCallback = (streamData) => {
       chrome.runtime.sendMessage({

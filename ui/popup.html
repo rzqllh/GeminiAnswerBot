@@ -39,6 +39,11 @@
       <div id="pageSummaryContainer" class="hidden"></div>
 
       <div id="quizModeContainer">
+        <div id="imagePreviewContainer" class="card hidden">
+          <img id="imagePreview" src="" alt="Image Preview"/>
+          <p id="imageStatusText">Processing image...</p>
+        </div>
+
         <div id="contentDisplayWrapper" class="card question-card">
           <div id="contentDisplay" class="card-body"></div>
         </div>
@@ -53,7 +58,7 @@
 
         <div id="answerContainer" class="card answer-card">
           <div class="card-header">
-            <h2 class="card-title">
+            <h2 id="answerCardTitle" class="card-title">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 2L14.472 9.528L22 12L14.472 14.472L12 22L9.528 14.472L2 12L9.528 9.528L12 2Z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" /></svg>
               Quick Answer
