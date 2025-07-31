@@ -82,14 +82,26 @@ class PopupApp {
         }
     }
 
-    async _injectContentScripts(tabId) {
+    /**
+     * Injects content scripts into the tab if they are not already present.
+     * It first pings the tab; if it gets a response, scripts are already injected.
+     * Otherwise, it proceeds with the injection.
+     * @param {number} tabId The ID of the tab to inject scripts into.
+     */
+    async _ensureContentScripts(tabId) {
         try {
-            await Promise.all([
-                chrome.scripting.insertCSS({
+            // Ping the content script first to see if it's already there
+            await this._sendMessageToContentScript({ action: "ping_content_script" }, 200);
+            return; // Scripts are already injected and responsive.
+        } catch (e) {
+            // This error is expected if the content script isn't there yet.
+            console.log("Content script not found, injecting now.");
+            try {
+                await chrome.scripting.insertCSS({
                     target: { tabId },
                     files: ['assets/highlighter.css', 'assets/dialog.css', 'assets/toolbar.css'],
-                }),
-                chrome.scripting.executeScript({
+                });
+                await chrome.scripting.executeScript({
                     target: { tabId },
                     files: [
                         'js/utils.js',
@@ -98,11 +110,13 @@ class PopupApp {
                         'js/vendor/mark.min.js',
                         'js/content.js'
                     ],
-                })
-            ]);
-        } catch (error) {
-            console.error(`Failed to inject content scripts into tab ${tabId}:`, error);
-            throw new Error('Script injection failed. This page may not be supported.');
+                });
+                // Wait a moment for the script to initialize after injection
+                await new Promise(resolve => setTimeout(resolve, 100));
+            } catch (injectionError) {
+                console.error(`Failed to inject content scripts into tab ${tabId}:`, injectionError);
+                throw new Error('Script injection failed. This page may not be supported.');
+            }
         }
     }
 
@@ -121,8 +135,7 @@ class PopupApp {
             this.state.config = await chrome.storage.sync.get(null);
             if (!this.state.config.geminiApiKey) throw { type: 'INVALID_API_KEY', message: 'API Key not set.' };
             
-            await this._injectContentScripts(tab.id);
-            await this._pingContentScriptWithRetry(3, 200);
+            await this._ensureContentScripts(tab.id);
 
             const contextKey = `context_action_${tab.id}`;
             const contextData = (await chrome.storage.local.get(contextKey))[contextKey];
@@ -277,7 +290,6 @@ class PopupApp {
     async _handlePageAnalysis() {
         await this._clearPersistedState();
         this.state.view = 'loading';
-        // Manually update loading text for this specific action
         this.render();
         const loadingText = this.elements.messageArea.querySelector('p');
         if (loadingText) loadingText.textContent = 'Analyzing the entire page...';
@@ -306,13 +318,10 @@ class PopupApp {
         if (purpose.startsWith('rephrase-')) {
             const language = purpose.split('-')[1];
             systemPrompt = currentPrompts.rephrase || DEFAULT_PROMPTS.rephrase;
-            userContent = `Target Language: ${language}\n\nText to rephrase:\n${userContent}`;
+            userContent = `Target Language: ${language}\\n\\nText to rephrase:\\n${userContent}`;
         }
     
-        const targetContainer = {
-            'answer': this.elements.answerDisplay, 'explanation': this.elements.explanationDisplay,
-            'correction': this.elements.explanationDisplay,
-        }[purpose];
+        const targetContainer = { 'answer': this.elements.answerDisplay, 'explanation': this.elements.explanationDisplay, 'correction': this.elements.explanationDisplay }[purpose];
     
         if (targetContainer && targetContainer.parentElement.classList.contains('hidden')) {
             targetContainer.parentElement.classList.remove('hidden');
@@ -351,7 +360,7 @@ class PopupApp {
         this.elements.explanationButton.disabled = true;
         this.elements.retryExplanation.disabled = true;
         this.elements.explanationContainer.classList.remove('hidden');
-        const contentForExplanation = `${this.state.cleanedContent}\n\nCorrect Answer: ${this.state.incorrectAnswer}`;
+        const contentForExplanation = `${this.state.cleanedContent}\\n\\nCorrect Answer: ${this.state.incorrectAnswer}`;
         this._callGeminiStream('explanation', contentForExplanation);
     }
 
@@ -392,15 +401,12 @@ class PopupApp {
     _handlePageAnalysisResult(text) {
         let parsedData;
         try {
-            const jsonMatch = text.match(/{[\s\S]*}/);
-            if (jsonMatch) {
-                parsedData = JSON.parse(jsonMatch[0]);
-            } else {
-                throw new Error("No JSON object found in response.");
-            }
+            const jsonMatch = text.match(/{[\\s\\S]*}/);
+            if (jsonMatch) parsedData = JSON.parse(jsonMatch[0]);
+            else throw new Error("No JSON object found in response.");
         } catch (e) {
             console.warn("Could not parse page analysis JSON, showing as raw text.", e);
-            parsedData = text; // Fallback to raw text
+            parsedData = text;
         }
         this.state.summaryData = parsedData;
         this.state.view = 'summary';
@@ -410,7 +416,6 @@ class PopupApp {
 
     _renderPageSummary(data) {
         let summaryHtml;
-        // Check if data is an object (parsed JSON) or a string (fallback)
         if (typeof data === 'object' && data !== null && data.tldr) {
             const tldrHtml = data.tldr ? `<div class="summary-section summary-tldr"><h3 class="summary-section-title">TL;DR</h3><p>${_escapeHtml(data.tldr)}</p></div>` : '';
             const takeawaysHtml = (data.takeaways?.length > 0) ? `<div class="summary-section summary-takeaways"><h3 class="summary-section-title">Key Takeaways</h3><ul>${data.takeaways.map(item => `<li>${_escapeHtml(item)}</li>`).join('')}</ul></div>` : '';
@@ -418,7 +423,6 @@ class PopupApp {
             const entitiesHtml = (data.entities && (Object.values(data.entities).some(arr => arr && arr.length > 0))) ? `<div class="summary-section summary-entities"><h3 class="summary-section-title">Entities Mentioned</h3>${renderEntities(data.entities.people, 'People')}${renderEntities(data.entities.organizations, 'Organizations')}${renderEntities(data.entities.locations, 'Locations')}</div>` : '';
             summaryHtml = tldrHtml + takeawaysHtml + entitiesHtml;
         } else {
-            // Fallback for raw text
             summaryHtml = `<div class="summary-section"><h3 class="summary-section-title">General Summary</h3><div class="panel-content">${DOMPurify.sanitize(marked.parse(String(data)))}</div></div>`;
         }
         this.elements.pageSummaryContainer.innerHTML = summaryHtml;
@@ -432,8 +436,8 @@ class PopupApp {
         let answerText = (answerMatch ? answerMatch[1].trim() : fullText.trim()).replace(/`/g, '');
         this.state.incorrectAnswer = answerText;
         
-        let formattedHtml = `<p class="answer-highlight">${_escapeHtml(answerText).replace(/\n/g, '<br>')}</p>`;
-        const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
+        let formattedHtml = `<p class="answer-highlight">${_escapeHtml(answerText).replace(/\\n/g, '<br>')}</p>`;
+        const confidenceMatch = fullText.match(/Confidence:\\s*(High|Medium|Low)/i);
         if (confidenceMatch) {
             const confidence = confidenceMatch[1].toLowerCase();
             const reason = fullText.match(/Reason:(.*)/is)?.[1].trim() || "";
@@ -471,30 +475,27 @@ class PopupApp {
     _handleImageModeResult(fullText, purpose) { /* ... implementation ... */ }
     _formatQuestionContent(content) {
         if(!content) return '';
-        const lines = content.split('\n').filter(line => line.trim() !== '');
+        const lines = content.split('\\n').filter(line => line.trim() !== '');
         if (lines.length === 0) return `<div class="question-text">${_escapeHtml(content)}</div>`;
-        const question = _escapeHtml(lines.shift().replace(/^Question:\s*/i, ''));
+        const question = _escapeHtml(lines.shift().replace(/^Question:\\s*/i, ''));
         const optionLines = lines.filter(line => !/^options?:?$/.test(line.trim().toLowerCase()) && !/^pilihan?:?$/.test(line.trim().toLowerCase()));
-        const optionsHtml = optionLines.map(option => `<li>${_escapeHtml(option.trim().replace(/^[\*\-•]\s*|^\s*[\*\-]\s*/, ''))}</li>`).join('');
+        const optionsHtml = optionLines.map(option => `<li>${_escapeHtml(option.trim().replace(/^[\\*\\-•]\\s*|^\\s*[\\*-]\\s*/, ''))}</li>`).join('');
         return `<div class="question-text">${question}</div><ul>${optionsHtml}</ul>`;
     }
-    _renderCorrectionOptions(options) { this.elements.correctionOptions.innerHTML = ''; options.forEach(optionText => { const button = document.createElement('button'); button.className = 'correction-option-button'; button.innerHTML = _escapeHtml(optionText); button.addEventListener('click', () => { const correctionContent = `The original quiz content was:\n${this.state.cleanedContent}\n\nMy previous incorrect answer was: \`${this.state.incorrectAnswer}\`\n\nThe user has indicated the correct answer is: \`${optionText}\``; this.elements.correctionPanel.classList.add('hidden'); this.elements.explanationContainer.classList.remove('hidden'); this.elements.explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div><p>Generating corrected explanation...</p></div>`; this._callGeminiStream('correction', correctionContent); }); this.elements.correctionOptions.appendChild(button); }); }
+    _renderCorrectionOptions(options) { this.elements.correctionOptions.innerHTML = ''; options.forEach(optionText => { const button = document.createElement('button'); button.className = 'correction-option-button'; button.innerHTML = _escapeHtml(optionText); button.addEventListener('click', () => { const correctionContent = `The original quiz content was:\\n${this.state.cleanedContent}\\n\\nMy previous incorrect answer was: \`${this.state.incorrectAnswer}\`\\n\\nThe user has indicated the correct answer is: \`${optionText}\``; this.elements.correctionPanel.classList.add('hidden'); this.elements.explanationContainer.classList.remove('hidden'); this.elements.explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div><p>Generating corrected explanation...</p></div>`; this._callGeminiStream('correction', correctionContent); }); this.elements.correctionOptions.appendChild(button); }); }
     _resetFeedbackButtons() { this.elements.feedbackCorrect.disabled = false; this.elements.feedbackIncorrect.disabled = false; this.elements.feedbackCorrect.classList.remove('selected-correct'); this.elements.feedbackIncorrect.classList.remove('selected-incorrect'); }
     _copyToClipboard(button) { const textToCopy = button.dataset.copyText; if (textToCopy) navigator.clipboard.writeText(textToCopy).then(() => { const originalTitle = button.title; button.title = 'Copied!'; button.classList.add('copied'); setTimeout(() => { button.classList.remove('copied'); button.title = originalTitle; }, 1500); }); }
     _getPersistedState() { return this.state.tab ? chrome.storage.local.get(this.state.tab.id.toString()).then(r => r[this.state.tab.id.toString()] || null) : Promise.resolve(null); }
     _clearPersistedState() { return this.state.tab ? chrome.storage.local.remove(this.state.tab.id.toString()) : Promise.resolve(); }
     _saveCurrentViewState() { if (!this.state.tab) return; const key = this.state.tab.id.toString(); const stateToSave = { lastView: this.state.view, url: this.state.url, cleanedContent: this.state.cleanedContent, originalUserContent: this.state.originalUserContent, answerHTML: this.state.answerHTML, explanationHTML: this.state.explanationHTML, summaryData: this.state.summaryData, totalTokenCount: this.state.totalTokenCount, incorrectAnswer: this.state.incorrectAnswer, isImageMode: this.state.isImageMode, imageUrl: this.state.imageUrl, action: this.state.action, }; chrome.storage.local.set({ [key]: stateToSave }); }
     async _saveToHistory(stateData, actionType) { if (!this.state.tab) return; const { history = [] } = await chrome.storage.local.get('history'); const newEntry = { ...stateData, id: Date.now(), url: this.state.tab.url, title: this.state.tab.title, timestamp: new Date().toISOString(), actionType }; history.unshift(newEntry); if (history.length > 100) history.pop(); await chrome.storage.local.set({ history }); }
-    _pingContentScriptWithRetry(retries, delay) { return new Promise((resolve, reject) => { const attempt = (n) => { this._sendMessageToContentScript({ action: "ping_content_script" }, 500).then(resolve).catch(err => { if (n > 0) { setTimeout(() => attempt(n - 1), delay); } else { reject(new Error("Could not communicate with the page. Please reload the page and try again.")); } }); }; attempt(retries); }); }
     _sendMessageToContentScript(message, timeout = 5000) { return new Promise((resolve, reject) => { if (!this.state.tab || this.state.tab.id === undefined) return reject(new Error("Invalid tab ID.")); const timer = setTimeout(() => reject(new Error('Content script timeout.')), timeout); chrome.tabs.sendMessage(this.state.tab.id, message, (response) => { clearTimeout(timer); if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message)); else resolve(response); }); }); }
-    _createQuizFingerprint(cleanedContent) { if (!cleanedContent) return null; const lines = cleanedContent.split('\n').map(l => l.trim()).filter(l => l); return lines.length < 2 ? null : lines.map(l => l.toLowerCase().replace(/\s+/g, ' ').trim()).join('\n'); }
+    _createQuizFingerprint(cleanedContent) { if (!cleanedContent) return null; const lines = cleanedContent.split('\\n').map(l => l.trim()).filter(l => l); return lines.length < 2 ? null : lines.map(l => l.toLowerCase().replace(/\\s+/g, ' ').trim()).join('\\n'); }
     _simpleHash(str) { let hash = 0; for (let i = 0; i < str.length; i++) { hash = ((hash << 5) - hash) + str.charCodeAt(i); hash |= 0; } return 'cache_' + new Uint32Array([hash])[0].toString(16); }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     new PopupApp().init().catch(err => {
-        // This is a global failsafe for any unhandled rejection during init.
         console.error("Critical initialization error:", err);
-        // Optionally, render a failsafe error message here.
     });
 });
