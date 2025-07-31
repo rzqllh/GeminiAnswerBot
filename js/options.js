@@ -31,10 +31,16 @@ document.addEventListener('DOMContentLoaded', function() {
         confirmTitle: document.getElementById('custom-confirm-title'),
         confirmMessage: document.getElementById('custom-confirm-message'),
         confirmOk: document.getElementById('custom-confirm-ok'),
+<<<<<<< HEAD
         confirmCancel: document.getElementById('custom-confirm-cancel'),
         promptResetButtons: document.querySelectorAll('.prompt-reset-btn')
     };
     
+=======
+        confirmCancel: document.getElementById('custom-confirm-cancel')
+    };
+
+>>>>>>> 27a93821c0a31d1f44e4aad0ef3af2e8cac62586
     const PROMPT_TEXTAREAS = {
         cleaning: document.getElementById('cleaningPrompt'),
         answer: document.getElementById('answerPrompt'),
@@ -53,19 +59,26 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     const REPHRASE_LANGUAGES_INPUT = document.getElementById('rephraseLanguages');
+<<<<<<< HEAD
     
     function showToast(title, message, type = 'info') {
         if (activeToast) activeToast.remove();
         
+=======
+
+    function showToast(title, message, type = 'info') {
+        if (activeToast) activeToast.remove();
+
+>>>>>>> 27a93821c0a31d1f44e4aad0ef3af2e8cac62586
         const toast = document.createElement('div');
         toast.className = 'custom-toast';
         toast.setAttribute('role', 'alert');
         toast.setAttribute('aria-live', 'assertive');
 
         const iconMap = {
-          success: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
-          error: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
-          info: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
+            success: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+            error: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+            info: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
         };
 
         toast.innerHTML = `
@@ -81,6 +94,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         setTimeout(() => toast.classList.add('show'), 100);
         setTimeout(() => {
+<<<<<<< HEAD
           toast.classList.remove('show');
           toast.addEventListener('transitionend', () => {
             if(toast.parentElement) toast.remove();
@@ -225,6 +239,188 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+=======
+            toast.classList.remove('show');
+            toast.addEventListener('transitionend', () => {
+                if (toast.parentElement) toast.remove();
+                if (activeToast === toast) activeToast = null;
+            }, { once: true });
+        }, 4000);
+    }
+    
+    function showConfirm({ title, message, okLabel = 'OK', okClass = 'button-primary' }) {
+        return new Promise(resolve => {
+            ELS.confirmTitle.textContent = title;
+            ELS.confirmMessage.textContent = message;
+            ELS.confirmOk.textContent = okLabel;
+            ELS.confirmOk.className = `button ${okClass}`;
+            ELS.confirmOverlay.classList.remove('hidden');
+            setTimeout(() => ELS.confirmOverlay.classList.add('show'), 10);
+
+            const close = (value) => {
+                ELS.confirmOverlay.classList.remove('show');
+                ELS.confirmOverlay.addEventListener('transitionend', () => {
+                    ELS.confirmOverlay.classList.add('hidden');
+                    // Deregister listeners to prevent multiple resolves
+                    ELS.confirmOk.onclick = null;
+                    ELS.confirmCancel.onclick = null;
+                    resolve(value);
+                }, { once: true });
+            };
+
+            ELS.confirmOk.onclick = () => close(true);
+            ELS.confirmCancel.onclick = () => close(false);
+        });
+    }
+
+    // --- Navigation ---
+    function showInitialTab() {
+        const hash = window.location.hash.slice(1);
+        const targetLink = document.querySelector(`.settings-sidebar a[href="#${hash}"]`);
+        if (hash && targetLink) {
+            switchTab(hash);
+        } else {
+            switchTab('general');
+        }
+    }
+    
+    function switchTab(targetId) {
+        ELS.navLinks.forEach(navLink => {
+            const isActive = navLink.getAttribute('href') === `#${targetId}`;
+            navLink.classList.toggle('active', isActive);
+        });
+        ELS.contentPanes.forEach(pane => {
+            pane.classList.toggle('active', pane.id === targetId);
+        });
+        window.location.hash = targetId;
+        if (targetId === 'history') loadHistory();
+    }
+    
+    // --- General Settings ---
+    async function loadGeneralSettings() {
+      const settings = await chrome.storage.sync.get(['geminiApiKey', 'selectedModel', 'autoHighlight', 'preSubmissionCheck', 'responseTone', 'temperature']);
+      ELS.apiKeyInput.value = settings.geminiApiKey || '';
+      ELS.modelSelect.value = settings.selectedModel || 'gemini-1.5-pro-latest';
+      ELS.responseToneSelect.value = settings.responseTone || 'normal';
+      ELS.autoHighlightToggle.checked = settings.autoHighlight ?? true;
+      ELS.preSubmissionCheckToggle.checked = settings.preSubmissionCheck ?? true;
+
+      const temp = settings.temperature !== undefined ? settings.temperature : 0.4;
+      ELS.temperatureSlider.value = temp;
+      ELS.temperatureValue.textContent = parseFloat(temp).toFixed(1);
+      globalTemperature = temp;
+    }
+
+    function saveGeneralSettings() {
+      const newGlobalTemp = parseFloat(ELS.temperatureSlider.value);
+      const settingsToSave = {
+          'geminiApiKey': ELS.apiKeyInput.value.trim(),
+          'selectedModel': ELS.modelSelect.value,
+          'responseTone': ELS.responseToneSelect.value,
+          'autoHighlight': ELS.autoHighlightToggle.checked,
+          'preSubmissionCheck': ELS.preSubmissionCheckToggle.checked,
+          'temperature': newGlobalTemp
+      };
+      chrome.storage.sync.set(settingsToSave, () => {
+          globalTemperature = newGlobalTemp;
+          loadPromptsForActiveProfile();
+          showToast('Success', 'General settings have been saved.', 'success');
+      });
+    }
+
+    // --- History Management ---
+    function formatQuestionContent(content) {
+        if (!content) return '';
+        const lines = content.split('\n').filter(line => line.trim() !== '');
+        if (lines.length === 0) return '';
+        const question = _escapeHtml(lines.shift().replace(/^Question:\s*/i, ''));
+        const optionsHtml = lines.map(option => {
+            const cleanedOption = option.trim().replace(/^[\*\-]\s*Options:\s*|^\s*[\*\-]\s*/, '');
+            return `<li>${_escapeHtml(cleanedOption)}</li>`;
+        }).join('');
+        return `<p class="history-question">${question}</p><ul class="history-options">${optionsHtml}</ul>`;
+    }
+
+    async function loadHistory() {
+        if (!ELS.historyListContainer) return;
+        ELS.historyListContainer.innerHTML = `<div class="loading-message">Loading history...</div>`;
+        const { history = [] } = await chrome.storage.local.get('history');
+        if (history.length === 0) {
+            ELS.historyListContainer.innerHTML = `<div class="empty-state">No history found.</div>`;
+            return;
+        }
+        ELS.historyListContainer.innerHTML = '';
+        history.forEach(item => {
+            const itemElement = document.createElement('div');
+            itemElement.className = 'card';
+            const formattedDate = new Date(item.timestamp).toLocaleString();
+            const actionLabel = item.actionType.charAt(0).toUpperCase() + item.actionType.slice(1);
+            
+            const contentDisplay = item.cleanedContent ? `
+                <div class="history-item-content">
+                    <h3>Question Content</h3>
+                    <div class="answer-block">${formatQuestionContent(item.cleanedContent)}</div>
+                </div>
+            ` : '';
+            const aiResponseHtml = item.answerHTML ? DOMPurify.sanitize(marked.parse(item.answerHTML)) : 'No response captured.';
+            itemElement.innerHTML = `
+                <div class="history-item-header">
+                    <div class="history-item-title"><a href="${item.url}" target="_blank" title="${_escapeHtml(item.title)}">${_escapeHtml(item.title)}</a></div>
+                    <div class="history-item-meta">${actionLabel} • ${formattedDate}</div>
+                </div>
+                ${contentDisplay}
+                <div class="history-item-content">
+                    <h3>AI Response</h3>
+                    <div class="answer-block">${aiResponseHtml}</div>
+                </div>
+            `;
+            ELS.historyListContainer.appendChild(itemElement);
+        });
+    }
+
+    // --- Prompt Profile Management ---
+    function updateProfileButtonStates() {
+        const selectedProfile = ELS.profileSelect.value;
+        const isDefault = selectedProfile === 'Default';
+        const isLastProfile = ELS.profileSelect.options.length <= 1;
+        ELS.renameProfileBtn.disabled = isDefault;
+        ELS.deleteProfileBtn.disabled = isDefault || isLastProfile;
+    }
+
+    async function populateProfileSelector() {
+        const { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+        ELS.profileSelect.innerHTML = '';
+        for (const profileName in promptProfiles) {
+            const option = document.createElement('option');
+            option.value = profileName;
+            option.textContent = profileName;
+            ELS.profileSelect.appendChild(option);
+        }
+        ELS.profileSelect.value = activeProfile;
+        updateProfileButtonStates();
+    }
+    
+    async function loadPromptsForActiveProfile() {
+        const { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+        const activeProfileData = promptProfiles[activeProfile] || {};
+        
+        for (const key in PROMPT_TEXTAREAS) {
+            PROMPT_TEXTAREAS[key].value = activeProfileData[key] || DEFAULT_PROMPTS[key] || '';
+            PROMPT_TEXTAREAS[key].placeholder = DEFAULT_PROMPTS[key] || '';
+        }
+
+        for (const key in PROMPT_TEMP_SLIDERS) {
+            const slider = PROMPT_TEMP_SLIDERS[key];
+            const valueDisplay = document.getElementById(slider.dataset.target);
+            const tempValue = activeProfileData[`${key}_temp`] !== undefined ? activeProfileData[`${key}_temp`] : globalTemperature;
+            slider.value = tempValue;
+            valueDisplay.textContent = parseFloat(tempValue).toFixed(1);
+        }
+
+        REPHRASE_LANGUAGES_INPUT.value = activeProfileData.rephraseLanguages || 'English, Indonesian';
+    }
+
+>>>>>>> 27a93821c0a31d1f44e4aad0ef3af2e8cac62586
     async function initializePromptManager() {
         let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
         if (!promptProfiles || Object.keys(promptProfiles).length === 0) {
@@ -399,6 +595,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showToast('Success', `Profile "${activeProfile}" has been deleted.`, 'success');
             }
         });
+<<<<<<< HEAD
 
         ELS.promptResetButtons.forEach(button => {
             button.addEventListener('click', (e) => {
@@ -409,6 +606,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
+=======
+>>>>>>> 27a93821c0a31d1f44e4aad0ef3af2e8cac62586
     }
     
     // --- Initialization ---
