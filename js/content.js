@@ -161,11 +161,6 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
       }
   }
 
-  /**
-   * Tries to extract a structured quiz (question + options) from the page.
-   * This is the most specific extraction method.
-   * @returns {string|null} The extracted quiz content or null if not found.
-   */
   function getQuizContent() {
       const quizContainerSelectors = [
           'div.w3-container.w3-panel', 'form[action*="quiz"]', 'div[id*="quiz"]',
@@ -179,7 +174,7 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
               const questionCandidates = container.querySelectorAll('h3, h4, p, div.w3-large, div[class*="question-text"]');
               for (const qEl of questionCandidates) {
                   let qText = qEl.textContent.trim().replace(/^Question\s+\d+\s+of\s+\d+\s*[:-]?\s*/i, '').trim();
-                  if (qText.length > 10 && !qEl.querySelector('input')) { // Ensure it's not a label
+                  if (qText.length > 10 && !qEl.querySelector('input')) {
                       quizQuestion = qText;
                       break;
                   }
@@ -215,33 +210,38 @@ if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
       return null;
   }
   
-  /**
-   * Extracts the main textual content of the page, ignoring interactive elements.
-   * This is used for the "Analyze Page" feature.
-   * @returns {string|null} The main page content, or null if nothing significant is found.
-   */
   function getFullPageContent() {
-      const mainContentArea = document.querySelector('main, article, div[role="main"], #main, .main-content');
+      const mainContentSelectors = [
+          'main', 'article', 'div[role="main"]', 'div[id*="content"]', 
+          'div[class*="content"]', 'div[id*="main"]', 'div[class*="main"]'
+      ];
+      
+      let mainContentArea = null;
+      for (const selector of mainContentSelectors) {
+          mainContentArea = document.querySelector(selector);
+          if (mainContentArea) break;
+      }
+
       const clone = (mainContentArea || document.body).cloneNode(true);
 
       const selectorsToRemove = [
           'script', 'style', 'noscript', 'iframe', 'nav', 'header', 'footer', 'aside',
-          '.ads', '.ad', '[id*="ad"]', '[class*="ad"]', '.hidden', '[style*="display:none"]',
-          '[aria-hidden="true"]', 'button', 'input', 'textarea', 'select', 'form',
-          '[class*="quiz"]', '[id*="quiz"]', '.w3-sidebar', '.w3-bar', '.w3-example'
+          'button', 'input', 'textarea', 'select', 'form',
+          '[aria-hidden="true"]', '[style*="display:none"]',
+          'div[class*="sidebar"]', 'div[id*="sidebar"]', 
+          'div[class*="promo"]', 'div[class*="related"]',
+          'div[class*="ad"]', '[id*="ad"]', '.ads', '.ad',
+          '.hidden', '.w3-sidebar', '.w3-bar', '.w3-example',
+          '[class*="quiz"]', '[id*="quiz"]'
       ];
       clone.querySelectorAll(selectorsToRemove.join(', ')).forEach(el => el.remove());
 
       let content = clone.innerText;
-      content = content.replace(/\s+/g, ' ').trim();
+      content = content.replace(/\s{3,}/g, '\n\n').trim();
       
       return content.length > 100 ? content : null;
   }
 
-  /**
-   * Fallback to get any text content if other methods fail.
-   * @returns {string} The innerText of the body.
-   */
   function getAnyContentFallback() {
       const bodyClone = document.body.cloneNode(true);
       bodyClone.querySelectorAll('script, style, noscript, iframe').forEach(el => el.remove());

@@ -48,38 +48,28 @@ Carefully follow these steps:
 
 Your final response should be clean, informative, and focused entirely on correcting and clarifying the quiz content.`,
 
-  pageAnalysis: `You are a highly advanced text analysis engine. Your task is to process raw webpage content and return a structured semantic summary.
+  pageAnalysis: `You are a highly advanced text analysis engine. Your primary task is to identify the main content of a webpage from a raw text dump and create a structured semantic summary of IT.
 
 STRICT INSTRUCTIONS:
-1. Analyze the **entire input text** to determine its main topic, key insights, and any named entities (people, organizations, locations).
-2. Your output MUST be a **valid, standalone JSON object**. Absolutely DO NOT include any explanations, markdown, or additional commentary outside the JSON.
-3. Use the exact JSON structure defined below. If a field cannot be populated (e.g. no entities found, unclear content), use an empty string "" or an empty array []. Never omit keys or change the structure.
-4. All string values (including tldr, takeaways, and entity names) MUST be in the **exact same language** as the source content. Do not translate or mix languages.
-5. If the input is nonsensical, contains only code, or cannot be meaningfully analyzed, return the following fallback structure, fully populated:
-
-{
-  "tldr": "Content could not be summarized.",
-  "takeaways": [],
-  "entities": {
-    "people": [],
-    "organizations": [],
-    "locations": []
-  }
-}
+1.  **Identify Main Content:** From the entire input text, first identify the core topic, article, or main subject matter. You MUST intelligently ignore and filter out surrounding noise like navigation menus, sidebars, lists of links, promotional text, and footers.
+2.  **Summarize Main Content ONLY:** Your entire summary must be based ONLY on the main content you have identified.
+3.  **JSON Output:** Your output MUST be a **valid, standalone JSON object**. Do not include any explanations, markdown, or commentary outside the JSON structure.
+4.  **Language Consistency:** All string values in the JSON (tldr, takeaways, entities) MUST be in the **exact same language** as the source content. Do not translate.
+5.  **Structure and Keys:** Use the exact JSON structure defined below. If a field cannot be populated, use an empty string "" or an empty array []. Never omit keys.
 
 **JSON OUTPUT FORMAT (MUST FOLLOW EXACTLY):**
 \`\`\`json
 {
-  "tldr": "A concise, one-sentence summary of the entire content.",
+  "tldr": "A concise, one-sentence summary of the main content.",
   "takeaways": [
-    "Key insight or supporting point from the content.",
-    "Second notable insight.",
-    "Third major point, if present."
+    "Key insight or supporting point from the main content.",
+    "Second notable insight from the main content.",
+    "Third major point from the main content, if present."
   ],
   "entities": {
-    "people": ["Name of a person mentioned", "Another name if present"],
-    "organizations": ["Mentioned company or organization"],
-    "locations": ["Relevant city, country, or place"]
+    "people": ["Name of a person mentioned in the main content"],
+    "organizations": ["Mentioned company or organization in the main content"],
+    "locations": ["Relevant city or country in the main content"]
   }
 }
 \`\`\``,
