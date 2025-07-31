@@ -65,6 +65,7 @@ This extension is built using Manifest V3 and follows a modern, modular architec
     -   Displaying the "Pre-Submission Check" confirmation modal.
 -   `js/popup.js`: Manages the entire UI and state of the default popup window. It is built as a self-contained class (`PopupApp`) that handles rendering different views (loading, quiz, summary, error), managing user interactions, and orchestrating communication with the content and background scripts.
 -   `js/options.js`: Contains all the logic for the feature-rich options page, including saving settings, managing prompt profiles, and displaying interaction history.
+-   `js/utils.js`: A shared utility script, primarily for HTML escaping to prevent XSS.
 
 ### Core Concepts
 
@@ -72,23 +73,26 @@ This extension is built using Manifest V3 and follows a modern, modular architec
 -   **Per-Tab State Persistence**: The popup's state is saved to `chrome.storage.local` keyed by the tab's ID. This allows the UI to be restored to its last known state (e.g., showing a previous answer) when the user reopens the popup on the same page, providing a seamless experience.
 
 ### Project Structure
-
 ```
 GeminiAnswerBot/
 ├── assets/
 │ ├── options.css
 │ ├── popup.css
 │ ├── dialog.css
+│ ├── toolbar.css
+│ ├── highlighter.css
 │ └── ... (icons, images)
 ├── js/
 │ ├── vendor/
-│ │ └── marked.min.js
+│ │ ├── dompurify.min.js
+│ │ ├── marked.min.js
 │ │ └── mark.min.js
-│ ├── background.js # Service Worker, API calls, routing
-│ ├── content.js # DOM interaction, text extraction
-│ ├── popup.js # UI logic for the main popup
-│ ├── options.js # UI logic for the settings page
-│ └── prompts.js # Default system prompts for the AI
+│ ├── background.js
+│ ├── content.js
+│ ├── options.js
+│ ├── popup.js
+│ ├── prompts.js
+│ └── utils.js
 ├── ui/
 │ ├── options.html
 │ └── popup.html
