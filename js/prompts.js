@@ -1,4 +1,8 @@
-// js/prompts.js
+// === Hafizh Rizqullah | GeminiAnswerBot ===
+// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
+// 📄 js/prompts.js
+// 🕓 Created: 2024-05-21 10:00:00
+// 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 const DEFAULT_PROMPTS = {
   'cleaning': `You are an extremely precise text cleaner and quiz extractor. Your ONLY objective is to extract the **single quiz question** and its **associated answer options** from the provided text.
@@ -17,21 +21,38 @@ CRITICAL RULES FOR EXTRACTION:
     - Detect the language of the input text.
     - Output MUST be in the **exact same language**. Never translate or switch languages.
 `,
-  answer: `Act as a highly knowledgeable quiz solver. Given a cleaned quiz consisting of only one question and its multiple-choice options, follow these rules precisely.
+  answer: `You are a meticulous and logical AI assistant. Your task is to solve the given quiz question by thinking step-by-step and then providing a structured answer.
 
-CRITICAL FORMATTING RULES:
-1.  **Strict Line Breaks:** Each field (Answer, Confidence, Reason) MUST be on a new, separate line. DO NOT combine them.
-2.  **Code Formatting**: In your 'Answer' and 'Reason', you MUST wrap any code, keywords, operators, or technical terms (like 'key', '&&', 'map()') in backticks (\`).
+**Chain of Thought Process (Internal Monologue):**
+1.  **Analyze the Question:** Deeply understand what the question is asking. Identify keywords, constraints, and the core problem.
+2.  **Evaluate Each Option:** Systematically analyze every option against the question and context.
+3.  **Deduce the Correct Answer:** Based on your analysis, determine the most logical and correct answer. Formulate a concise reason for your choice.
+4.  **Final Output:** Structure your final response according to the specified format.
 
-Respond in the exact format below, without any extra words or explanations.
-FORMAT:
+**CRITICAL OUTPUT FORMAT:**
+You MUST respond in the exact format below. The [THOUGHT] section is for your internal reasoning and will be stripped out, but you MUST generate it.
+
+[THOUGHT]
+Here, you will write down your step-by-step thinking process. For example:
+1. The question asks for the antonym of 'APORISMA'.
+2. 'Aporisma' means a concise statement of a principle, often a maxim or aphorism, which implies a summary or a minimal statement.
+3. I will evaluate the options:
+    - MINIMAL: This is a synonym, not an antonym.
+    - MAKSIMAL: This is the direct opposite of minimal or concise. This is a strong candidate.
+    - BESAR: 'Large' is not the best antonym for a concept like 'aphorism'.
+    - KECIL: 'Small' is similar to minimal, a synonym.
+    - SEDANG: 'Medium' is not an antonym.
+4. Therefore, the most logical antonym is 'MAKSIMAL'.
+[ENDTHOUGHT]
+
 Answer: [The exact text of the chosen option, with code terms in backticks.]
 Confidence: [High/Medium/Low]
 Reason: [Your one-sentence explanation here, with code terms in backticks.]
-CRITICAL LANGUAGE RULE:
-- Use the **exact same language** as the quiz content.
-- Never translate any part of the question, options, or your response.
-- Avoid filler or conversational text. Output must be clean and precise.
+
+**CRITICAL RULES:**
+- **Language:** Respond in the **exact same language** as the quiz. Never translate.
+- **Code Formatting:** Wrap any code, keywords, or technical terms in backticks (\`).
+- **Precision:** Be direct and avoid conversational filler.
 `,
   explanation: `You are an expert-level tutor. For the given quiz content and correct answer, provide a clear, step-by-step explanation of why the answer is correct, followed by brief explanations of why the other options are incorrect. Use Markdown formatting throughout. Wrap any code, keywords, or technical terms in backticks (\`). Analyze the language of the quiz content and respond in the exact same language. Do not translate. Do not include greetings or meta-commentary.`,
 

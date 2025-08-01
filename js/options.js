@@ -1,4 +1,8 @@
-// js/options.js
+// === Hafizh Rizqullah | GeminiAnswerBot ===
+// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
+// 📄 js/options.js
+// 🕓 Created: 2024-05-21 10:10:00
+// 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 document.addEventListener('DOMContentLoaded', function() {
     let activeToast = null;
@@ -170,7 +174,61 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- History Management ---
     async function loadHistory() {
-        // ... (function body remains the same)
+        ELS.historyListContainer.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading history...</p></div>';
+        const { history = [] } = await chrome.storage.local.get('history');
+
+        if (history.length === 0) {
+            ELS.historyListContainer.innerHTML = `
+                <div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                    <h3>No History Yet</h3>
+                    <p>Your interactions with the extension will appear here.</p>
+                </div>`;
+            return;
+        }
+
+        ELS.historyListContainer.innerHTML = '';
+        history.forEach(item => {
+            try {
+                const card = document.createElement('div');
+                card.className = 'history-card';
+
+                const cleanAnswer = (item.answerHTML || '').replace(/\[THOUGHT\][\s\S]*\[ENDTHOUGHT\]\s*/, '');
+                const answerMatch = cleanAnswer.match(/Answer:\s*(.*)/i);
+                const answerText = answerMatch ? answerMatch[1].trim() : cleanAnswer.trim();
+
+                const questionText = (item.cleanedContent || 'No question content available.')
+                    .replace(/Question:/i, '')
+                    .replace(/Options:/i, '')
+                    .trim()
+                    .substring(0, 150);
+
+                const formattedDate = new Date(item.timestamp).toLocaleString(undefined, {
+                    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                });
+
+                card.innerHTML = `
+                    <div class="history-card-header">
+                        <a href="${_escapeHtml(item.url)}" target="_blank" class="history-card-title" title="${_escapeHtml(item.title)}">${_escapeHtml(item.title) || 'Untitled Page'}</a>
+                        <span class="history-card-date">${formattedDate}</span>
+                    </div>
+                    <div class="history-card-body">
+                        <div class="history-item">
+                            <span class="history-item-label">Q:</span>
+                            <p class="history-item-content">${_escapeHtml(questionText)}...</p>
+                        </div>
+                        <div class="history-item">
+                            <span class="history-item-label">A:</span>
+                            <p class="history-item-content answer">${_escapeHtml(answerText)}</p>
+                        </div>
+                    </div>
+                `;
+                ELS.historyListContainer.appendChild(card);
+            } catch (e) {
+                console.error('Failed to render history item:', item, e);
+                // Skip this item if it's malformed
+            }
+        });
     }
 
     // --- Prompt Profile Management ---

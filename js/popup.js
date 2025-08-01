@@ -1,4 +1,8 @@
-// js/popup.js
+// === Hafizh Rizqullah | GeminiAnswerBot ===
+// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
+// 📄 js/popup.js
+// 🕓 Created: 2024-05-21 10:05:00
+// 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /**
  * Manages the entire lifecycle and UI of the popup.
@@ -414,14 +418,17 @@ class PopupApp {
     }
     
     _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0) {
-        this.state.answerHTML = fullText;
+        // Strip the [THOUGHT] block before processing
+        const cleanText = fullText.replace(/\[THOUGHT\][\s\S]*\[ENDTHOUGHT\]\s*/, '');
+
+        this.state.answerHTML = cleanText;
         this.state.totalTokenCount = totalTokenCount;
 
-        const answerMatch = fullText.match(/Answer:\s*(.*)/i);
-        const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
-        const reasonMatch = fullText.match(/Reason:\s*([\s\S]*)/i);
+        const answerMatch = cleanText.match(/Answer:\s*(.*)/i);
+        const confidenceMatch = cleanText.match(/Confidence:\s*(High|Medium|Low)/i);
+        const reasonMatch = cleanText.match(/Reason:\s*([\s\S]*)/i);
 
-        const answerText = answerMatch ? answerMatch[1].trim() : fullText.trim();
+        const answerText = answerMatch ? answerMatch[1].trim() : cleanText.trim();
         this.state.incorrectAnswer = answerText.replace(/`/g, '');
         
         let answerHtml = `<p class="answer-highlight">${this._renderInlineMarkdown(answerText)}</p>`;
@@ -452,12 +459,12 @@ class PopupApp {
                 .catch(err => console.warn('Could not highlight answer on page:', err.message));
         }
         if (!fromCache && this.state.cacheKey) {
-            chrome.storage.local.set({ [this.state.cacheKey]: { answerHTML: fullText, totalTokenCount } });
+            chrome.storage.local.set({ [this.state.cacheKey]: { answerHTML: cleanText, totalTokenCount } });
         }
         
         this._saveCurrentViewState();
         if (!fromCache) {
-            this._saveToHistory({ cleanedContent: this.state.cleanedContent, answerHTML: fullText }, 'quiz');
+            this._saveToHistory({ cleanedContent: this.state.cleanedContent, answerHTML: cleanText }, 'quiz');
         }
     }
 
