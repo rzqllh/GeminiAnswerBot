@@ -1,14 +1,49 @@
 /* assets/dialog.css */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+:root {
+  /* Light Mode Variables */
+  --dialog-overlay-bg: rgba(0, 0, 0, 0.4);
+  --dialog-bg: #ffffff;
+  --dialog-border: rgba(0, 0, 0, 0.1);
+  --dialog-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  --dialog-primary-text: #1d1d1f;
+  --dialog-secondary-text: #6e6e73;
+  --dialog-answers-bg: #f5f5f7;
+  --dialog-code-bg: #e8e8ed;
+  --dialog-code-text: #333333;
+  --dialog-button-secondary-bg: #e9e9eb;
+  --dialog-button-secondary-text: #1d1d1f;
+  --dialog-button-primary-bg: #007aff;
+  --dialog-button-primary-text: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Dark Mode Overrides */
+    --dialog-overlay-bg: rgba(0, 0, 0, 0.5);
+    --dialog-bg: #2d2d2d;
+    --dialog-border: rgba(255, 255, 255, 0.1);
+    --dialog-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    --dialog-primary-text: #f5f5f7;
+    --dialog-secondary-text: #b0b0b0;
+    --dialog-answers-bg: rgba(0, 0, 0, 0.2);
+    --dialog-code-bg: rgba(0, 0, 0, 0.3);
+    --dialog-code-text: #e0e0e0;
+    --dialog-button-secondary-bg: #555;
+    --dialog-button-secondary-text: #f5f5f7;
+    --dialog-button-primary-bg: #0a84ff;
+  }
+}
+
 .gemini-answer-bot-dialog-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 2147483646; /* One less than the dialog itself */
+    background-color: var(--dialog-overlay-bg);
+    z-index: 2147483646;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -20,11 +55,11 @@
 
 .gemini-answer-bot-dialog-box {
     width: 420px;
-    background: #2d2d2d;
+    background: var(--dialog-bg);
     border-radius: 14px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #f5f5f7;
+    box-shadow: var(--dialog-shadow);
+    border: 1px solid var(--dialog-border);
+    color: var(--dialog-primary-text);
     padding: 24px;
     transform: scale(0.95);
     opacity: 0;
@@ -52,13 +87,13 @@
 
 .gemini-answer-bot-dialog-content p {
     font-size: 14px;
-    color: #b0b0b0;
+    color: var(--dialog-secondary-text);
     line-height: 1.6;
     margin: 0 0 20px 0;
 }
 
 .gemini-answer-bot-dialog-answers {
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--dialog-answers-bg);
     border-radius: 8px;
     padding: 16px;
     margin-bottom: 24px;
@@ -72,22 +107,21 @@
 }
 
 .gemini-answer-bot-answer-item strong {
-    color: #f5f5f7;
+    color: var(--dialog-secondary-text);
     font-weight: 500;
     display: block;
     margin-bottom: 4px;
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: #888;
 }
 
 .gemini-answer-bot-answer-item code {
-    background-color: rgba(0, 0, 0, 0.3);
+    background-color: var(--dialog-code-bg);
     border-radius: 4px;
     padding: 2px 6px;
     font-family: 'SF Mono', 'Menlo', 'monospace';
-    color: #e0e0e0;
+    color: var(--dialog-code-text);
 }
 
 
@@ -111,11 +145,11 @@
 }
 
 .gemini-answer-bot-dialog-button.primary {
-    background-color: #0a84ff;
-    color: white;
+    background-color: var(--dialog-button-primary-bg);
+    color: var(--dialog-button-primary-text);
 }
 
 .gemini-answer-bot-dialog-button.secondary {
-    background-color: #555;
-    color: #f5f5f7;
+    background-color: var(--dialog-button-secondary-bg);
+    color: var(--dialog-button-secondary-text);
 }
