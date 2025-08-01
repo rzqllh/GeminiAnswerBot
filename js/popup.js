@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/popup.js
-// 🕓 Created: 2024-05-21 17:05:00
+// 🕓 Created: 2024-05-21 18:05:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /**
@@ -126,11 +126,11 @@ class PopupApp {
             
             await this._ensureContentScripts(tab.id);
 
-            // [FIXED] Ganti logika storage dengan message-passing yang andal.
+            // [FIXED] Replace unreliable storage check with a reliable message handshake.
             const contextData = await chrome.runtime.sendMessage({ action: 'popupReady' });
 
             if (contextData && contextData.source === 'contextMenu') {
-                // Alur kerja jika popup dibuka oleh menu konteks/toolbar
+                // This block runs ONLY if the popup was opened by a context menu or toolbar action.
                 await this._clearPersistedState();
                 this.state.action = contextData.action;
                 this.state.url = this.state.tab.url;
@@ -150,7 +150,7 @@ class PopupApp {
                     this._callGeminiStream(contextData.action, contextData.selectionText);
                 }
             } else {
-                // Alur kerja normal jika popup dibuka oleh pengguna
+                // This is the normal flow for when a user clicks the extension icon.
                 const persistedState = await this._getPersistedState();
                 if (persistedState && persistedState.url === this.state.tab.url) {
                     Object.assign(this.state, persistedState);

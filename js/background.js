@@ -1,11 +1,11 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/background.js
-// 🕓 Created: 2024-05-21 17:00:00
+// 🕓 Created: 2024-05-21 18:00:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 // Variabel sementara di memori untuk menyimpan data konteks.
-// Ini jauh lebih andal daripada chrome.storage untuk komunikasi cepat.
+// Ini adalah solusi andal untuk menghindari race condition dengan chrome.storage.
 let contextDataForPopup = null;
 
 async function fetchImageAsBase64(url) {
@@ -259,14 +259,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         case 'triggerContextMenuAction':
             handleContextAction({ menuItemId: request.payload.action, selectionText: request.payload.selectionText }, sender.tab);
             break;
-        // [ADDED] Listener untuk "jabat tangan" dari popup.
         case 'popupReady':
             if (contextDataForPopup) {
                 sendResponse(contextDataForPopup);
-                contextDataForPopup = null; // Hapus data setelah dikirim untuk mencegah penggunaan ulang.
+                contextDataForPopup = null; // Clear data after sending
             } else {
-                sendResponse(null); // Kirim null jika tidak ada data konteks.
+                sendResponse(null); // No data to send
             }
-            return true; // Wajib untuk respons asinkron.
+            return true; // Required for async response
     }
 });
