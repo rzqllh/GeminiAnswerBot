@@ -1,36 +1,21 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/popup.js
-// 🕓 Created: 2024-05-21 18:05:00
+// 🕓 Created: 2024-05-21 19:00:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /**
  * Manages the entire lifecycle and UI of the popup.
  */
 class PopupApp {
-    /**
-     * Caches DOM elements, initializes state, and binds event listeners.
-     */
     constructor() {
         this.state = {
-            tab: null,
-            config: {},
-            view: 'loading', // 'loading', 'quiz', 'summary', 'error', 'info'
-            lastView: 'quiz', // The view to persist
-            url: null, // The URL associated with the persisted state
-            error: null,
-            cleanedContent: null,
-            originalUserContent: null,
-            answerHTML: null,
-            explanationHTML: null,
-            totalTokenCount: 0,
-            cacheKey: null,
-            incorrectAnswer: null,
-            isImageMode: false,
-            imageUrl: null,
-            base64ImageData: null,
-            action: null, // To store the specific action, e.g., 'image-quiz'
-            summaryData: null, // To store summary results
+            tab: null, config: {}, view: 'loading', lastView: 'quiz', url: null,
+            error: null, cleanedContent: null, originalUserContent: null,
+            answerHTML: null, explanationHTML: null, totalTokenCount: 0,
+            cacheKey: null, incorrectAnswer: null, isImageMode: false,
+            imageUrl: null, base64ImageData: null, action: null,
+            summaryData: null, generalTaskResult: null,
         };
 
         this.elements = {};
@@ -48,13 +33,13 @@ class PopupApp {
     _queryElements() {
         const ids = [
             'settingsButton', 'analyzePageButton', 'rescanButton', 'explanationButton',
-            'aiActionsWrapper', 'pageSummaryContainer', 'quizModeContainer',
-            'contentDisplayWrapper', 'contentDisplay', 'answerContainer', 'answerDisplay',
-            'explanationContainer', 'explanationDisplay', 'messageArea',
-            'retryAnswer', 'retryExplanation', 'copyAnswer', 'copyExplanation',
-            'feedbackContainer', 'feedbackCorrect', 'feedbackIncorrect',
-            'correctionPanel', 'correctionOptions', 'imagePreviewContainer',
-            'imagePreview', 'imageStatusText', 'answerCardTitle'
+            'aiActionsWrapper', 'quizModeContainer', 'contentDisplayWrapper', 
+            'contentDisplay', 'answerContainer', 'answerDisplay', 'explanationContainer', 
+            'explanationDisplay', 'messageArea', 'retryAnswer', 'retryExplanation', 
+            'copyAnswer', 'copyExplanation', 'feedbackContainer', 'feedbackCorrect', 
+            'feedbackIncorrect', 'correctionPanel', 'correctionOptions', 
+            'imagePreviewContainer', 'imagePreview', 'imageStatusText', 'answerCardTitle',
+            'generalTaskContainer', 'generalTaskTitle', 'generalTaskDisplay', 'copyGeneralTask'
         ];
         ids.forEach(id => {
             const key = id.replace(/-([a-z])/g, g => g[1].toUpperCase());
@@ -73,35 +58,21 @@ class PopupApp {
         this.elements.feedbackIncorrect.addEventListener('click', () => this._handleFeedbackIncorrect());
         this.elements.copyAnswer.addEventListener('click', e => this._copyToClipboard(e.currentTarget));
         this.elements.copyExplanation.addEventListener('click', e => this._copyToClipboard(e.currentTarget));
+        this.elements.copyGeneralTask.addEventListener('click', e => this._copyToClipboard(e.currentTarget));
     }
 
     _handleMessages(request) {
-        if (request.action === 'geminiStreamUpdate') {
-            this._handleStreamUpdate(request);
-        }
+        if (request.action === 'geminiStreamUpdate') this._handleStreamUpdate(request);
     }
 
     async _ensureContentScripts(tabId) {
         try {
             await this._sendMessageToContentScript({ action: "ping_content_script" }, 200);
-            return;
         } catch (e) {
             console.log("Content script not found, injecting now.");
             try {
-                await chrome.scripting.insertCSS({
-                    target: { tabId },
-                    files: ['assets/highlighter.css', 'assets/dialog.css', 'assets/toolbar.css'],
-                });
-                await chrome.scripting.executeScript({
-                    target: { tabId },
-                    files: [
-                        'js/utils.js',
-                        'js/vendor/dompurify.min.js',
-                        'js/vendor/marked.min.js',
-                        'js/vendor/mark.min.js',
-                        'js/content.js'
-                    ],
-                });
+                await chrome.scripting.insertCSS({ target: { tabId }, files: ['assets/highlighter.css', 'assets/dialog.css', 'assets/toolbar.css'] });
+                await chrome.scripting.executeScript({ target: { tabId }, files: ['js/utils.js', 'js/vendor/dompurify.min.js', 'js/vendor/marked.min.js', 'js/vendor/mark.min.js', 'js/content.js'] });
                 await new Promise(resolve => setTimeout(resolve, 100));
             } catch (injectionError) {
                 console.error(`Failed to inject content scripts into tab ${tabId}:`, injectionError);
@@ -126,31 +97,29 @@ class PopupApp {
             
             await this._ensureContentScripts(tab.id);
 
-            // [FIXED] Replace unreliable storage check with a reliable message handshake.
             const contextData = await chrome.runtime.sendMessage({ action: 'popupReady' });
 
             if (contextData && contextData.source === 'contextMenu') {
-                // This block runs ONLY if the popup was opened by a context menu or toolbar action.
                 await this._clearPersistedState();
                 this.state.action = contextData.action;
                 this.state.url = this.state.tab.url;
+                this.state.originalUserContent = contextData.selectionText || contextData.srcUrl;
+                
+                const isGeneralTask = ['summarize', 'explain', 'translate'].some(t => this.state.action.startsWith(t));
 
-                if (contextData.action.startsWith('image-')) {
-                    this.state.isImageMode = true;
+                if (isGeneralTask) {
+                    this.state.view = 'general';
+                    this.render();
+                    this._callGeminiStream(this.state.action, this.state.originalUserContent);
+                } else {
+                    this.state.isImageMode = contextData.action.startsWith('image-');
                     this.state.imageUrl = contextData.srcUrl;
                     this.state.base64ImageData = contextData.base64ImageData;
-                    this.state.originalUserContent = contextData.srcUrl;
                     this.state.view = 'quiz';
                     this.render();
-                    this._callGeminiStream('answer', '', this.state.base64ImageData);
-                } else {
-                    this.state.originalUserContent = contextData.selectionText;
-                    this.state.view = 'quiz';
-                    this.render();
-                    this._callGeminiStream(contextData.action, contextData.selectionText);
+                    this._callGeminiStream(this.state.action, this.state.originalUserContent, this.state.base64ImageData);
                 }
             } else {
-                // This is the normal flow for when a user clicks the extension icon.
                 const persistedState = await this._getPersistedState();
                 if (persistedState && persistedState.url === this.state.tab.url) {
                     Object.assign(this.state, persistedState);
@@ -161,8 +130,12 @@ class PopupApp {
                     this.state.view = 'loading';
                     this.render();
                     const response = await this._sendMessageToContentScript({ action: "get_quiz_content" });
-                    if (!response || !response.content?.trim()) throw new Error("No readable quiz content found.");
-
+                    if (!response || !response.content?.trim()) {
+                        this.state.view = 'info';
+                        this.render();
+                        this.elements.messageArea.innerHTML = `<div class="info-panel"><div class="info-panel-header">No Quiz Found</div><div class="info-panel-body"><p>We couldn't detect a quiz on this page. Try highlighting a question and its options, then use the right-click menu.</p></div></div>`;
+                        return;
+                    }
                     this.state.url = this.state.tab.url;
                     this.state.originalUserContent = response.content;
                     this._callGeminiStream('cleaning', response.content);
@@ -179,29 +152,27 @@ class PopupApp {
     render() {
         this.elements.messageArea.classList.add('hidden');
         this.elements.quizModeContainer.classList.add('hidden');
-        this.elements.pageSummaryContainer.classList.add('hidden');
+        this.elements.generalTaskContainer.classList.add('hidden');
         
         switch (this.state.view) {
-            case 'loading':
-                this.elements.messageArea.classList.remove('hidden');
-                this.elements.messageArea.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Scanning for quiz...</p></div>`;
-                break;
-            case 'info':
-                this.elements.messageArea.classList.remove('hidden');
-                this.elements.messageArea.innerHTML = `<div class="info-panel"><div class="info-panel-header">Page Not Supported</div><div class="info-panel-body"><p>For your security, Chrome extensions cannot run on this special page.</p></div></div>`;
-                break;
-            case 'error':
-                this.elements.messageArea.classList.remove('hidden');
-                this._renderErrorState();
-                break;
-            case 'summary':
-                this.elements.pageSummaryContainer.classList.remove('hidden');
-                this._renderPageSummary(this.state.summaryData);
-                break;
-            case 'quiz':
-                this.elements.quizModeContainer.classList.remove('hidden');
-                this._renderQuizState();
-                break;
+            case 'loading': this.elements.messageArea.classList.remove('hidden'); this.elements.messageArea.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Scanning for quiz...</p></div>`; break;
+            case 'info': this.elements.messageArea.classList.remove('hidden'); break;
+            case 'error': this.elements.messageArea.classList.remove('hidden'); this._renderErrorState(); break;
+            case 'general': this.elements.generalTaskContainer.classList.remove('hidden'); this._renderGeneralTaskState(); break;
+            case 'quiz': this.elements.quizModeContainer.classList.remove('hidden'); this._renderQuizState(); break;
+        }
+    }
+
+    _renderGeneralTaskState() {
+        const titleMap = { 'summarize': 'Summary', 'explain': 'Explanation', 'translate': 'Translation' };
+        const baseAction = this.state.action.split('-')[0];
+        this.elements.generalTaskTitle.textContent = titleMap[baseAction] || 'Result';
+        
+        if (this.state.generalTaskResult) {
+            this.elements.generalTaskDisplay.innerHTML = DOMPurify.sanitize(marked.parse(this.state.generalTaskResult));
+            this.elements.copyGeneralTask.dataset.copyText = this.state.generalTaskResult;
+        } else {
+            this.elements.generalTaskDisplay.innerHTML = `<div class="loading-state" style="min-height: 150px;"><div class="spinner"></div></div>`;
         }
     }
 
@@ -306,13 +277,6 @@ class PopupApp {
             userContent = `Target Language: ${language}\n\nText to rephrase:\n${userContent}`;
         }
     
-        const targetContainer = { 'answer': this.elements.answerDisplay, 'explanation': this.elements.explanationDisplay, 'correction': this.elements.explanationDisplay }[purpose];
-    
-        if (targetContainer && targetContainer.parentElement.classList.contains('hidden')) {
-            targetContainer.parentElement.classList.remove('hidden');
-            targetContainer.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div></div>`;
-        }
-    
         chrome.runtime.sendMessage({ action: 'callGeminiStream', payload: { apiKey: geminiApiKey, model: selectedModel, systemPrompt, userContent, base64ImageData, purpose } });
     }
     
@@ -351,29 +315,39 @@ class PopupApp {
 
     _handleStreamUpdate(request) {
         const { payload, purpose } = request;
-        if (!payload.success) {
-            this.state.view = 'error'; this.state.error = payload.error; this.render();
-            return;
-        }
+        if (!payload.success) { this.state.view = 'error'; this.state.error = payload.error; this.render(); return; }
+        
+        const isGeneralTask = ['summarize', 'explain', 'translate'].some(t => purpose.startsWith(t));
+
         if (payload.done) {
             const fullText = payload.fullText || this.streamAccumulator[purpose] || '';
             delete this.streamAccumulator[purpose];
 
-            const purposeHandlers = {
-                'cleaning': text => this._handleCleaningResult(text),
-                'answer': text => this._handleAnswerResult(text, false, payload.totalTokenCount),
-                'explanation': text => this._handleExplanationResult(text, false),
-                'correction': text => this._handleCorrectionResult(text),
-                'pageAnalysis': text => this._handlePageAnalysisResult(text)
-            };
-            
-            if (purpose.startsWith('image-')) this._handleImageModeResult(fullText, purpose);
-            else if (purpose.startsWith('rephrase-') || ['summarize', 'explain', 'translate'].includes(purpose)) this._handleContextMenuResult(fullText, purpose);
-            else if (purposeHandlers[purpose]) purposeHandlers[purpose](fullText);
-
+            if (isGeneralTask) {
+                this._handleGeneralTaskResult(fullText);
+            } else {
+                const purposeHandlers = {
+                    'cleaning': text => this._handleCleaningResult(text),
+                    'answer': text => this._handleAnswerResult(text, false, payload.totalTokenCount),
+                    'explanation': text => this._handleExplanationResult(text, false),
+                    'correction': text => this._handleCorrectionResult(text),
+                };
+                if (purposeHandlers[purpose]) purposeHandlers[purpose](fullText);
+            }
         } else if (payload.chunk) {
             this.streamAccumulator[purpose] = (this.streamAccumulator[purpose] || '') + payload.chunk;
+            if (isGeneralTask) {
+                this.state.generalTaskResult = this.streamAccumulator[purpose];
+                this._renderGeneralTaskState();
+            }
         }
+    }
+
+    _handleGeneralTaskResult(fullText) {
+        this.state.generalTaskResult = fullText;
+        this.state.view = 'general';
+        this.render();
+        this._saveToHistory({ originalUserContent: this.state.originalUserContent, generalTaskResult: fullText }, this.state.action);
     }
     
     _handleCleaningResult(fullText) {
@@ -383,36 +357,6 @@ class PopupApp {
         this._saveCurrentViewState();
     }
 
-    _handlePageAnalysisResult(text) {
-        let parsedData;
-        try {
-            const jsonMatch = text.match(/{[\s\S]*}/);
-            if (jsonMatch) parsedData = JSON.parse(jsonMatch[0]);
-            else throw new Error("No JSON object found in response.");
-        } catch (e) {
-            console.warn("Could not parse page analysis JSON, showing as raw text.", e);
-            parsedData = text;
-        }
-        this.state.summaryData = parsedData;
-        this.state.view = 'summary';
-        this.render();
-        this._saveCurrentViewState();
-    }
-
-    _renderPageSummary(data) {
-        let summaryHtml;
-        if (typeof data === 'object' && data !== null && data.tldr) {
-            const tldrHtml = data.tldr ? `<div class="summary-section summary-tldr"><h3 class="summary-section-title">TL;DR</h3><p>${_escapeHtml(data.tldr)}</p></div>` : '';
-            const takeawaysHtml = (data.takeaways?.length > 0) ? `<div class="summary-section summary-takeaways"><h3 class="summary-section-title">Key Takeaways</h3><ul>${data.takeaways.map(item => `<li>${_escapeHtml(item)}</li>`).join('')}</ul></div>` : '';
-            const renderEntities = (entities, label) => (entities?.length > 0) ? `<div class="entity-group"><span class="entity-label">${label}</span><div class="entity-tags">${entities.map(e => `<span class="entity-tag">${_escapeHtml(e)}</span>`).join('')}</div></div>` : '';
-            const entitiesHtml = (data.entities && (Object.values(data.entities).some(arr => arr && arr.length > 0))) ? `<div class="summary-section summary-entities"><h3 class="summary-section-title">Entities Mentioned</h3>${renderEntities(data.entities.people, 'People')}${renderEntities(data.entities.organizations, 'Organizations')}${renderEntities(data.entities.locations, 'Locations')}</div>` : '';
-            summaryHtml = tldrHtml + takeawaysHtml + entitiesHtml;
-        } else {
-            summaryHtml = `<div class="summary-section"><h3 class="summary-section-title">General Summary</h3><div class="panel-content">${DOMPurify.sanitize(marked.parse(String(data)))}</div></div>`;
-        }
-        this.elements.pageSummaryContainer.innerHTML = summaryHtml;
-    }
-    
     _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0) {
         this.state.answerHTML = fullText;
         this.state.totalTokenCount = totalTokenCount;
@@ -473,13 +417,10 @@ class PopupApp {
     }
     
     _handleCorrectionResult(fullText) { this._handleExplanationResult(fullText, false); }
-    _handleContextMenuResult(fullText, purpose) { /* Placeholder */ }
-    _handleImageModeResult(fullText, purpose) { /* Placeholder */ }
     
     _formatQuestionContent(content) {
         if (!content) return '';
-        const renderedHtml = DOMPurify.sanitize(marked.parse(content.replace(/Question:/i, '### Question\n').replace(/Options:/i, '\n### Options\n')));
-        return renderedHtml;
+        return DOMPurify.sanitize(marked.parse(content.replace(/Question:/i, '### Question\n').replace(/Options:/i, '\n### Options\n')));
     }
     
     _renderInlineMarkdown(text) {
@@ -538,9 +479,9 @@ class PopupApp {
     _saveCurrentViewState() { 
         if (!this.state.tab) return; 
         const key = this.state.tab.id.toString(); 
-        const stateToSave = { 
-            lastView: this.state.view, url: this.state.url, cleanedContent: this.state.cleanedContent, originalUserContent: this.state.originalUserContent, answerHTML: this.state.answerHTML, explanationHTML: this.state.explanationHTML, summaryData: this.state.summaryData, totalTokenCount: this.state.totalTokenCount, incorrectAnswer: this.state.incorrectAnswer, isImageMode: this.state.isImageMode, imageUrl: this.state.imageUrl, action: this.state.action, 
-        }; 
+        const stateToSave = { ...this.state };
+        delete stateToSave.tab;
+        delete stateToSave.config;
         chrome.storage.local.set({ [key]: stateToSave }); 
     }
 
