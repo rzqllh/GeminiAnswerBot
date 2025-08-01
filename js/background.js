@@ -1,16 +1,19 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/background.js
-// 🕓 Created: 2024-05-21 12:05:00
+// 🕓 Created: 2024-05-21 14:00:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
-// Variabel global untuk menyimpan data konteks sementara
-let contextDataForPopup = null;
+// js/background.js
 
 async function fetchImageAsBase64(url) {
   try {
+    // Use no-cors mode for potentially cross-origin images, though this has limitations.
+    // For many public images, this will work.
     const response = await fetch(url, { mode: 'cors' });
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     const blob = await response.blob();
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -20,6 +23,7 @@ async function fetchImageAsBase64(url) {
     });
   } catch (error) {
     console.error(`Error fetching image as Base64 from ${url}:`, error);
+    // Fallback for CORS issues if possible, but often not feasible from background script.
     return null;
   }
 }
@@ -31,8 +35,7 @@ async function handleContextAction(info, tab) {
   }
   
   const actionData = {
-    action: info.menuItemId,
-    source: 'contextMenu'
+    action: info.menuItemId
   };
 
   if (info.selectionText) {
@@ -46,26 +49,25 @@ async function handleContextAction(info, tab) {
       actionData.base64ImageData = base64Data;
     } else {
       console.error("Could not fetch and convert image. Aborting action.");
+      // Optionally, we could notify the user here, but for now, we just abort.
       return;
     }
   }
   
-  // Simpan data ke variabel global, bukan storage
-  contextDataForPopup = actionData;
+  await chrome.storage.local.set({
+    [`context_action_${tab.id}`]: actionData
+  });
 
-  // Buka popup
-  try {
-    await chrome.action.openPopup();
-  } catch (e) {
-    console.error("Failed to open popup:", e);
-    // Reset data jika popup gagal dibuka
-    contextDataForPopup = null;
-  }
+  // In Manifest V3, we cannot reliably check if a popup is open.
+  // The modern approach is to simply call openPopup. If it's already open,
+  // it will likely just focus. The popup's init logic will handle the rest.
+  chrome.action.openPopup();
 }
 
 async function updateContextMenus() {
   await chrome.contextMenus.removeAll();
   
+  // --- Text Selection Menus ---
   chrome.contextMenus.create({
     id: "gemini-text-parent",
     title: "GeminiAnswerBot Actions",
@@ -103,6 +105,7 @@ async function updateContextMenus() {
     });
   }
 
+  // --- Image Selection Menus ---
   chrome.contextMenus.create({
     id: "gemini-image-parent",
     title: "Gemini Image Actions",
@@ -121,6 +124,9 @@ async function updateContextMenus() {
       });
   });
 }
+
+chrome.runtime.onInstalled.addListener(updateContextMenus);
+chrome.runtime.onStartup.addListener(updateContextMenus);
 
 async function performApiCall(payload) {
     const { apiKey, model, systemPrompt, userContent, base64ImageData, purpose } = payload;
@@ -151,6 +157,7 @@ async function performApiCall(payload) {
       generationConfig
     };
 
+    // Conditionally add system_instruction only if systemPrompt is valid
     if (systemPrompt && typeof systemPrompt === 'string' && systemPrompt.trim() !== '') {
       apiPayload.system_instruction = { parts: [{ text: systemPrompt }] };
     }
@@ -237,19 +244,6 @@ function handleTestConnection(payload, sendResponse) {
     .catch(err => sendResponse({ success: false, error: err.message }));
 }
 
-async function handleSaveHistory(payload) {
-    try {
-        const { history = [] } = await chrome.storage.local.get('history');
-        history.unshift(payload);
-        if (history.length > 100) history.pop();
-        await chrome.storage.local.set({ history });
-    } catch (e) {
-        console.error("Error saving history in background:", e);
-    }
-}
-
-chrome.runtime.onInstalled.addListener(updateContextMenus);
-chrome.runtime.onStartup.addListener(updateContextMenus);
 chrome.contextMenus.onClicked.addListener(handleContextAction);
   
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -266,17 +260,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         case 'triggerContextMenuAction':
             handleContextAction({ menuItemId: request.payload.action, selectionText: request.payload.selectionText }, sender.tab);
             break;
-        case 'saveHistory':
-            handleSaveHistory(request.payload);
-            break;
-        case 'popupReady':
-            if (contextDataForPopup) {
-                sendResponse(contextDataForPopup);
-                contextDataForPopup = null; // Hapus setelah dikirim
-            } else {
-                sendResponse(null); // Kirim null jika tidak ada data
-            }
-            return true; // Menandakan respons asinkron
     }
-    return false;
 });
