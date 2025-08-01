@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/popup.js
-// 🕓 Created: 2024-05-21 16:05:00
+// 🕓 Created: 2024-05-21 17:05:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /**
@@ -79,9 +79,6 @@ class PopupApp {
         if (request.action === 'geminiStreamUpdate') {
             this._handleStreamUpdate(request);
         }
-        if (request.action === 're_initialize_popup') {
-            this.init();
-        }
     }
 
     async _ensureContentScripts(tabId) {
@@ -129,11 +126,11 @@ class PopupApp {
             
             await this._ensureContentScripts(tab.id);
 
-            const contextKey = `context_action_${tab.id}`;
-            const contextData = (await chrome.storage.local.get(contextKey))[contextKey];
+            // [FIXED] Ganti logika storage dengan message-passing yang andal.
+            const contextData = await chrome.runtime.sendMessage({ action: 'popupReady' });
 
-            if (contextData) {
-                await chrome.storage.local.remove(contextKey);
+            if (contextData && contextData.source === 'contextMenu') {
+                // Alur kerja jika popup dibuka oleh menu konteks/toolbar
                 await this._clearPersistedState();
                 this.state.action = contextData.action;
                 this.state.url = this.state.tab.url;
@@ -153,6 +150,7 @@ class PopupApp {
                     this._callGeminiStream(contextData.action, contextData.selectionText);
                 }
             } else {
+                // Alur kerja normal jika popup dibuka oleh pengguna
                 const persistedState = await this._getPersistedState();
                 if (persistedState && persistedState.url === this.state.tab.url) {
                     Object.assign(this.state, persistedState);
@@ -449,7 +447,6 @@ class PopupApp {
         this.elements.feedbackContainer.classList.remove('hidden');
         this._resetFeedbackButtons();
         
-        // [FIXED] Add condition to prevent highlighting for image-based quizzes
         if (this.state.config.autoHighlight && !this.state.isImageMode) {
             this._sendMessageToContentScript({ action: 'highlight-answer', text: [this.state.incorrectAnswer] })
                 .catch(err => console.warn('Could not highlight answer on page:', err.message));
