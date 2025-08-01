@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/content.js
-// 🕓 Created: 2024-05-21 16:00:00
+// 🕓 Created: 2024-05-21 20:05:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /**
@@ -64,10 +64,6 @@ class QuizModule {
     this.submissionHandler = this.handleSubmissionClick.bind(this);
   }
   
-  /**
-   * Mengekstrak konten kuis menggunakan algoritma heuristik dinamis.
-   * @returns {string|null} Konten kuis yang diformat atau null jika tidak ditemukan.
-   */
   extractContent() {
     const optionGroups = this._findOptionGroups();
     if (optionGroups.length === 0) return null;
@@ -75,19 +71,28 @@ class QuizModule {
     const questionCandidates = this._findQuestionCandidates();
     if (questionCandidates.length === 0) return null;
 
-    let bestPair = { score: -1, question: null, options: [] };
+    let bestPair = { score: -1, question: null, options: [], hasCheckboxes: false };
 
     for (const group of optionGroups) {
       for (const candidate of questionCandidates) {
         const score = this._calculateProximityScore(candidate.element, group.container);
         if (score > bestPair.score) {
-          bestPair = { score, question: candidate.text, options: group.options };
+          bestPair = { 
+            score, 
+            question: candidate.text, 
+            options: group.options,
+            hasCheckboxes: group.hasCheckboxes 
+          };
         }
       }
     }
 
     if (bestPair.score > 0 && bestPair.question && bestPair.options.length > 1) {
-      return `Question: ${bestPair.question}\n\nOptions:\n${bestPair.options.map(opt => `- ${opt}`).join('\n')}`;
+      let content = `Question: ${bestPair.question}\n\nOptions:\n${bestPair.options.map(opt => `- ${opt}`).join('\n')}`;
+      if (bestPair.hasCheckboxes) {
+        content += "\n\nNote: This question may have multiple correct answers. Select all that apply.";
+      }
+      return content;
     }
     
     return null;
@@ -108,16 +113,20 @@ class QuizModule {
 
         if (optionText) {
             if (!groups.has(container)) {
-                groups.set(container, { options: new Set() });
+                groups.set(container, { options: new Set(), hasCheckboxes: false });
             }
-            groups.get(container).options.add(optionText);
+            const data = groups.get(container);
+            data.options.add(optionText);
+            if (input.type === 'checkbox') {
+                data.hasCheckboxes = true;
+            }
         }
     });
 
     const validGroups = [];
     groups.forEach((data, container) => {
         if (data.options.size > 1) {
-            validGroups.push({ container, options: Array.from(data.options) });
+            validGroups.push({ container, options: Array.from(data.options), hasCheckboxes: data.hasCheckboxes });
         }
     });
     return validGroups;
@@ -163,15 +172,9 @@ class QuizModule {
     return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
   }
 
-  /**
-   * [FIXED] Extracts all visible radio/checkbox options from the entire document.
-   * This generalized approach is more robust and works across different site structures.
-   */
   extractOptions() {
     const options = [];
     const seenOptions = new Set();
-    
-    // Scan the entire document for any visible radio or checkbox inputs.
     document.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
         if (this._isVisible(input)) {
             const label = input.closest('label') || (input.id && document.querySelector(`label[for="${input.id}"]`));

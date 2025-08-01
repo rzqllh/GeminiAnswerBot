@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/popup.js
-// 🕓 Created: 2024-05-21 19:00:00
+// 🕓 Created: 2024-05-21 20:10:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /**
@@ -12,10 +12,10 @@ class PopupApp {
         this.state = {
             tab: null, config: {}, view: 'loading', lastView: 'quiz', url: null,
             error: null, cleanedContent: null, originalUserContent: null,
-            answerHTML: null, explanationHTML: null, totalTokenCount: 0,
-            cacheKey: null, incorrectAnswer: null, isImageMode: false,
-            imageUrl: null, base64ImageData: null, action: null,
-            summaryData: null, generalTaskResult: null,
+            answerHTML: null, explanationHTML: null, thoughtProcess: null,
+            totalTokenCount: 0, cacheKey: null, incorrectAnswer: null,
+            isImageMode: false, imageUrl: null, base64ImageData: null,
+            action: null, generalTaskResult: null,
         };
 
         this.elements = {};
@@ -39,7 +39,8 @@ class PopupApp {
             'copyAnswer', 'copyExplanation', 'feedbackContainer', 'feedbackCorrect', 
             'feedbackIncorrect', 'correctionPanel', 'correctionOptions', 
             'imagePreviewContainer', 'imagePreview', 'imageStatusText', 'answerCardTitle',
-            'generalTaskContainer', 'generalTaskTitle', 'generalTaskDisplay', 'copyGeneralTask'
+            'generalTaskContainer', 'generalTaskTitle', 'generalTaskDisplay', 'copyGeneralTask',
+            'showReasoningButton', 'reasoningDisplay'
         ];
         ids.forEach(id => {
             const key = id.replace(/-([a-z])/g, g => g[1].toUpperCase());
@@ -59,6 +60,7 @@ class PopupApp {
         this.elements.copyAnswer.addEventListener('click', e => this._copyToClipboard(e.currentTarget));
         this.elements.copyExplanation.addEventListener('click', e => this._copyToClipboard(e.currentTarget));
         this.elements.copyGeneralTask.addEventListener('click', e => this._copyToClipboard(e.currentTarget));
+        this.elements.showReasoningButton.addEventListener('click', () => this._toggleReasoningDisplay());
     }
 
     _handleMessages(request) {
@@ -105,7 +107,7 @@ class PopupApp {
                 this.state.url = this.state.tab.url;
                 this.state.originalUserContent = contextData.selectionText || contextData.srcUrl;
                 
-                const isGeneralTask = ['summarize', 'explain', 'translate'].some(t => this.state.action.startsWith(t));
+                const isGeneralTask = ['summarize', 'explain', 'translate', 'rephrase'].some(t => this.state.action.startsWith(t));
 
                 if (isGeneralTask) {
                     this.state.view = 'general';
@@ -164,7 +166,7 @@ class PopupApp {
     }
 
     _renderGeneralTaskState() {
-        const titleMap = { 'summarize': 'Summary', 'explain': 'Explanation', 'translate': 'Translation' };
+        const titleMap = { 'summarize': 'Summary', 'explain': 'Explanation', 'translate': 'Translation', 'rephrase': 'Rephrased Text' };
         const baseAction = this.state.action.split('-')[0];
         this.elements.generalTaskTitle.textContent = titleMap[baseAction] || 'Result';
         
@@ -196,7 +198,7 @@ class PopupApp {
 
         this.elements.answerContainer.classList.toggle('hidden', !this.state.answerHTML);
         if (this.state.answerHTML) {
-            this._handleAnswerResult(this.state.answerHTML, true, this.state.totalTokenCount);
+            this._handleAnswerResult(this.state.answerHTML, true, this.state.totalTokenCount, this.state.thoughtProcess);
         } else if ((this.state.cleanedContent || this.state.isImageMode) && !this.state.error) {
             this._getAnswer();
         }
@@ -293,7 +295,7 @@ class PopupApp {
         if (this.state.cacheKey) {
             chrome.storage.local.get(this.state.cacheKey).then(cachedResult => {
                 if (cachedResult[this.state.cacheKey]?.answerHTML) {
-                    this._handleAnswerResult(cachedResult[this.state.cacheKey].answerHTML, true, cachedResult[this.state.cacheKey].totalTokenCount);
+                    this._handleAnswerResult(cachedResult[this.state.cacheKey].answerHTML, true, cachedResult[this.state.cacheKey].totalTokenCount, cachedResult[this.state.cacheKey].thoughtProcess);
                 } else { this._continueGetAnswer(); }
             });
         } else { this._continueGetAnswer(); }
@@ -317,7 +319,7 @@ class PopupApp {
         const { payload, purpose } = request;
         if (!payload.success) { this.state.view = 'error'; this.state.error = payload.error; this.render(); return; }
         
-        const isGeneralTask = ['summarize', 'explain', 'translate'].some(t => purpose.startsWith(t));
+        const isGeneralTask = ['summarize', 'explain', 'translate', 'rephrase'].some(t => purpose.startsWith(t));
 
         if (payload.done) {
             const fullText = payload.fullText || this.streamAccumulator[purpose] || '';
@@ -357,15 +359,19 @@ class PopupApp {
         this._saveCurrentViewState();
     }
 
-    _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0) {
-        this.state.answerHTML = fullText;
+    _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0, thoughtProcess = null) {
+        const thoughtMatch = fullText.match(/\[THOUGHT\]([\s\S]*)\[ENDTHOUGHT\]/);
+        this.state.thoughtProcess = thoughtProcess || (thoughtMatch ? thoughtMatch[1].trim() : null);
+        const cleanText = fullText.replace(/\[THOUGHT\][\s\S]*\[ENDTHOUGHT\]\s*/, '');
+
+        this.state.answerHTML = cleanText;
         this.state.totalTokenCount = totalTokenCount;
 
-        const answerMatch = fullText.match(/Answer:\s*(.*)/i);
-        const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
-        const reasonMatch = fullText.match(/Reason:\s*([\s\S]*)/i);
+        const answerMatch = cleanText.match(/Answer:\s*(.*)/i);
+        const confidenceMatch = cleanText.match(/Confidence:\s*(High|Medium|Low)/i);
+        const reasonMatch = cleanText.match(/Reason:\s*([\s\S]*)/i);
 
-        const answerText = answerMatch ? answerMatch[1].trim() : fullText.trim();
+        const answerText = answerMatch ? answerMatch[1].trim() : cleanText.trim();
         this.state.incorrectAnswer = answerText.replace(/`/g, '');
         
         let answerHtml = `<p class="answer-highlight">${this._renderInlineMarkdown(answerText)}</p>`;
@@ -389,19 +395,21 @@ class PopupApp {
         this.elements.retryAnswer.disabled = false;
         this.elements.aiActionsWrapper.classList.remove('hidden');
         this.elements.feedbackContainer.classList.remove('hidden');
+        this.elements.showReasoningButton.classList.toggle('hidden', !this.state.thoughtProcess);
         this._resetFeedbackButtons();
         
+        const answersToHighlight = this.state.incorrectAnswer.split(',').map(s => s.trim());
         if (this.state.config.autoHighlight && !this.state.isImageMode) {
-            this._sendMessageToContentScript({ action: 'highlight-answer', text: [this.state.incorrectAnswer] })
+            this._sendMessageToContentScript({ action: 'highlight-answer', text: answersToHighlight })
                 .catch(err => console.warn('Could not highlight answer on page:', err.message));
         }
         if (!fromCache && this.state.cacheKey) {
-            chrome.storage.local.set({ [this.state.cacheKey]: { answerHTML: fullText, totalTokenCount } });
+            chrome.storage.local.set({ [this.state.cacheKey]: { answerHTML: cleanText, totalTokenCount, thoughtProcess: this.state.thoughtProcess } });
         }
         
         this._saveCurrentViewState();
         if (!fromCache) {
-            this._saveToHistory({ cleanedContent: this.state.cleanedContent, answerHTML: fullText }, 'quiz');
+            this._saveToHistory({ cleanedContent: this.state.cleanedContent, answerHTML: cleanText, thoughtProcess: this.state.thoughtProcess }, 'quiz');
         }
     }
 
@@ -444,6 +452,16 @@ class PopupApp {
             }); 
             this.elements.correctionOptions.appendChild(button); 
         }); 
+    }
+
+    _toggleReasoningDisplay() {
+        const reasoningDisplay = this.elements.reasoningDisplay;
+        const button = this.elements.showReasoningButton;
+        const isHidden = reasoningDisplay.classList.toggle('hidden');
+        button.classList.toggle('active', !isHidden);
+        if (!isHidden && this.state.thoughtProcess) {
+            reasoningDisplay.innerHTML = `<h3>AI Reasoning</h3>${DOMPurify.sanitize(marked.parse(this.state.thoughtProcess))}`;
+        }
     }
 
     _resetFeedbackButtons() { 
