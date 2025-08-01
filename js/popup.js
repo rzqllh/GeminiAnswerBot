@@ -78,7 +78,7 @@ class PopupApp {
             this._handleStreamUpdate(request);
         }
         if (request.action === 're_initialize_popup') {
-            this.init(); // Re-run initialization
+            this.init();
         }
     }
 
@@ -113,7 +113,6 @@ class PopupApp {
 
     async init() {
         chrome.runtime.onMessage.addListener(this._messageHandler);
-
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (!tab || !tab.id) throw new Error('Cannot find the active tab.');
@@ -418,22 +417,23 @@ class PopupApp {
         this.state.answerHTML = fullText;
         this.state.totalTokenCount = totalTokenCount;
 
-        const renderedHtml = DOMPurify.sanitize(marked.parse(fullText));
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = renderedHtml;
+        // Robustly parse the multi-field response, whether it's single-line or multi-line
+        const answerMatch = fullText.match(/Answer:\s*(.*)/i);
+        const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
+        const reasonMatch = fullText.match(/Reason:\s*([\s\S]*)/i);
 
-        const answerText = tempDiv.querySelector('p')?.textContent || '';
-        this.state.incorrectAnswer = answerText;
+        const answerText = answerMatch ? answerMatch[1].trim() : fullText.trim();
+        this.state.incorrectAnswer = answerText.replace(/`/g, ''); // Clean version for submission check
         
-        const answerHtml = `<p class="answer-highlight">${tempDiv.querySelector('p')?.innerHTML || ''}</p>`;
-
+        let answerHtml = `<p class="answer-highlight">${DOMPurify.sanitize(marked.parseInline(answerText))}</p>`;
+        
         let confidenceHtml = '';
-        const otherContent = tempDiv.innerText.replace(answerText, '').trim();
-        const confidenceMatch = otherContent.match(/Confidence:\s*(High|Medium|Low)/i);
         if (confidenceMatch) {
             const confidence = confidenceMatch[1].toLowerCase();
-            const reason = otherContent.match(/Reason:(.*)/is)?.[1].trim() || "";
-            confidenceHtml = `<div class="confidence-wrapper"><div class="confidence-level"><span class="confidence-level-label">Confidence ${fromCache ? '<span>⚡️</span>' : ''}</span><span class="confidence-badge confidence-${confidence}">${confidence[0].toUpperCase() + confidence.slice(1)}</span></div>${reason ? `<div class="confidence-reason">${reason}</div>` : ''}</div>`;
+            const reasonText = reasonMatch ? reasonMatch[1].trim() : "";
+            const reasonHtml = DOMPurify.sanitize(marked.parseInline(reasonText));
+
+            confidenceHtml = `<div class="confidence-wrapper"><div class="confidence-level"><span class="confidence-level-label">Confidence ${fromCache ? '<span>⚡️</span>' : ''}</span><span class="confidence-badge confidence-${confidence}">${confidence[0].toUpperCase() + confidence.slice(1)}</span></div>${reasonHtml ? `<div class="confidence-reason">${reasonHtml}</div>` : ''}</div>`;
         }
         
         let tokenHtml = '';
@@ -443,14 +443,14 @@ class PopupApp {
         
         this.elements.answerContainer.classList.remove('hidden');
         this.elements.answerDisplay.innerHTML = answerHtml + confidenceHtml + tokenHtml;
-        this.elements.copyAnswer.dataset.copyText = answerText;
+        this.elements.copyAnswer.dataset.copyText = this.state.incorrectAnswer;
         this.elements.retryAnswer.disabled = false;
         this.elements.aiActionsWrapper.classList.remove('hidden');
         this.elements.feedbackContainer.classList.remove('hidden');
         this._resetFeedbackButtons();
         
         if (this.state.config.autoHighlight) {
-            this._sendMessageToContentScript({ action: 'highlight-answer', text: [answerText] })
+            this._sendMessageToContentScript({ action: 'highlight-answer', text: [this.state.incorrectAnswer] })
                 .catch(err => console.warn('Could not highlight answer on page:', err.message));
         }
         if (!fromCache && this.state.cacheKey) {
@@ -475,8 +475,8 @@ class PopupApp {
     }
     
     _handleCorrectionResult(fullText) { this._handleExplanationResult(fullText, false); }
-    _handleContextMenuResult(fullText, purpose) { /* This is a placeholder */ }
-    _handleImageModeResult(fullText, purpose) { /* This is a placeholder */ }
+    _handleContextMenuResult(fullText, purpose) { /* Placeholder */ }
+    _handleImageModeResult(fullText, purpose) { /* Placeholder */ }
     
     _formatQuestionContent(content) {
         if (!content) return '';
@@ -535,18 +535,7 @@ class PopupApp {
         if (!this.state.tab) return; 
         const key = this.state.tab.id.toString(); 
         const stateToSave = { 
-            lastView: this.state.view, 
-            url: this.state.url, 
-            cleanedContent: this.state.cleanedContent, 
-            originalUserContent: this.state.originalUserContent, 
-            answerHTML: this.state.answerHTML, 
-            explanationHTML: this.state.explanationHTML, 
-            summaryData: this.state.summaryData, 
-            totalTokenCount: this.state.totalTokenCount, 
-            incorrectAnswer: this.state.incorrectAnswer, 
-            isImageMode: this.state.isImageMode, 
-            imageUrl: this.state.imageUrl, 
-            action: this.state.action, 
+            lastView: this.state.view, url: this.state.url, cleanedContent: this.state.cleanedContent, originalUserContent: this.state.originalUserContent, answerHTML: this.state.answerHTML, explanationHTML: this.state.explanationHTML, summaryData: this.state.summaryData, totalTokenCount: this.state.totalTokenCount, incorrectAnswer: this.state.incorrectAnswer, isImageMode: this.state.isImageMode, imageUrl: this.state.imageUrl, action: this.state.action, 
         }; 
         chrome.storage.local.set({ [key]: stateToSave }); 
     }

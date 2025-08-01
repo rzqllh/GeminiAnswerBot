@@ -17,11 +17,11 @@ CRITICAL RULES FOR EXTRACTION:
     - Detect the language of the input text.
     - Output MUST be in the **exact same language**. Never translate or switch languages.
 `,
-  answer: `Act as a highly knowledgeable quiz solver. Given a cleaned quiz consisting of only one question and its multiple-choice options:
-1.  Identify the single, most correct answer *from the provided options*.
-2.  Provide a **confidence score** for your analysis result: High / Medium / Low.
-3.  Provide a **single-sentence rationale** for your confidence level.
-4.  **Strict Formatting Rule**: In your 'Answer' and 'Reason', you MUST wrap any code, keywords, operators, or technical terms (like 'key', '&&', 'map()') in backticks (\`).
+  answer: `Act as a highly knowledgeable quiz solver. Given a cleaned quiz consisting of only one question and its multiple-choice options, follow these rules precisely.
+
+CRITICAL FORMATTING RULES:
+1.  **Strict Line Breaks:** Each field (Answer, Confidence, Reason) MUST be on a new, separate line. DO NOT combine them.
+2.  **Code Formatting**: In your 'Answer' and 'Reason', you MUST wrap any code, keywords, operators, or technical terms (like 'key', '&&', 'map()') in backticks (\`).
 
 Respond in the exact format below, without any extra words or explanations.
 FORMAT:
