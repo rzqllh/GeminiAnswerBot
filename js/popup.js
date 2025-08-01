@@ -82,19 +82,11 @@ class PopupApp {
         }
     }
 
-    /**
-     * Injects content scripts into the tab if they are not already present.
-     * It first pings the tab; if it gets a response, scripts are already injected.
-     * Otherwise, it proceeds with the injection.
-     * @param {number} tabId The ID of the tab to inject scripts into.
-     */
     async _ensureContentScripts(tabId) {
         try {
-            // Ping the content script first to see if it's already there
             await this._sendMessageToContentScript({ action: "ping_content_script" }, 200);
-            return; // Scripts are already injected and responsive.
+            return;
         } catch (e) {
-            // This error is expected if the content script isn't there yet.
             console.log("Content script not found, injecting now.");
             try {
                 await chrome.scripting.insertCSS({
@@ -111,7 +103,6 @@ class PopupApp {
                         'js/content.js'
                     ],
                 });
-                // Wait a moment for the script to initialize after injection
                 await new Promise(resolve => setTimeout(resolve, 100));
             } catch (injectionError) {
                 console.error(`Failed to inject content scripts into tab ${tabId}:`, injectionError);
@@ -187,12 +178,10 @@ class PopupApp {
     }
 
     render() {
-        // Hide all major containers by default
         this.elements.messageArea.classList.add('hidden');
         this.elements.quizModeContainer.classList.add('hidden');
         this.elements.pageSummaryContainer.classList.add('hidden');
         
-        // Show the correct container based on the view state
         switch (this.state.view) {
             case 'loading':
                 this.elements.messageArea.classList.remove('hidden');
@@ -220,7 +209,6 @@ class PopupApp {
     _renderQuizState() {
         const titleText = this._getActionTitle(this.state.action) || 'Answer';
         this.elements.answerCardTitle.textContent = titleText;
-
         this.elements.imagePreviewContainer.classList.toggle('hidden', !this.state.isImageMode);
         this.elements.contentDisplayWrapper.classList.toggle('hidden', this.state.isImageMode);
 
@@ -228,11 +216,9 @@ class PopupApp {
             this.elements.imagePreview.src = this.state.imageUrl;
         }
 
-        if (this.state.cleanedContent) {
-            this.elements.contentDisplay.innerHTML = this._formatQuestionContent(this.state.cleanedContent);
-            this.elements.contentDisplayWrapper.classList.remove('hidden');
-        } else if (this.state.originalUserContent && !this.state.isImageMode) {
-            this.elements.contentDisplay.innerHTML = `<div class="question-text">${_escapeHtml(this.state.originalUserContent)}</div>`;
+        const contentToDisplay = this.state.cleanedContent || this.state.originalUserContent;
+        if (contentToDisplay && !this.state.isImageMode) {
+            this.elements.contentDisplay.innerHTML = this._formatQuestionContent(contentToDisplay);
             this.elements.contentDisplayWrapper.classList.remove('hidden');
         } else if (!this.state.isImageMode) {
             this.elements.contentDisplayWrapper.classList.add('hidden');
@@ -318,7 +304,7 @@ class PopupApp {
         if (purpose.startsWith('rephrase-')) {
             const language = purpose.split('-')[1];
             systemPrompt = currentPrompts.rephrase || DEFAULT_PROMPTS.rephrase;
-            userContent = `Target Language: ${language}\\n\\nText to rephrase:\\n${userContent}`;
+            userContent = `Target Language: ${language}\n\nText to rephrase:\n${userContent}`;
         }
     
         const targetContainer = { 'answer': this.elements.answerDisplay, 'explanation': this.elements.explanationDisplay, 'correction': this.elements.explanationDisplay }[purpose];
@@ -360,7 +346,7 @@ class PopupApp {
         this.elements.explanationButton.disabled = true;
         this.elements.retryExplanation.disabled = true;
         this.elements.explanationContainer.classList.remove('hidden');
-        const contentForExplanation = `${this.state.cleanedContent}\\n\\nCorrect Answer: ${this.state.incorrectAnswer}`;
+        const contentForExplanation = `${this.state.cleanedContent}\n\nCorrect Answer: ${this.state.incorrectAnswer}`;
         this._callGeminiStream('explanation', contentForExplanation);
     }
 
@@ -401,7 +387,7 @@ class PopupApp {
     _handlePageAnalysisResult(text) {
         let parsedData;
         try {
-            const jsonMatch = text.match(/{[\\s\\S]*}/);
+            const jsonMatch = text.match(/{[\s\S]*}/);
             if (jsonMatch) parsedData = JSON.parse(jsonMatch[0]);
             else throw new Error("No JSON object found in response.");
         } catch (e) {
@@ -436,8 +422,8 @@ class PopupApp {
         let answerText = (answerMatch ? answerMatch[1].trim() : fullText.trim()).replace(/`/g, '');
         this.state.incorrectAnswer = answerText;
         
-        let formattedHtml = `<p class="answer-highlight">${_escapeHtml(answerText).replace(/\\n/g, '<br>')}</p>`;
-        const confidenceMatch = fullText.match(/Confidence:\\s*(High|Medium|Low)/i);
+        let formattedHtml = `<p class="answer-highlight">${_escapeHtml(answerText).replace(/\n/g, '<br>')}</p>`;
+        const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
         if (confidenceMatch) {
             const confidence = confidenceMatch[1].toLowerCase();
             const reason = fullText.match(/Reason:(.*)/is)?.[1].trim() || "";
@@ -469,29 +455,157 @@ class PopupApp {
         }
     }
 
-    _handleExplanationResult(fullText, fromCache = false) { this.state.explanationHTML = fullText; this.elements.explanationDisplay.innerHTML = DOMPurify.sanitize(marked.parse(fullText)); this.elements.copyExplanation.dataset.copyText = fullText; this.elements.explanationButton.disabled = false; this.elements.retryExplanation.disabled = false; this.elements.explanationContainer.classList.remove('hidden'); this._saveCurrentViewState(); if (!fromCache) this._saveToHistory({ ...this.state }, 'explanation'); }
-    _handleCorrectionResult(fullText) { this._handleExplanationResult(fullText, false); }
-    _handleContextMenuResult(fullText, purpose) { /* ... implementation ... */ }
-    _handleImageModeResult(fullText, purpose) { /* ... implementation ... */ }
-    _formatQuestionContent(content) {
-        if(!content) return '';
-        const lines = content.split('\\n').filter(line => line.trim() !== '');
-        if (lines.length === 0) return `<div class="question-text">${_escapeHtml(content)}</div>`;
-        const question = _escapeHtml(lines.shift().replace(/^Question:\\s*/i, ''));
-        const optionLines = lines.filter(line => !/^options?:?$/.test(line.trim().toLowerCase()) && !/^pilihan?:?$/.test(line.trim().toLowerCase()));
-        const optionsHtml = optionLines.map(option => `<li>${_escapeHtml(option.trim().replace(/^[\\*\\-•]\\s*|^\\s*[\\*-]\\s*/, ''))}</li>`).join('');
-        return `<div class="question-text">${question}</div><ul>${optionsHtml}</ul>`;
+    _handleExplanationResult(fullText, fromCache = false) { 
+        this.state.explanationHTML = fullText; 
+        this.elements.explanationDisplay.innerHTML = DOMPurify.sanitize(marked.parse(fullText)); 
+        this.elements.copyExplanation.dataset.copyText = fullText; 
+        this.elements.explanationButton.disabled = false; 
+        this.elements.retryExplanation.disabled = false; 
+        this.elements.explanationContainer.classList.remove('hidden'); 
+        this._saveCurrentViewState(); 
+        if (!fromCache) this._saveToHistory({ ...this.state }, 'explanation'); 
     }
-    _renderCorrectionOptions(options) { this.elements.correctionOptions.innerHTML = ''; options.forEach(optionText => { const button = document.createElement('button'); button.className = 'correction-option-button'; button.innerHTML = _escapeHtml(optionText); button.addEventListener('click', () => { const correctionContent = `The original quiz content was:\\n${this.state.cleanedContent}\\n\\nMy previous incorrect answer was: \`${this.state.incorrectAnswer}\`\\n\\nThe user has indicated the correct answer is: \`${optionText}\``; this.elements.correctionPanel.classList.add('hidden'); this.elements.explanationContainer.classList.remove('hidden'); this.elements.explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div><p>Generating corrected explanation...</p></div>`; this._callGeminiStream('correction', correctionContent); }); this.elements.correctionOptions.appendChild(button); }); }
-    _resetFeedbackButtons() { this.elements.feedbackCorrect.disabled = false; this.elements.feedbackIncorrect.disabled = false; this.elements.feedbackCorrect.classList.remove('selected-correct'); this.elements.feedbackIncorrect.classList.remove('selected-incorrect'); }
-    _copyToClipboard(button) { const textToCopy = button.dataset.copyText; if (textToCopy) navigator.clipboard.writeText(textToCopy).then(() => { const originalTitle = button.title; button.title = 'Copied!'; button.classList.add('copied'); setTimeout(() => { button.classList.remove('copied'); button.title = originalTitle; }, 1500); }); }
-    _getPersistedState() { return this.state.tab ? chrome.storage.local.get(this.state.tab.id.toString()).then(r => r[this.state.tab.id.toString()] || null) : Promise.resolve(null); }
-    _clearPersistedState() { return this.state.tab ? chrome.storage.local.remove(this.state.tab.id.toString()) : Promise.resolve(); }
-    _saveCurrentViewState() { if (!this.state.tab) return; const key = this.state.tab.id.toString(); const stateToSave = { lastView: this.state.view, url: this.state.url, cleanedContent: this.state.cleanedContent, originalUserContent: this.state.originalUserContent, answerHTML: this.state.answerHTML, explanationHTML: this.state.explanationHTML, summaryData: this.state.summaryData, totalTokenCount: this.state.totalTokenCount, incorrectAnswer: this.state.incorrectAnswer, isImageMode: this.state.isImageMode, imageUrl: this.state.imageUrl, action: this.state.action, }; chrome.storage.local.set({ [key]: stateToSave }); }
-    async _saveToHistory(stateData, actionType) { if (!this.state.tab) return; const { history = [] } = await chrome.storage.local.get('history'); const newEntry = { ...stateData, id: Date.now(), url: this.state.tab.url, title: this.state.tab.title, timestamp: new Date().toISOString(), actionType }; history.unshift(newEntry); if (history.length > 100) history.pop(); await chrome.storage.local.set({ history }); }
-    _sendMessageToContentScript(message, timeout = 5000) { return new Promise((resolve, reject) => { if (!this.state.tab || this.state.tab.id === undefined) return reject(new Error("Invalid tab ID.")); const timer = setTimeout(() => reject(new Error('Content script timeout.')), timeout); chrome.tabs.sendMessage(this.state.tab.id, message, (response) => { clearTimeout(timer); if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message)); else resolve(response); }); }); }
-    _createQuizFingerprint(cleanedContent) { if (!cleanedContent) return null; const lines = cleanedContent.split('\\n').map(l => l.trim()).filter(l => l); return lines.length < 2 ? null : lines.map(l => l.toLowerCase().replace(/\\s+/g, ' ').trim()).join('\\n'); }
-    _simpleHash(str) { let hash = 0; for (let i = 0; i < str.length; i++) { hash = ((hash << 5) - hash) + str.charCodeAt(i); hash |= 0; } return 'cache_' + new Uint32Array([hash])[0].toString(16); }
+    
+    _handleCorrectionResult(fullText) { this._handleExplanationResult(fullText, false); }
+    _handleContextMenuResult(fullText, purpose) { /* This is a placeholder for future implementation */ }
+    _handleImageModeResult(fullText, purpose) { /* This is a placeholder for future implementation */ }
+    
+    _formatQuestionContent(content) {
+        if (!content) return '';
+
+        let questionPart = content;
+        let optionsPart = '';
+        
+        const optionsMatch = content.match(/options?:([\s\S]*)/i);
+        if (optionsMatch) {
+            questionPart = content.substring(0, optionsMatch.index).trim();
+            optionsPart = optionsMatch[1].trim();
+        }
+        
+        questionPart = questionPart.replace(/^question:\s*/i, '').trim();
+        const questionHtml = `<div class="question-text">${_escapeHtml(questionPart)}</div>`;
+
+        let optionsHtml = '';
+        if (optionsPart) {
+            const options = optionsPart.split(/\n\s*(?:-|\*)\s*/).filter(opt => opt.trim() !== '');
+            if (options.length > 1) {
+                optionsHtml = `<ul>${options.map(opt => `<li>${_escapeHtml(opt.trim())}</li>`).join('')}</ul>`;
+            }
+        }
+        
+        if (!optionsHtml && content.includes('-')) {
+            const parts = content.split(/-\s+/).map(p => p.trim().replace(/'/g, '')).filter(p => p);
+            if (parts.length > 2) { 
+                const questionFallback = parts.shift().replace(/^question:\s*/i, '').trim();
+                return `<div class="question-text">${_escapeHtml(questionFallback)}</div><ul>${parts.map(opt => `<li>${_escapeHtml(opt)}</li>`).join('')}</ul>`;
+            }
+        }
+
+        return questionHtml + (optionsHtml || '');
+    }
+
+    _renderCorrectionOptions(options) { 
+        this.elements.correctionOptions.innerHTML = ''; 
+        options.forEach(optionText => { 
+            const button = document.createElement('button'); 
+            button.className = 'correction-option-button'; 
+            button.innerHTML = _escapeHtml(optionText); 
+            button.addEventListener('click', () => { 
+                const correctionContent = `The original quiz content was:\n${this.state.cleanedContent}\n\nMy previous incorrect answer was: \`${this.state.incorrectAnswer}\`\n\nThe user has indicated the correct answer is: \`${optionText}\``; 
+                this.elements.correctionPanel.classList.add('hidden'); 
+                this.elements.explanationContainer.classList.remove('hidden'); 
+                this.elements.explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div><p>Generating corrected explanation...</p></div>`; 
+                this._callGeminiStream('correction', correctionContent); 
+            }); 
+            this.elements.correctionOptions.appendChild(button); 
+        }); 
+    }
+
+    _resetFeedbackButtons() { 
+        this.elements.feedbackCorrect.disabled = false; 
+        this.elements.feedbackIncorrect.disabled = false; 
+        this.elements.feedbackCorrect.classList.remove('selected-correct'); 
+        this.elements.feedbackIncorrect.classList.remove('selected-incorrect'); 
+    }
+
+    _copyToClipboard(button) { 
+        const textToCopy = button.dataset.copyText; 
+        if (textToCopy) {
+            navigator.clipboard.writeText(textToCopy).then(() => { 
+                const originalTitle = button.title; 
+                button.title = 'Copied!'; 
+                button.classList.add('copied'); 
+                setTimeout(() => { 
+                    button.classList.remove('copied'); 
+                    button.title = originalTitle; 
+                }, 1500); 
+            }); 
+        }
+    }
+
+    _getPersistedState() { 
+        return this.state.tab ? chrome.storage.local.get(this.state.tab.id.toString()).then(r => r[this.state.tab.id.toString()] || null) : Promise.resolve(null); 
+    }
+    
+    _clearPersistedState() { 
+        return this.state.tab ? chrome.storage.local.remove(this.state.tab.id.toString()) : Promise.resolve(); 
+    }
+    
+    _saveCurrentViewState() { 
+        if (!this.state.tab) return; 
+        const key = this.state.tab.id.toString(); 
+        const stateToSave = { 
+            lastView: this.state.view, 
+            url: this.state.url, 
+            cleanedContent: this.state.cleanedContent, 
+            originalUserContent: this.state.originalUserContent, 
+            answerHTML: this.state.answerHTML, 
+            explanationHTML: this.state.explanationHTML, 
+            summaryData: this.state.summaryData, 
+            totalTokenCount: this.state.totalTokenCount, 
+            incorrectAnswer: this.state.incorrectAnswer, 
+            isImageMode: this.state.isImageMode, 
+            imageUrl: this.state.imageUrl, 
+            action: this.state.action, 
+        }; 
+        chrome.storage.local.set({ [key]: stateToSave }); 
+    }
+
+    async _saveToHistory(stateData, actionType) { 
+        if (!this.state.tab) return; 
+        const { history = [] } = await chrome.storage.local.get('history'); 
+        const newEntry = { ...stateData, id: Date.now(), url: this.state.tab.url, title: this.state.tab.title, timestamp: new Date().toISOString(), actionType }; 
+        history.unshift(newEntry); 
+        if (history.length > 100) history.pop(); 
+        await chrome.storage.local.set({ history }); 
+    }
+
+    _sendMessageToContentScript(message, timeout = 5000) { 
+        return new Promise((resolve, reject) => { 
+            if (!this.state.tab || this.state.tab.id === undefined) return reject(new Error("Invalid tab ID.")); 
+            const timer = setTimeout(() => reject(new Error('Content script timeout.')), timeout); 
+            chrome.tabs.sendMessage(this.state.tab.id, message, (response) => { 
+                clearTimeout(timer); 
+                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message)); 
+                else resolve(response); 
+            }); 
+        }); 
+    }
+
+    _createQuizFingerprint(cleanedContent) { 
+        if (!cleanedContent) return null; 
+        const lines = cleanedContent.split('\n').map(l => l.trim()).filter(l => l); 
+        return lines.length < 2 ? null : lines.map(l => l.toLowerCase().replace(/\s+/g, ' ').trim()).join('\n'); 
+    }
+    
+    _simpleHash(str) { 
+        let hash = 0; 
+        for (let i = 0; i < str.length; i++) { 
+            hash = ((hash << 5) - hash) + str.charCodeAt(i); 
+            hash |= 0; 
+        } 
+        return 'cache_' + new Uint32Array([hash])[0].toString(16); 
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
