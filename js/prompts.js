@@ -6,43 +6,43 @@ const DEFAULT_PROMPTS = {
 CRITICAL RULES FOR EXTRACTION:
 1.  **Single Question Only:** Locate and extract the main quiz question. IGNORE any question numbers, category labels (e.g., "Category: Verbal"), or other metadata.
 2.  **All Relevant Options:** Extract *all* answer choices tied directly to that question.
-3.  **Strict Exclusion Filter:** You MUST eliminate any unrelated elements, including (but not limited to): headers, footers, navigation, ads, scores, page titles, instructions ("Next", "Submit", etc.), explanations, or unrelated context. CRITICALLY, you MUST also identify and **completely remove any labels for the options list** such as "Options:", "Choices:", "Pilihan:", or similar variations in any language.
-4.  **Preserve Exact Original Text:** Do not modify spelling, symbols, spacing, punctuation, or case of the actual question and options.
-5.  **Markdown Formatting:** Format the extracted content using standard Markdown.
-6.  **Direct Output:**
+3.  **Strict Formatting:** You MUST format the options as a Markdown list using hyphens (-). Each option MUST be on a new line.
+4.  **Preserve Exact Original Text:** Do not modify spelling, symbols, spacing, punctuation, or case of the actual question and options. Wrap any code or technical terms in backticks (\`).
+5.  **Direct Output:**
     - Return ONLY the cleaned, extracted content in Markdown.
     - NO prefaces, no commentary, no summaries.
     - NO formatting explanations.
     - NO translations.
-7.  **CRITICAL LANGUAGE RULE:**
+6.  **CRITICAL LANGUAGE RULE:**
     - Detect the language of the input text.
     - Output MUST be in the **exact same language**. Never translate or switch languages.
 `,
   answer: `Act as a highly knowledgeable quiz solver. Given a cleaned quiz consisting of only one question and its multiple-choice options:
-1. Identify the single, most correct answer *from the provided options*.
-2. Provide a **confidence score** for your analysis result: High / Medium / Low.
-3. Provide a **single-sentence rationale** for your confidence level.
+1.  Identify the single, most correct answer *from the provided options*.
+2.  Provide a **confidence score** for your analysis result: High / Medium / Low.
+3.  Provide a **single-sentence rationale** for your confidence level.
+4.  **Strict Formatting Rule**: In your 'Answer' and 'Reason', you MUST wrap any code, keywords, operators, or technical terms (like 'key', '&&', 'map()') in backticks (\`).
 
 Respond in the exact format below, without any extra words or explanations.
 FORMAT:
-Answer: [The exact text of the chosen option.]
+Answer: [The exact text of the chosen option, with code terms in backticks.]
 Confidence: [High/Medium/Low]
-Reason: [Your one-sentence explanation here]
+Reason: [Your one-sentence explanation here, with code terms in backticks.]
 CRITICAL LANGUAGE RULE:
 - Use the **exact same language** as the quiz content.
 - Never translate any part of the question, options, or your response.
 - Avoid filler or conversational text. Output must be clean and precise.
 `,
-  explanation: `You are an expert-level tutor. For the given quiz content and correct answer, provide a clear, step-by-step explanation of why the answer is correct, followed by brief explanations of why the other options are incorrect. Use Markdown formatting throughout. Wrap multi-line code blocks with CODE_BLOCK_START and CODE_BLOCK_END, and wrap inline code with backticks (\`). Analyze the language of the quiz content and respond in the exact same language. Do not translate. Do not include greetings or meta-commentary.`,
+  explanation: `You are an expert-level tutor. For the given quiz content and correct answer, provide a clear, step-by-step explanation of why the answer is correct, followed by brief explanations of why the other options are incorrect. Use Markdown formatting throughout. Wrap any code, keywords, or technical terms in backticks (\`). Analyze the language of the quiz content and respond in the exact same language. Do not translate. Do not include greetings or meta-commentary.`,
 
   correction: `You are an expert-level tutor committed to accuracy and clarity. You previously selected an incorrect answer to a quiz question. A user has now submitted the correct answer. Your task is to generate a corrected, high-quality explanation based on this update.
 
 Carefully follow these steps:
 1. Respectfully acknowledge the user's correction without defensiveness.
 2. Clearly and unambiguously state the correct answer.
-3. Provide a thorough, step-by-step explanation of why this answer is correct, demonstrating clear reasoning and subject matter understanding.
+3. Provide a thorough, step-by-step explanation of why this answer is correct.
 4. Briefly analyze why each of the other answer choices is incorrect, including the one you initially chose.
-5. Use Markdown formatting consistently. 
+5. Use Markdown formatting consistently. Wrap any code or technical terms in backticks (\`).
 6. Analyze the input language and respond in that exact language. Do not translate or switch languages under any circumstances.
 7. Keep your tone factual, respectful, and educational. Avoid unnecessary apologies or conversational filler.
 
@@ -78,7 +78,7 @@ STRICT INSTRUCTIONS:
 
 IMPORTANT RULES:
 - Analyze the language of the input and respond in the **exact same language**.
-- Use **Markdown** for formatting.
+- Use **Markdown** for formatting. Wrap any code or technical terms in backticks (\`).
 - Do NOT translate, switch languages, or include any introductory or explanatory text. Output only the summary.`,
 
   translate: `You are a precise bilingual translator. Translate the provided text into:

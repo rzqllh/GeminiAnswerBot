@@ -417,24 +417,32 @@ class PopupApp {
     _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0) {
         this.state.answerHTML = fullText;
         this.state.totalTokenCount = totalTokenCount;
-        
-        const answerMatch = fullText.match(/Answer:(.*?)(Confidence:|Reason:|$)/is);
-        let answerText = (answerMatch ? answerMatch[1].trim() : fullText.trim()).replace(/`/g, '');
+
+        const renderedHtml = DOMPurify.sanitize(marked.parse(fullText));
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = renderedHtml;
+
+        const answerText = tempDiv.querySelector('p')?.textContent || '';
         this.state.incorrectAnswer = answerText;
         
-        let formattedHtml = `<p class="answer-highlight">${_escapeHtml(answerText).replace(/\n/g, '<br>')}</p>`;
-        const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
+        const answerHtml = `<p class="answer-highlight">${tempDiv.querySelector('p')?.innerHTML || ''}</p>`;
+
+        let confidenceHtml = '';
+        const otherContent = tempDiv.innerText.replace(answerText, '').trim();
+        const confidenceMatch = otherContent.match(/Confidence:\s*(High|Medium|Low)/i);
         if (confidenceMatch) {
             const confidence = confidenceMatch[1].toLowerCase();
-            const reason = fullText.match(/Reason:(.*)/is)?.[1].trim() || "";
-            formattedHtml += `<div class="confidence-wrapper"><div class="confidence-level"><span class="confidence-level-label">Confidence ${fromCache ? '<span>⚡️</span>' : ''}</span><span class="confidence-badge confidence-${confidence}">${confidence[0].toUpperCase() + confidence.slice(1)}</span></div>${reason ? `<div class="confidence-reason">${_escapeHtml(reason)}</div>` : ''}</div>`;
+            const reason = otherContent.match(/Reason:(.*)/is)?.[1].trim() || "";
+            confidenceHtml = `<div class="confidence-wrapper"><div class="confidence-level"><span class="confidence-level-label">Confidence ${fromCache ? '<span>⚡️</span>' : ''}</span><span class="confidence-badge confidence-${confidence}">${confidence[0].toUpperCase() + confidence.slice(1)}</span></div>${reason ? `<div class="confidence-reason">${reason}</div>` : ''}</div>`;
         }
+        
+        let tokenHtml = '';
         if (totalTokenCount > 0 && !fromCache) {
-            formattedHtml += `<div class="token-count"><span class="token-count-label">Tokens Used</span><span class="token-count-value">${totalTokenCount}</span></div>`;
+            tokenHtml = `<div class="token-count"><span class="token-count-label">Tokens Used</span><span class="token-count-value">${totalTokenCount}</span></div>`;
         }
         
         this.elements.answerContainer.classList.remove('hidden');
-        this.elements.answerDisplay.innerHTML = formattedHtml;
+        this.elements.answerDisplay.innerHTML = answerHtml + confidenceHtml + tokenHtml;
         this.elements.copyAnswer.dataset.copyText = answerText;
         this.elements.retryAnswer.disabled = false;
         this.elements.aiActionsWrapper.classList.remove('hidden');
@@ -467,41 +475,13 @@ class PopupApp {
     }
     
     _handleCorrectionResult(fullText) { this._handleExplanationResult(fullText, false); }
-    _handleContextMenuResult(fullText, purpose) { /* This is a placeholder for future implementation */ }
-    _handleImageModeResult(fullText, purpose) { /* This is a placeholder for future implementation */ }
+    _handleContextMenuResult(fullText, purpose) { /* This is a placeholder */ }
+    _handleImageModeResult(fullText, purpose) { /* This is a placeholder */ }
     
     _formatQuestionContent(content) {
         if (!content) return '';
-
-        let questionPart = content;
-        let optionsPart = '';
-        
-        const optionsMatch = content.match(/options?:([\s\S]*)/i);
-        if (optionsMatch) {
-            questionPart = content.substring(0, optionsMatch.index).trim();
-            optionsPart = optionsMatch[1].trim();
-        }
-        
-        questionPart = questionPart.replace(/^question:\s*/i, '').trim();
-        const questionHtml = `<div class="question-text">${_escapeHtml(questionPart)}</div>`;
-
-        let optionsHtml = '';
-        if (optionsPart) {
-            const options = optionsPart.split(/\n\s*(?:-|\*)\s*/).filter(opt => opt.trim() !== '');
-            if (options.length > 1) {
-                optionsHtml = `<ul>${options.map(opt => `<li>${_escapeHtml(opt.trim())}</li>`).join('')}</ul>`;
-            }
-        }
-        
-        if (!optionsHtml && content.includes('-')) {
-            const parts = content.split(/-\s+/).map(p => p.trim().replace(/'/g, '')).filter(p => p);
-            if (parts.length > 2) { 
-                const questionFallback = parts.shift().replace(/^question:\s*/i, '').trim();
-                return `<div class="question-text">${_escapeHtml(questionFallback)}</div><ul>${parts.map(opt => `<li>${_escapeHtml(opt)}</li>`).join('')}</ul>`;
-            }
-        }
-
-        return questionHtml + (optionsHtml || '');
+        const renderedHtml = DOMPurify.sanitize(marked.parse(content.replace(/Question:/i, '### Question\n').replace(/Options:/i, '\n### Options\n')));
+        return renderedHtml;
     }
 
     _renderCorrectionOptions(options) { 
