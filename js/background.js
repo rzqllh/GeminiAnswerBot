@@ -1,15 +1,16 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/background.js
-// 🕓 Created: 2024-05-21 11:00:00
+// 🕓 Created: 2024-05-21 12:05:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
+
+// Variabel global untuk menyimpan data konteks sementara
+let contextDataForPopup = null;
 
 async function fetchImageAsBase64(url) {
   try {
     const response = await fetch(url, { mode: 'cors' });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const blob = await response.blob();
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -30,7 +31,8 @@ async function handleContextAction(info, tab) {
   }
   
   const actionData = {
-    action: info.menuItemId
+    action: info.menuItemId,
+    source: 'contextMenu'
   };
 
   if (info.selectionText) {
@@ -48,11 +50,17 @@ async function handleContextAction(info, tab) {
     }
   }
   
-  await chrome.storage.local.set({
-    [`context_action_${tab.id}`]: actionData
-  });
+  // Simpan data ke variabel global, bukan storage
+  contextDataForPopup = actionData;
 
-  chrome.action.openPopup();
+  // Buka popup
+  try {
+    await chrome.action.openPopup();
+  } catch (e) {
+    console.error("Failed to open popup:", e);
+    // Reset data jika popup gagal dibuka
+    contextDataForPopup = null;
+  }
 }
 
 async function updateContextMenus() {
@@ -251,7 +259,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             break;
         case 'testApiConnection':
             handleTestConnection(request.payload, sendResponse);
-            return true; // Indicates async response
+            return true;
         case 'updateContextMenus':
             updateContextMenus();
             break;
@@ -261,6 +269,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         case 'saveHistory':
             handleSaveHistory(request.payload);
             break;
+        case 'popupReady':
+            if (contextDataForPopup) {
+                sendResponse(contextDataForPopup);
+                contextDataForPopup = null; // Hapus setelah dikirim
+            } else {
+                sendResponse(null); // Kirim null jika tidak ada data
+            }
+            return true; // Menandakan respons asinkron
     }
-    return false; // No async response for other messages
+    return false;
 });

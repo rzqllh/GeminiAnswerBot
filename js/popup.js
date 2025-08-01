@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/popup.js
-// 🕓 Created: 2024-05-21 11:20:00
+// 🕓 Created: 2024-05-21 12:10:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /**
@@ -100,11 +100,9 @@ class PopupApp {
             
             await this._ensureContentScripts(tab.id);
 
-            const contextKey = `context_action_${tab.id}`;
-            const contextData = (await chrome.storage.local.get(contextKey))[contextKey];
+            const contextData = await chrome.runtime.sendMessage({ action: 'popupReady' });
 
-            if (contextData) {
-                await chrome.storage.local.remove(contextKey);
+            if (contextData && contextData.source === 'contextMenu') {
                 await this._clearPersistedState();
                 this.state.action = contextData.action;
                 this.state.url = this.state.tab.url;
@@ -492,13 +490,13 @@ class PopupApp {
         if (!this.state.tab) return; 
         const key = this.state.tab.id.toString(); 
         const stateToSave = { ...this.state };
-        delete stateToSave.tab; // Don't save the tab object
-        delete stateToSave.config; // Don't save config
+        delete stateToSave.tab;
+        delete stateToSave.config;
         chrome.storage.local.set({ [key]: stateToSave }); 
     }
 
-    _saveToHistory(actionType) { 
-        if (!this.state.tab) return; 
+    async _saveToHistory(actionType) {
+        if (!this.state.tab) return;
         const newEntry = {
             id: Date.now(),
             url: this.state.tab.url,
@@ -510,7 +508,7 @@ class PopupApp {
             thoughtProcess: this.state.thoughtProcess
         };
         try {
-            chrome.runtime.sendMessage({ action: 'saveHistory', payload: newEntry });
+            await chrome.runtime.sendMessage({ action: 'saveHistory', payload: newEntry });
         } catch (e) {
             console.error("Failed to send history to background script:", e);
         }

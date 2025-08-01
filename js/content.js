@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/content.js
-// 🕓 Created: 2024-05-21 11:05:00
+// 🕓 Created: 2024-05-21 12:00:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /**
@@ -63,106 +63,79 @@ class QuizModule {
     this.quizContainer = null;
     this.submissionHandler = this.handleSubmissionClick.bind(this);
   }
-  
-  extractContent() {
-    const optionGroups = this._findOptionGroups();
-    if (optionGroups.length === 0) return null;
 
-    const questionCandidates = this._findQuestionCandidates();
-    if (questionCandidates.length === 0) return null;
-
-    let bestPair = { score: -1, question: null, options: [] };
-
-    for (const group of optionGroups) {
-      for (const candidate of questionCandidates) {
-        const score = this._calculateProximityScore(candidate.element, group.container);
-        if (score > bestPair.score) {
-          bestPair = { score, question: candidate.text, options: group.options };
-        }
-      }
-    }
-
-    if (bestPair.score > 0 && bestPair.question && bestPair.options.length > 1) {
-      return `Question: ${bestPair.question}\n\nOptions:\n${bestPair.options.map(opt => `- ${opt}`).join('\n')}`;
-    }
-    
-    return null;
-  }
-
-  _findOptionGroups() {
-    const groups = new Map();
-    const inputs = document.querySelectorAll('input[type="radio"], input[type="checkbox"]');
-
-    inputs.forEach(input => {
-        if (!this._isVisible(input)) return;
-
-        const container = input.closest('form, fieldset, ol, ul, div');
-        if (!container) return;
-
-        const label = input.closest('label') || document.querySelector(`label[for="${input.id}"]`);
-        const optionText = label ? label.textContent.trim() : null;
-
-        if (optionText) {
-            if (!groups.has(container)) {
-                groups.set(container, { options: new Set() });
-            }
-            groups.get(container).options.add(optionText);
-        }
-    });
-
-    const validGroups = [];
-    groups.forEach((data, container) => {
-        if (data.options.size > 1) {
-            validGroups.push({ container, options: Array.from(data.options) });
-        }
-    });
-    return validGroups;
-  }
-
-  _findQuestionCandidates() {
-    const candidates = [];
-    const elements = document.querySelectorAll('p, h1, h2, h3, h4, div[class*="question"], span');
-    
-    elements.forEach(el => {
-      const clone = el.cloneNode(true);
-      clone.querySelectorAll('button, input, a, select, form, ul, ol').forEach(child => child.remove());
-      const text = clone.textContent.trim().replace(/\s+/g, ' ');
-
-      const hasInteractiveChildren = el.querySelector('button, input, a, select');
-
-      if (this._isVisible(el) && text.length > 10 && text.length < 500 && !hasInteractiveChildren) {
-        if (!candidates.some(c => c.element.contains(el))) {
-          candidates.push({ element: el, text });
-        }
-      }
-    });
-    return candidates;
-  }
-
-  _calculateProximityScore(questionEl, optionsContainer) {
-    if (optionsContainer.contains(questionEl)) return 10;
-    
-    let current = questionEl;
-    for (let i = 0; i < 5; i++) {
-        if (current.nextElementSibling === optionsContainer || current.previousElementSibling === optionsContainer) {
-            return 9 - i;
-        }
-        current = current.parentElement;
-        if (!current) break;
-        if (current === optionsContainer.parentElement) return 8 - i;
-    }
-    
-    return 0;
-  }
-  
   _isVisible(el) {
     return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+  }
+
+  _getCleanText(el) {
+      const clone = el.cloneNode(true);
+      // Hapus elemen yang tidak relevan untuk mendapatkan teks yang bersih
+      clone.querySelectorAll('button, input, a, select, form, ul, ol, .button, .btn, [class*="action"]').forEach(child => child.remove());
+      return clone.textContent.trim().replace(/\s+/g, ' ');
+  }
+
+  /**
+   * Algoritma ekstraksi konten kuis Top-Down yang baru dan lebih andal.
+   * @returns {string|null} Konten kuis yang diformat atau null jika tidak ditemukan.
+   */
+  extractContent() {
+      const potentialQuizBlocks = [];
+      const blockSelectors = 'form, div[class*="quiz"], div[class*="question"], article, section';
+      
+      document.querySelectorAll(blockSelectors).forEach(block => {
+          if (!this._isVisible(block)) return;
+
+          const inputs = block.querySelectorAll('input[type="radio"], input[type="checkbox"]');
+          if (inputs.length < 2) return; // Harus ada minimal 2 pilihan
+
+          // Cari kandidat pertanyaan di dalam blok
+          const questionCandidates = [];
+          block.querySelectorAll('p, h1, h2, h3, h4, span, div').forEach(pEl => {
+              // Pastikan elemen ini adalah anak langsung atau cucu dekat, bukan di dalam kontainer opsi
+              if (pEl.closest('label, li, [class*="option"]')) return;
+              
+              const text = this._getCleanText(pEl);
+              if (text.length > 15 && text.length < 500 && text.includes('?')) {
+                  questionCandidates.push({ element: pEl, text });
+              }
+          });
+
+          if (questionCandidates.length === 0) return;
+
+          // Ekstrak opsi dari dalam blok
+          const options = new Set();
+          inputs.forEach(input => {
+              const label = input.closest('label') || (input.id && block.querySelector(`label[for="${input.id}"]`));
+              if (label) {
+                  const optionText = label.textContent.trim();
+                  if (optionText) options.add(optionText);
+              }
+          });
+
+          if (options.size > 1) {
+              // Pilih pertanyaan terbaik (biasanya yang pertama atau paling atas)
+              const bestQuestion = questionCandidates[0].text;
+              potentialQuizBlocks.push({
+                  question: bestQuestion,
+                  options: Array.from(options),
+                  blockElement: block
+              });
+          }
+      });
+
+      if (potentialQuizBlocks.length === 0) return null;
+
+      // Heuristik: Pilih blok dengan teks pertanyaan terpanjang (kemungkinan paling lengkap)
+      potentialQuizBlocks.sort((a, b) => b.question.length - a.question.length);
+      const bestBlock = potentialQuizBlocks[0];
+
+      return `Question: ${bestBlock.question}\n\nOptions:\n${bestBlock.options.map(opt => `- ${opt}`).join('\n')}`;
   }
 
   extractOptions() {
     const options = [];
     const seenOptions = new Set();
-    // Generalize selector to find any visible radio or checkbox on the page
     document.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
         if (!this._isVisible(input)) return;
 
@@ -182,12 +155,12 @@ class QuizModule {
     this.correctAiAnswer = aiAnswer;
     if (!this.correctAiAnswer) return;
     const highlight = document.querySelector('mark.gemini-answer-highlight');
-    this.quizContainer = highlight ? highlight.closest('form, div[class*="quiz"], div[class*="question"], div.w3-panel') : document.body;
+    this.quizContainer = highlight ? highlight.closest('form, div[class*="quiz"], div[class*="question"]') : document.body;
     if (!this.quizContainer) return;
-    const keywords = ['next', 'submit', 'finish', 'selesai', 'lanjut', 'berikutnya', 'kirim'];
+    const keywords = ['next', 'submit', 'finish', 'selesai', 'lanjut', 'berikutnya', 'kirim', 'selanjutnya'];
     const selectors = 'button, a, div[role="button"], input[type="submit"]';
     this.quizContainer.querySelectorAll(selectors).forEach(el => {
-      const elText = el.textContent.toLowerCase().trim();
+      const elText = (el.textContent || el.value || "").toLowerCase().trim();
       if (keywords.some(keyword => elText.includes(keyword))) {
         el.removeEventListener('click', this.submissionHandler, true);
         el.addEventListener('click', this.submissionHandler, true);
@@ -334,7 +307,7 @@ class ToolbarModule {
   }
 
   show() {
-    if (!this.toolbarElement) return; // Defensive check
+    if (!this.toolbarElement) return;
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) { this.hide(); return; }
     const range = selection.getRangeAt(0);
@@ -382,9 +355,12 @@ class ContentController {
           const selectedText = window.getSelection().toString().trim();
           let content;
           if (selectedText.length > 20) {
-              content = `Question: ${selectedText}`;
+              // Jika ada teks yang disorot, coba jalankan algoritma cerdas padanya
+              const tempDiv = document.createElement('div');
+              tempDiv.innerHTML = selectedText; // Ini tidak ideal, tapi cara cepat untuk membuat fragmen DOM
+              content = this.quiz.extractContent(tempDiv) || `Question: ${selectedText}`;
           } else {
-              content = this.quiz.extractContent() || this.page.fallbackContent();
+              content = this.quiz.extractContent(document.body) || this.page.fallbackContent();
           }
           sendResponse({ content });
           break;
@@ -412,7 +388,6 @@ class ContentController {
   }
 }
 
-// Inisialisasi controller hanya jika belum pernah dimuat sebelumnya.
 if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
   window.geminiAnswerBotContentScriptLoaded = true;
   new ContentController();
