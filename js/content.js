@@ -60,50 +60,109 @@ class QuizModule {
     this.submissionHandler = this.handleSubmissionClick.bind(this);
   }
   
+  /**
+   * Mengekstrak konten kuis menggunakan algoritma heuristik dinamis.
+   * @returns {string|null} Konten kuis yang diformat atau null jika tidak ditemukan.
+   */
   extractContent() {
-    const quizContainerSelectors = [
-      'div.w3-container.w3-panel', 'form[action*="quiz"]', 'div[id*="quiz"]',
-      'div[class*="quiz"]', 'div[class*="question-block"]', 'div[id*="question"]'
-    ];
+    const optionGroups = this._findOptionGroups();
+    if (optionGroups.length === 0) return null;
 
-    for (const selector of quizContainerSelectors) {
-      const container = document.querySelector(selector);
-      if (container && (container.querySelector('input[type="radio"]') || container.querySelector('input[type="checkbox"]'))) {
-        let quizQuestion = '';
-        const questionCandidates = container.querySelectorAll('h3, h4, p, div.w3-large, div[class*="question-text"]');
-        for (const qEl of questionCandidates) {
-          let qText = qEl.textContent.trim().replace(/^Question\s+\d+\s+of\s+\d+\s*[:-]?\s*/i, '').trim();
-          if (qText.length > 10 && !qEl.querySelector('input')) {
-            quizQuestion = qText;
-            break;
-          }
-        }
+    const questionCandidates = this._findQuestionCandidates();
+    if (questionCandidates.length === 0) return null;
 
-        const quizOptions = [];
-        const seenOptions = new Set();
-        container.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
-          let label = input.closest('label') || container.querySelector(`label[for="${input.id}"]`);
-          if (label) {
-            const optionContent = label.textContent.trim();
-            if (optionContent && !seenOptions.has(optionContent)) {
-              quizOptions.push(optionContent);
-              seenOptions.add(optionContent);
-            }
-          }
-        });
+    let bestPair = { score: -1, question: null, options: [] };
 
-        if (quizQuestion && quizOptions.length >= 2) {
-          return `Question: ${quizQuestion}\n\nOptions:\n${quizOptions.map(opt => `- ${opt}`).join('\n')}`;
+    for (const group of optionGroups) {
+      for (const candidate of questionCandidates) {
+        const score = this._calculateProximityScore(candidate.element, group.container);
+        if (score > bestPair.score) {
+          bestPair = { score, question: candidate.text, options: group.options };
         }
       }
     }
+
+    if (bestPair.score > 0 && bestPair.question && bestPair.options.length > 1) {
+      return `Question: ${bestPair.question}\n\nOptions:\n${bestPair.options.map(opt => `- ${opt}`).join('\n')}`;
+    }
+    
     return null;
+  }
+
+  _findOptionGroups() {
+    const groups = new Map();
+    const inputs = document.querySelectorAll('input[type="radio"], input[type="checkbox"]');
+
+    inputs.forEach(input => {
+        if (!this._isVisible(input)) return;
+
+        const container = input.closest('form, fieldset, ol, ul, div');
+        if (!container) return;
+
+        const label = input.closest('label') || document.querySelector(`label[for="${input.id}"]`);
+        const optionText = label ? label.textContent.trim() : null;
+
+        if (optionText) {
+            if (!groups.has(container)) {
+                groups.set(container, { options: new Set() });
+            }
+            groups.get(container).options.add(optionText);
+        }
+    });
+
+    const validGroups = [];
+    groups.forEach((data, container) => {
+        if (data.options.size > 1) {
+            validGroups.push({ container, options: Array.from(data.options) });
+        }
+    });
+    return validGroups;
+  }
+
+  _findQuestionCandidates() {
+    const candidates = [];
+    const elements = document.querySelectorAll('p, h1, h2, h3, h4, div[class*="question"], span');
+    
+    elements.forEach(el => {
+      const clone = el.cloneNode(true);
+      // Hapus elemen anak yang tidak diinginkan untuk mendapatkan teks pertanyaan yang bersih
+      clone.querySelectorAll('button, input, a, select, form, ul, ol').forEach(child => child.remove());
+      const text = clone.textContent.trim().replace(/\s+/g, ' ');
+
+      const hasInteractiveChildren = el.querySelector('button, input, a, select');
+
+      if (this._isVisible(el) && text.length > 10 && text.length < 500 && !hasInteractiveChildren) {
+        if (!candidates.some(c => c.element.contains(el))) {
+          candidates.push({ element: el, text });
+        }
+      }
+    });
+    return candidates;
+  }
+
+  _calculateProximityScore(questionEl, optionsContainer) {
+    if (optionsContainer.contains(questionEl)) return 10;
+    
+    let current = questionEl;
+    for (let i = 0; i < 5; i++) {
+        if (current.nextElementSibling === optionsContainer || current.previousElementSibling === optionsContainer) {
+            return 9 - i;
+        }
+        current = current.parentElement;
+        if (!current) break;
+        if (current === optionsContainer.parentElement) return 8 - i;
+    }
+    
+    return 0;
+  }
+  
+  _isVisible(el) {
+    return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
   }
 
   extractOptions() {
     const container = document.querySelector('div[class*="quiz"], form[action*="quiz"], div.w3-panel');
     if (!container) return [];
-
     const options = [];
     const seenOptions = new Set();
     container.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
@@ -122,15 +181,11 @@ class QuizModule {
   activatePreSubmissionCheck(aiAnswer) {
     this.correctAiAnswer = aiAnswer;
     if (!this.correctAiAnswer) return;
-
     const highlight = document.querySelector('mark.gemini-answer-highlight');
     this.quizContainer = highlight ? highlight.closest('form, div[class*="quiz"], div[class*="question"], div.w3-panel') : document.body;
-    
     if (!this.quizContainer) return;
-
     const keywords = ['next', 'submit', 'finish', 'selesai', 'lanjut', 'berikutnya', 'kirim'];
     const selectors = 'button, a, div[role="button"], input[type="submit"]';
-
     this.quizContainer.querySelectorAll(selectors).forEach(el => {
       const elText = el.textContent.toLowerCase().trim();
       if (keywords.some(keyword => elText.includes(keyword))) {
@@ -142,17 +197,13 @@ class QuizModule {
 
   handleSubmissionClick(event) {
     if (!this.quizContainer || !this.correctAiAnswer) return;
-
     const userSelectedInput = this.quizContainer.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked');
     if (!userSelectedInput) return;
-
     let userSelectedText = (userSelectedInput.closest('label')?.textContent || userSelectedInput.value).trim();
-
     const normalize = str => str?.replace(/`/g, '').replace(/\s+/g, ' ').toLowerCase().trim();
     if (normalize(userSelectedText) !== normalize(this.correctAiAnswer)) {
       event.preventDefault();
       event.stopImmediatePropagation();
-
       this.showConfirmationDialog(userSelectedText, this.correctAiAnswer, confirmed => {
         if (confirmed) {
           event.target.removeEventListener('click', this.submissionHandler, true);
@@ -165,14 +216,11 @@ class QuizModule {
   showConfirmationDialog(userAnswer, aiAnswer, callback) {
     const oldDialog = document.getElementById('gemini-dialog-overlay');
     if (oldDialog) oldDialog.remove();
-    
     const dialogOverlay = document.createElement('div');
     dialogOverlay.id = 'gemini-dialog-overlay';
     dialogOverlay.className = 'gemini-answer-bot-dialog-overlay';
-
     const safeUserAnswer = _escapeHtml(userAnswer);
     const safeAiAnswer = _escapeHtml(typeof aiAnswer === 'string' ? aiAnswer.replace(/`/g, '') : aiAnswer);
-
     dialogOverlay.innerHTML = `
       <div class="gemini-answer-bot-dialog-box">
           <h2 class="gemini-answer-bot-dialog-title">
@@ -191,17 +239,13 @@ class QuizModule {
               <button class="gemini-answer-bot-dialog-button primary" id="gemini-confirm-btn">Continue Anyway</button>
           </div>
       </div>`;
-
     document.body.appendChild(dialogOverlay);
-    
     const closeDialog = () => {
         dialogOverlay.classList.remove('visible');
         setTimeout(() => dialogOverlay.remove(), 200);
     };
-
     document.getElementById('gemini-confirm-btn').onclick = () => { callback(true); closeDialog(); };
     document.getElementById('gemini-cancel-btn').onclick = () => { callback(false); closeDialog(); };
-
     setTimeout(() => dialogOverlay.classList.add('visible'), 10);
   }
 }
@@ -213,7 +257,6 @@ class PageModule {
     extractFullContent() {
         const mainContentSelectors = ['main', 'article', 'div[role="main"]', 'div[id*="content"]', 'div[class*="content"]'];
         let mainContentArea = mainContentSelectors.map(s => document.querySelector(s)).find(el => el) || document.body;
-
         const clone = mainContentArea.cloneNode(true);
         const selectorsToRemove = [
             'script', 'style', 'noscript', 'iframe', 'nav', 'header', 'footer', 'aside', 'button', 'input', 'textarea',
@@ -221,7 +264,6 @@ class PageModule {
             'div[id*="sidebar"]', 'div[class*="promo"]', 'div[class*="related"]', '[class*="ad"]', '[id*="ad"]'
         ];
         clone.querySelectorAll(selectorsToRemove.join(', ')).forEach(el => el.remove());
-
         let content = clone.innerText;
         content = content.replace(/\s{3,}/g, '\n\n').trim();
         return content.length > 100 ? content : this.fallbackContent();
@@ -246,17 +288,14 @@ class ToolbarModule {
 
   create() {
     if (document.getElementById('gemini-answer-bot-toolbar')) return;
-
     this.toolbarElement = document.createElement('div');
     this.toolbarElement.id = 'gemini-answer-bot-toolbar';
     this.toolbarElement.className = 'gemini-answer-bot-toolbar';
-    
     const toolbarActions = [
         { action: 'summarize', title: 'Summarize', svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.37 3.63a2.12 2.12 0 1 1 3 3L12 16l-4 1 1-4Z"/></svg>' },
         { action: 'explain', title: 'Explain', svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14-4-4 4-4"/><path d="M12 14h-4a2 2 0 0 0-2 2v4"/><path d="m16 10 4 4-4 4"/><path d="m16 10h4a2 2 0 0 1 2 2v4"/></svg>' },
         { action: 'translate', title: 'Translate', svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>' },
     ];
-
     toolbarActions.forEach(item => {
       const button = document.createElement('button');
       button.className = 'gab-toolbar-button';
@@ -275,7 +314,6 @@ class ToolbarModule {
       });
       this.toolbarElement.appendChild(button);
     });
-
     document.body.appendChild(this.toolbarElement);
   }
   
@@ -294,23 +332,18 @@ class ToolbarModule {
   show() {
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) { this.hide(); return; }
-    
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
     if (rect.width < 5 && rect.height < 5) { this.hide(); return; }
-
     this.toolbarElement.classList.add('visible');
     const { offsetWidth: toolbarWidth, offsetHeight: toolbarHeight } = this.toolbarElement;
-    
     let top = rect.top + window.scrollY - toolbarHeight - 10;
     let left = rect.left + window.scrollX + (rect.width / 2) - (toolbarWidth / 2);
-
     if (top < window.scrollY) top = rect.bottom + window.scrollY + 10;
     if (left < 0) left = 5;
     if (left + toolbarWidth > document.documentElement.clientWidth) {
       left = document.documentElement.clientWidth - toolbarWidth - 5;
     }
-
     this.toolbarElement.style.top = `${top}px`;
     this.toolbarElement.style.left = `${left}px`;
   }
@@ -341,7 +374,13 @@ class ContentController {
           sendResponse({ ready: true, success: true });
           break;
         case "get_quiz_content":
-          const content = this.quiz.extractContent() || this.page.fallbackContent();
+          const selectedText = window.getSelection().toString().trim();
+          let content;
+          if (selectedText.length > 20) {
+              content = `Question: ${selectedText}`;
+          } else {
+              content = this.quiz.extractContent() || this.page.fallbackContent();
+          }
           sendResponse({ content });
           break;
         case "get_full_page_content":
@@ -363,7 +402,7 @@ class ContentController {
           sendResponse({ options });
           break;
       }
-      return true; // Keep the message channel open for async responses
+      return true;
     });
   }
 }

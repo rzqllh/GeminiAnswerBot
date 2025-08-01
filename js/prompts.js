@@ -1,14 +1,14 @@
 // js/prompts.js
 
 const DEFAULT_PROMPTS = {
-  'cleaning': `You are an extremely precise text cleaner and quiz extractor. Your ONLY objective is to extract the **single quiz question** and its **associated answer options** from raw, unstructured webpage text.
+  'cleaning': `You are an extremely precise text cleaner and quiz extractor. Your ONLY objective is to extract the **single quiz question** and its **associated answer options** from the provided text.
 
 CRITICAL RULES FOR EXTRACTION:
-1.  **Single Question Only:** Locate and extract the main quiz question.
+1.  **Single Question Only:** Locate and extract the main quiz question. IGNORE any question numbers, category labels (e.g., "Category: Verbal"), or other metadata.
 2.  **All Relevant Options:** Extract *all* answer choices tied directly to that question.
 3.  **Strict Exclusion Filter:** You MUST eliminate any unrelated elements, including (but not limited to): headers, footers, navigation, ads, scores, page titles, instructions ("Next", "Submit", etc.), explanations, or unrelated context. CRITICALLY, you MUST also identify and **completely remove any labels for the options list** such as "Options:", "Choices:", "Pilihan:", or similar variations in any language.
-4.  **Preserve Exact Original Text:** Do not modify spelling, symbols, spacing, punctuation, or case of the actual question and options. Retain all inline or block elements as written.
-5.  **Markdown Formatting:** Format the extracted content using standard Markdown. Use CODE_BLOCK_START and CODE_BLOCK_END for any multi-line code blocks found within options (e.g., "CODE_BLOCK_START\\nconsole.log('hello')\\nCODE_BLOCK_END"), and wrap inline code with single backticks (\`inline code\`). If the option text itself is a HTML tag (like <p>), you should also wrap it in CODE_BLOCK_START/END to preserve it.
+4.  **Preserve Exact Original Text:** Do not modify spelling, symbols, spacing, punctuation, or case of the actual question and options.
+5.  **Markdown Formatting:** Format the extracted content using standard Markdown.
 6.  **Direct Output:**
     - Return ONLY the cleaned, extracted content in Markdown.
     - NO prefaces, no commentary, no summaries.
@@ -25,7 +25,7 @@ CRITICAL RULES FOR EXTRACTION:
 
 Respond in the exact format below, without any extra words or explanations.
 FORMAT:
-Answer: [The exact text of the chosen option. If it's a code block, use CODE_BLOCK_START...CODE_BLOCK_END. If it's inline code, use backticks.]
+Answer: [The exact text of the chosen option.]
 Confidence: [High/Medium/Low]
 Reason: [Your one-sentence explanation here]
 CRITICAL LANGUAGE RULE:
