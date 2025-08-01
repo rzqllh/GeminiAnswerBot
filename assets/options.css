@@ -1,14 +1,14 @@
 /* === Hafizh Rizqullah | GeminiAnswerBot === */
 /* 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant */
 /* 📄 assets/options.css */
-/* 🕓 Created: 2024-05-21 10:15:00 */
+/* 🕓 Created: 2024-05-21 15:05:00 */
 /* 🧠 Modular | DRY | SOLID | Apple HIG Compliant */
 
 :root {
   --bg-color: #f2f2f7;
   --sidebar-bg: rgba(225, 225, 225, 0.55);
   --content-bg: rgba(255, 255, 255, 0.65);
-  --card-bg: rgba(242, 242, 247, 0.5);
+  --card-bg: rgba(255, 255, 255, 0.8);
   --primary-text: #1d1d1f;
   --secondary-text: rgba(29, 29, 31, 0.75);
   --border-color: rgba(0, 0, 0, 0.1);
@@ -17,6 +17,7 @@
   --accent-blue-hover: #006ee6;
   --accent-green: #34c759;
   --accent-red: #ff3b30;
+  --accent-yellow: #ffcc00;
   --danger-red-hover: #d93025;
   --button-secondary-bg: #e9e9eb;
   --button-secondary-hover: #e1e1e3;
@@ -30,7 +31,7 @@
     --bg-color: #1c1c1e;
     --sidebar-bg: rgba(28, 28, 30, 0.55);
     --content-bg: rgba(44, 44, 46, 0.7);
-    --card-bg: rgba(28, 28, 30, 0.5);
+    --card-bg: rgba(28, 28, 30, 0.7);
     --primary-text: #ffffff;
     --secondary-text: #a1a1aa;
     --border-color: rgba(255, 255, 255, 0.15);
@@ -41,6 +42,7 @@
     --accent-blue-hover: #0066cc;
     --accent-green: #30d158;
     --accent-red: #ff453a;
+    --accent-yellow: #ffd60a;
     --danger-red-hover: #c41c13;
     --toast-bg-dark: #48484a;
     --toast-border-dark: rgba(255, 255, 255, 0.2);
@@ -194,18 +196,31 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance
 
 .history-card {
     background-color: var(--card-bg); border: 1px solid var(--border-color);
-    border-radius: 10px; margin-bottom: 16px; transition: box-shadow 0.2s;
+    border-radius: 12px; margin-bottom: 20px;
+    transition: box-shadow 0.2s, transform 0.2s;
 }
-.history-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-.history-card-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-color); }
-.history-card-title { font-weight: 500; text-decoration: none; color: var(--primary-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 400px; }
+.history-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.08); transform: translateY(-2px); }
+@media (prefers-color-scheme: dark) {
+    .history-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.2); }
+}
+
+.history-card-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--border-color); }
+.history-card-title { font-weight: 600; text-decoration: none; color: var(--primary-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 400px; font-size: 15px; }
 .history-card-title:hover { color: var(--accent-blue); }
-.history-card-date { font-size: 12px; color: var(--secondary-text); flex-shrink: 0; margin-left: 16px; }
-.history-card-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-.history-item { display: flex; gap: 8px; align-items: flex-start; }
-.history-item-label { font-weight: 600; color: var(--secondary-text); font-size: 14px; }
-.history-item-content { margin: 0; font-size: 14px; line-height: 1.5; }
-.history-item-content.answer { font-weight: 500; color: var(--accent-blue); }
+.history-card-date { font-size: 13px; color: var(--secondary-text); flex-shrink: 0; margin-left: 16px; }
+.history-card-body { padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+.history-section { background-color: var(--bg-color); border-radius: 10px; padding: 16px; }
+.history-section-title { font-size: 13px; font-weight: 600; color: var(--secondary-text); margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+.history-question-text { font-weight: 500; margin: 0 0 12px 0; }
+.history-section ul { list-style-type: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.history-section li { padding-left: 20px; position: relative; }
+.history-section li::before { content: '•'; position: absolute; left: 0; color: var(--accent-blue); }
+.history-ai-response { margin: 0; line-height: 1.6; }
+.history-ai-response strong { font-weight: 600; color: var(--primary-text); }
+.confidence-tag { padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; color: #1d1d1f; }
+.confidence-high { background-color: var(--accent-green); }
+.confidence-medium { background-color: var(--accent-yellow); }
+.confidence-low { background-color: var(--accent-red); color: #fff; }
 
 /* Buttons */
 .button { padding: 10px 18px; font-size: 14px; font-weight: 500; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; }

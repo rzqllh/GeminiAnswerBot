@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/options.js
-// 🕓 Created: 2024-05-21 10:10:00
+// 🕓 Created: 2024-05-21 15:00:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -172,7 +172,7 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
 
-    // --- History Management ---
+    // --- History Management (Refactored) ---
     async function loadHistory() {
         ELS.historyListContainer.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading history...</p></div>';
         const { history = [] } = await chrome.storage.local.get('history');
@@ -187,21 +187,42 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        ELS.historyListContainer.innerHTML = '';
+        ELS.historyListContainer.innerHTML = ''; // Clear container
+        const fragment = document.createDocumentFragment();
+
         history.forEach(item => {
             try {
                 const card = document.createElement('div');
                 card.className = 'history-card';
 
-                const cleanAnswer = (item.answerHTML || '').replace(/\[THOUGHT\][\s\S]*\[ENDTHOUGHT\]\s*/, '');
-                const answerMatch = cleanAnswer.match(/Answer:\s*(.*)/i);
-                const answerText = answerMatch ? answerMatch[1].trim() : cleanAnswer.trim();
+                // --- Parse Question Content ---
+                let question = 'Question content not available.';
+                let optionsHtml = '<ul><li>No options found.</li></ul>';
+                if (item.cleanedContent) {
+                    const lines = item.cleanedContent.split('\n').filter(line => line.trim() !== '');
+                    const questionLine = lines.find(line => line.toLowerCase().startsWith('question:'));
+                    question = questionLine ? questionLine.substring(9).trim() : lines[0];
+                    
+                    const optionLines = lines.filter(line => line.trim().startsWith('- '));
+                    if (optionLines.length > 0) {
+                        optionsHtml = '<ul>' + optionLines.map(opt => `<li>${_escapeHtml(opt.substring(2).trim())}</li>`).join('') + '</ul>';
+                    }
+                }
 
-                const questionText = (item.cleanedContent || 'No question content available.')
-                    .replace(/Question:/i, '')
-                    .replace(/Options:/i, '')
-                    .trim()
-                    .substring(0, 150);
+                // --- Parse AI Response ---
+                let aiAnswer = 'N/A';
+                let aiConfidence = 'N/A';
+                let aiReason = 'N/A';
+                if (item.answerHTML) {
+                    const cleanAnswerHTML = item.answerHTML.replace(/\[THOUGHT\][\s\S]*\[ENDTHOUGHT\]\s*/, '');
+                    const answerMatch = cleanAnswerHTML.match(/Answer:\s*(.*)/i);
+                    const confidenceMatch = cleanAnswerHTML.match(/Confidence:\s*(High|Medium|Low)/i);
+                    const reasonMatch = cleanAnswerHTML.match(/Reason:\s*([\s\S]*)/i);
+                    
+                    if (answerMatch) aiAnswer = answerMatch[1].trim();
+                    if (confidenceMatch) aiConfidence = confidenceMatch[1].trim();
+                    if (reasonMatch) aiReason = reasonMatch[1].trim();
+                }
 
                 const formattedDate = new Date(item.timestamp).toLocaleString(undefined, {
                     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -213,22 +234,27 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span class="history-card-date">${formattedDate}</span>
                     </div>
                     <div class="history-card-body">
-                        <div class="history-item">
-                            <span class="history-item-label">Q:</span>
-                            <p class="history-item-content">${_escapeHtml(questionText)}...</p>
+                        <div class="history-section">
+                            <h4 class="history-section-title">Question Content</h4>
+                            <p class="history-question-text">${_escapeHtml(question)}</p>
+                            ${optionsHtml}
                         </div>
-                        <div class="history-item">
-                            <span class="history-item-label">A:</span>
-                            <p class="history-item-content answer">${_escapeHtml(answerText)}</p>
+                        <div class="history-section">
+                            <h4 class="history-section-title">AI Response</h4>
+                            <p class="history-ai-response">
+                                <strong>Answer:</strong> ${_escapeHtml(aiAnswer)}<br>
+                                <strong>Confidence:</strong> <span class="confidence-tag confidence-${aiConfidence.toLowerCase()}">${_escapeHtml(aiConfidence)}</span><br>
+                                <strong>Reason:</strong> ${_escapeHtml(aiReason)}
+                            </p>
                         </div>
                     </div>
                 `;
-                ELS.historyListContainer.appendChild(card);
+                fragment.appendChild(card);
             } catch (e) {
                 console.error('Failed to render history item:', item, e);
-                // Skip this item if it's malformed
             }
         });
+        ELS.historyListContainer.appendChild(fragment);
     }
 
     // --- Prompt Profile Management ---
