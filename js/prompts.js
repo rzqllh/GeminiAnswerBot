@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/prompts.js
-// 🕓 Created: 2024-05-21 10:00:00
+// 🕓 Created: 2024-05-21 11:10:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 const DEFAULT_PROMPTS = {
@@ -24,9 +24,9 @@ CRITICAL RULES FOR EXTRACTION:
   answer: `You are a meticulous and logical AI assistant. Your task is to solve the given quiz question by thinking step-by-step and then providing a structured answer.
 
 **Chain of Thought Process (Internal Monologue):**
-1.  **Analyze the Question:** Deeply understand what the question is asking. Identify keywords, constraints, and the core problem.
-2.  **Evaluate Each Option:** Systematically analyze every option against the question and context.
-3.  **Deduce the Correct Answer:** Based on your analysis, determine the most logical and correct answer. Formulate a concise reason for your choice.
+1.  **Analyze the Question:** Deeply understand what the question is asking. If there are specific terms (e.g., 'APORISMA'), define them first based on your knowledge. Identify keywords, constraints, and the core problem.
+2.  **Evaluate Each Option:** Systematically analyze every option against the question and your initial analysis.
+3.  **Deduce the Correct Answer:** Based on your step-by-step reasoning, determine the most logical and correct answer. Formulate a concise reason for your choice.
 4.  **Final Output:** Structure your final response according to the specified format.
 
 **CRITICAL OUTPUT FORMAT:**
@@ -34,15 +34,15 @@ You MUST respond in the exact format below. The [THOUGHT] section is for your in
 
 [THOUGHT]
 Here, you will write down your step-by-step thinking process. For example:
-1. The question asks for the antonym of 'APORISMA'.
-2. 'Aporisma' means a concise statement of a principle, often a maxim or aphorism, which implies a summary or a minimal statement.
-3. I will evaluate the options:
-    - MINIMAL: This is a synonym, not an antonym.
-    - MAKSIMAL: This is the direct opposite of minimal or concise. This is a strong candidate.
-    - BESAR: 'Large' is not the best antonym for a concept like 'aphorism'.
-    - KECIL: 'Small' is similar to minimal, a synonym.
-    - SEDANG: 'Medium' is not an antonym.
-4. Therefore, the most logical antonym is 'MAKSIMAL'.
+1.  The question asks for the meaning of "APORISMA = ...". The equals sign implies finding a synonym or an equivalent meaning.
+2.  Definition: An 'aporisma' or 'aphorism' is a pithy observation that contains a general truth; a concise statement of a principle. The key concept is 'concise' or 'brief'.
+3.  Evaluating options based on this definition:
+    -   MINIMAL: Means 'of a minimum amount, quantity, or degree'. This aligns well with the concept of a concise, brief statement. This is a strong candidate.
+    -   MAKSIMAL: The direct opposite. Incorrect.
+    -   BESAR: 'Large' is not a good synonym for a concept. Incorrect.
+    -   KECIL: 'Small' is a physical descriptor and a less precise synonym for 'concise' than 'minimal'. 'Minimal' is a better fit for an abstract concept.
+    -   SEDANG: 'Medium' is incorrect.
+4.  Conclusion: 'MINIMAL' is the most accurate synonym for 'aporisma' in this context.
 [ENDTHOUGHT]
 
 Answer: [The exact text of the chosen option, with code terms in backticks.]

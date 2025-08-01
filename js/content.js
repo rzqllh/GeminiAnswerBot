@@ -1,4 +1,8 @@
-// js/content.js
+// === Hafizh Rizqullah | GeminiAnswerBot ===
+// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
+// 📄 js/content.js
+// 🕓 Created: 2024-05-21 11:05:00
+// 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /**
  * Mengenkapsulasi semua interaksi dengan pustaka Mark.js untuk menyorot teks.
@@ -60,10 +64,6 @@ class QuizModule {
     this.submissionHandler = this.handleSubmissionClick.bind(this);
   }
   
-  /**
-   * Mengekstrak konten kuis menggunakan algoritma heuristik dinamis.
-   * @returns {string|null} Konten kuis yang diformat atau null jika tidak ditemukan.
-   */
   extractContent() {
     const optionGroups = this._findOptionGroups();
     if (optionGroups.length === 0) return null;
@@ -125,7 +125,6 @@ class QuizModule {
     
     elements.forEach(el => {
       const clone = el.cloneNode(true);
-      // Hapus elemen anak yang tidak diinginkan untuk mendapatkan teks pertanyaan yang bersih
       clone.querySelectorAll('button, input, a, select, form, ul, ol').forEach(child => child.remove());
       const text = clone.textContent.trim().replace(/\s+/g, ' ');
 
@@ -161,12 +160,13 @@ class QuizModule {
   }
 
   extractOptions() {
-    const container = document.querySelector('div[class*="quiz"], form[action*="quiz"], div.w3-panel');
-    if (!container) return [];
     const options = [];
     const seenOptions = new Set();
-    container.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
-        const label = input.closest('label') || document.querySelector(`label[for="${input.id}"]`);
+    // Generalize selector to find any visible radio or checkbox on the page
+    document.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
+        if (!this._isVisible(input)) return;
+
+        const label = input.closest('label') || (input.id && document.querySelector(`label[for="${input.id}"]`));
         if (label) {
             const optionContent = label.textContent.trim();
             if (optionContent && !seenOptions.has(optionContent)) {
@@ -287,7 +287,11 @@ class ToolbarModule {
   }
 
   create() {
-    if (document.getElementById('gemini-answer-bot-toolbar')) return;
+    const existingToolbar = document.getElementById('gemini-answer-bot-toolbar');
+    if (existingToolbar) {
+        this.toolbarElement = existingToolbar;
+        return;
+    }
     this.toolbarElement = document.createElement('div');
     this.toolbarElement.id = 'gemini-answer-bot-toolbar';
     this.toolbarElement.className = 'gemini-answer-bot-toolbar';
@@ -330,6 +334,7 @@ class ToolbarModule {
   }
 
   show() {
+    if (!this.toolbarElement) return; // Defensive check
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) { this.hide(); return; }
     const range = selection.getRangeAt(0);
