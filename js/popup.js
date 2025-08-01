@@ -248,14 +248,14 @@ class PopupApp {
     }
     
     _renderErrorState() {
-        let title = 'An Error Occurred', userMessage = 'Something went wrong.', actionsHtml = `<button id="error-retry-btn" class="button-error">Try Again</button>`;
+        let title = 'An Error Occurred', userMessage = 'Something went wrong.', actionsHtml = `<button id="error-retry-btn" class="button button-secondary">Try Again</button>`;
         const query = this.state.cleanedContent || this.state.originalUserContent || '';
         switch (this.state.error.type) {
-            case 'INVALID_API_KEY': title = 'Invalid API Key'; userMessage = 'The provided API key is not valid. Please check your key in the settings.'; actionsHtml = `<button id="error-settings-btn" class="button-error primary">Open Settings</button>`; break;
-            case 'QUOTA_EXCEEDED': title = 'API Quota Exceeded'; userMessage = 'You have exceeded your Google AI API quota.'; actionsHtml = `<button id="error-quota-btn" class="button-error">Check Quota</button> <button id="error-retry-btn" class="button-error">Try Again</button>`; break;
+            case 'INVALID_API_KEY': title = 'Invalid API Key'; userMessage = 'The provided API key is not valid. Please check your key in the settings.'; actionsHtml = `<button id="error-settings-btn" class="button button-primary">Open Settings</button>`; break;
+            case 'QUOTA_EXCEEDED': title = 'API Quota Exceeded'; userMessage = 'You have exceeded your Google AI API quota.'; actionsHtml = `<button id="error-quota-btn" class="button button-secondary">Check Quota</button> <button id="error-retry-btn" class="button button-secondary">Try Again</button>`; break;
             case 'NETWORK_ERROR': title = 'Network Error'; userMessage = 'Could not connect to the API. Check your internet connection.'; break;
             case 'INTERNAL_ERROR': title = 'Connection Failed'; userMessage = 'Could not connect to the current page.'; break;
-            case 'API_ERROR': default: title = 'API Error'; userMessage = 'The API returned an error.'; if (query) actionsHtml += ` <button id="error-google-btn" class="button-error">Search on Google</button>`; break;
+            case 'API_ERROR': default: title = 'API Error'; userMessage = 'The API returned an error.'; if (query) actionsHtml += ` <button id="error-google-btn" class="button button-secondary">Search on Google</button>`; break;
         }
         this.elements.messageArea.innerHTML = `<div class="error-panel"><div class="error-panel-header">${title}</div><div class="error-panel-body"><p>${userMessage}</p><details class="error-details"><summary>Technical Details</summary><code>${_escapeHtml(this.state.error.message)}</code></details></div><div class="error-panel-actions">${actionsHtml}</div>`;
         document.getElementById('error-retry-btn')?.addEventListener('click', () => this.init());
@@ -417,22 +417,20 @@ class PopupApp {
         this.state.answerHTML = fullText;
         this.state.totalTokenCount = totalTokenCount;
 
-        // Robustly parse the multi-field response, whether it's single-line or multi-line
         const answerMatch = fullText.match(/Answer:\s*(.*)/i);
         const confidenceMatch = fullText.match(/Confidence:\s*(High|Medium|Low)/i);
         const reasonMatch = fullText.match(/Reason:\s*([\s\S]*)/i);
 
         const answerText = answerMatch ? answerMatch[1].trim() : fullText.trim();
-        this.state.incorrectAnswer = answerText.replace(/`/g, ''); // Clean version for submission check
+        this.state.incorrectAnswer = answerText.replace(/`/g, '');
         
-        let answerHtml = `<p class="answer-highlight">${DOMPurify.sanitize(marked.parseInline(answerText))}</p>`;
+        let answerHtml = `<p class="answer-highlight">${this._renderInlineMarkdown(answerText)}</p>`;
         
         let confidenceHtml = '';
         if (confidenceMatch) {
             const confidence = confidenceMatch[1].toLowerCase();
             const reasonText = reasonMatch ? reasonMatch[1].trim() : "";
-            const reasonHtml = DOMPurify.sanitize(marked.parseInline(reasonText));
-
+            const reasonHtml = this._renderInlineMarkdown(reasonText);
             confidenceHtml = `<div class="confidence-wrapper"><div class="confidence-level"><span class="confidence-level-label">Confidence ${fromCache ? '<span>⚡️</span>' : ''}</span><span class="confidence-badge confidence-${confidence}">${confidence[0].toUpperCase() + confidence.slice(1)}</span></div>${reasonHtml ? `<div class="confidence-reason">${reasonHtml}</div>` : ''}</div>`;
         }
         
@@ -483,6 +481,13 @@ class PopupApp {
         const renderedHtml = DOMPurify.sanitize(marked.parse(content.replace(/Question:/i, '### Question\n').replace(/Options:/i, '\n### Options\n')));
         return renderedHtml;
     }
+    
+    _renderInlineMarkdown(text) {
+        if (!text) return '';
+        // Use marked.parse, then remove the wrapping <p> tags.
+        const parsed = marked.parse(text);
+        return DOMPurify.sanitize(parsed.replace(/^<p>|<\/p>$/g, ''));
+    }
 
     _renderCorrectionOptions(options) { 
         this.elements.correctionOptions.innerHTML = ''; 
@@ -528,7 +533,7 @@ class PopupApp {
     }
     
     _clearPersistedState() { 
-        return this.state.tab ? chrome.storage.local.remove(this.state.tab.id.toString()) : Promise.resolve(); 
+        return this.state.tab ? chrome.storage.local.remove(this.state.tab.id.toString()) : Promise.resolve(null); 
     }
     
     _saveCurrentViewState() { 
