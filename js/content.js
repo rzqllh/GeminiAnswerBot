@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/content.js
-// 🕓 Created: 2024-05-21 14:00:00
+// 🕓 Created: 2024-05-21 16:00:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /**
@@ -129,7 +129,6 @@ class QuizModule {
     
     elements.forEach(el => {
       const clone = el.cloneNode(true);
-      // Hapus elemen anak yang tidak diinginkan untuk mendapatkan teks pertanyaan yang bersih
       clone.querySelectorAll('button, input, a, select, form, ul, ol').forEach(child => child.remove());
       const text = clone.textContent.trim().replace(/\s+/g, ' ');
 
@@ -164,18 +163,24 @@ class QuizModule {
     return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
   }
 
+  /**
+   * [FIXED] Extracts all visible radio/checkbox options from the entire document.
+   * This generalized approach is more robust and works across different site structures.
+   */
   extractOptions() {
-    const container = document.querySelector('div[class*="quiz"], form[action*="quiz"], div.w3-panel');
-    if (!container) return [];
     const options = [];
     const seenOptions = new Set();
-    container.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
-        const label = input.closest('label') || document.querySelector(`label[for="${input.id}"]`);
-        if (label) {
-            const optionContent = label.textContent.trim();
-            if (optionContent && !seenOptions.has(optionContent)) {
-                options.push(optionContent);
-                seenOptions.add(optionContent);
+    
+    // Scan the entire document for any visible radio or checkbox inputs.
+    document.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
+        if (this._isVisible(input)) {
+            const label = input.closest('label') || (input.id && document.querySelector(`label[for="${input.id}"]`));
+            if (label) {
+                const optionContent = label.textContent.trim();
+                if (optionContent && !seenOptions.has(optionContent)) {
+                    options.push(optionContent);
+                    seenOptions.add(optionContent);
+                }
             }
         }
     });

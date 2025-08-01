@@ -1,15 +1,11 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/popup.js
-// 🕓 Created: 2024-05-21 14:00:00
+// 🕓 Created: 2024-05-21 16:05:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
-
-// js/popup.js
 
 /**
  * Manages the entire lifecycle and UI of the popup.
- * This class-based approach encapsulates state, centralizes DOM element access,
- * and provides a structured, scalable way to manage the extension's popup logic.
  */
 class PopupApp {
     /**
@@ -453,7 +449,8 @@ class PopupApp {
         this.elements.feedbackContainer.classList.remove('hidden');
         this._resetFeedbackButtons();
         
-        if (this.state.config.autoHighlight) {
+        // [FIXED] Add condition to prevent highlighting for image-based quizzes
+        if (this.state.config.autoHighlight && !this.state.isImageMode) {
             this._sendMessageToContentScript({ action: 'highlight-answer', text: [this.state.incorrectAnswer] })
                 .catch(err => console.warn('Could not highlight answer on page:', err.message));
         }
@@ -490,7 +487,6 @@ class PopupApp {
     
     _renderInlineMarkdown(text) {
         if (!text) return '';
-        // Use marked.parse, then remove the wrapping <p> tags.
         const parsed = marked.parse(text);
         return DOMPurify.sanitize(parsed.replace(/^<p>|<\/p>$/g, ''));
     }
