@@ -1,106 +1,167 @@
-// === Hafizh Rizqullah | GeminiAnswerBot ===
-// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
-// 📄 README.md
-// 🕓 Created: 2024-05-22 14:30:00
-// 🧠 Modular | DRY | SOLID | Apple HIG Compliant
+<!-- OG IMAGE PREVIEW HACK -->
+<!-- https://github.com/rzqllh/GeminiAnswerBot -->
+<!-- OG:image:https://raw.githubusercontent.com/rzqllh/GeminiAnswerBot/main/assets/icon.png -->
 
-# GeminiAnswerBot
 
-![Version](https://img.shields.io/badge/version-3.0.0-blue)
-![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
-![Maintained](https://img.shields.io/badge/Maintained-Yes-brightgreen)
 
-**GeminiAnswerBot** is an intelligent, privacy-first Chrome extension that leverages the Google Gemini API to supercharge your browsing experience. It features a sophisticated, context-aware engine to solve quizzes, summarize articles, and provide a suite of AI tools directly in your browser, all wrapped in a polished, professional user interface.
+<div align="center">
+  <a href="#">
+    <img src="https://raw.githubusercontent.com/rzqllh/GeminiAnswerBot/main/assets/icon.png" alt="GeminiAnswerBot Logo" width="128" height="128">
+  </a>
+
+  <h1><strong>GeminiAnswerBot</strong></h1>
+
+  <p><strong>Context-Aware AI Copilot for Seamless Quiz & Content Assistance</strong></p>
+  <p>Engineered for precision, privacy, and an exceptional in-browser experience.</p>
+
+  <p>
+    <img src="https://img.shields.io/badge/version-3.0.0-blue?style=for-the-badge" alt="Version">
+    <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
+    <img src="https://img.shields.io/badge/status-actively--maintained-brightgreen?style=for-the-badge" alt="Maintained">
+  </p>
+</div>
+
+---
+
+> “Well-architected code is invisible to the user — they just feel it works.”
+
+---
+
+## Overview
+
+**GeminiAnswerBot** is a modular Chrome Extension built to enhance how you solve quizzes, extract insights, and interact with content — all powered by Google Gemini. Unlike typical AI plugins, it's engineered from the ground up to prioritize context-awareness, performance, and user privacy.
+
+---
+
+## Quick Preview
+
+- ✅ Right-click any quiz or text → AI-powered actions appear instantly
+- ✅ Choose from: Solve, Summarize, Explain, Translate
+- ✅ Visual quizzes? Just right-click the image to extract insights
+- ✅ Results appear within context via a refined popup interface
+
+---
+
+## Why GeminiAnswerBot?
+
+| Feature                | Typical AI Tools                          | GeminiAnswerBot's Approach                                                                 |
+|------------------------|-------------------------------------------|--------------------------------------------------------------------------------------------|
+| Quiz Handling          | Full-page scraping, often inaccurate      | Context-aware: Only analyzes visible content for precise targeting                        |
+| UI/UX                  | Generic interfaces, jarring transitions   | Built with Apple HIG principles: clean layout, smooth loaders, consistent interactions    |
+| Architecture           | Monolithic scripts, hard to maintain      | Fully modular: Each feature lives in its own logical boundary, adhering to SOLID principles |
+| Image Support          | Usually unsupported                      | Native image-based quiz solving via Gemini Vision Pro                                     |
+| Privacy                | Sends data to unknown servers             | 100% local processing, with direct API call to Gemini — no third-party server involved     |
 
 ---
 
 ## Core Features
 
--   **🧠 Smart & Context-Aware Quiz Solver**: Unlike other tools, GeminiAnswerBot uses a **viewport-aware algorithm** to intelligently identify and solve the quiz question *you are currently looking at*. It excels on long pages with multiple questions, ensuring unparalleled accuracy.
+- **Precision Quiz Solving**  
+  Viewport-aware engine that intelligently detects the active quiz in view.
 
--   **🛠️ Contextual AI Toolkit**: Right-click or use the floating toolbar on any selected text to:
-    -   **Summarize**: Get a concise summary of long articles.
-    -   **Explain**: Understand complex topics with detailed explanations.
-    -   **Translate**: Instantly translate text into multiple languages.
+- **Inline AI Toolkit**  
+  Right-click selected text for instant:
+  - Summarization
+  - Concept explanation
+  - Translation
 
--   **🖼️ Image Analysis**: Right-click on any image to understand its content, solve quizzes embedded within the image, or translate text found in the picture.
+- **Advanced Image Analysis**  
+  Right-click images to solve embedded questions, translate, or get structured descriptions.
 
--   **✨ Professional & Intuitive UI**: A clean, modern, and intuitive user interface aligned with **Apple's Human Interface Guidelines (HIG)**. Features include:
-    -   Elegant **skeleton loaders** for a premium user experience.
-    -   Consistent typography and layout for maximum readability.
-    -   A fully-featured, easy-to-navigate options page.
+- **Modular Codebase**  
+  Engineered with separation of concerns:
+  - `background.js`: Handles context menu & service workers
+  - `popup.js`: UI state, loaders, result rendering
+  - `content.js`: DOM parsing, floating UI
+  - `options/*.js`: Micro-modules for settings, history, UI
 
--   **🚀 High Performance & Privacy**: Built with a performance-first approach using Manifest V3. Your API key and interaction history are stored exclusively in your browser's local storage and are never sent anywhere except directly to the Google Gemini API.
-
--   **🔧 Robust & Resilient**: The extraction engine is designed to handle a wide variety of non-standard HTML layouts, ensuring it works reliably across many different websites.
+- **Zero Backend, Full Privacy**  
+  API key is stored only in local browser storage. Nothing is sent to external servers.
 
 ---
 
-## Getting Started
+## Designed For
+
+- Teams using quiz-based learning tools
+- Engineers exploring Chrome Extension architecture best practices
+- Researchers working with Gemini APIs & prompt customization
+
+---
+
+## Installation
 
 ### Prerequisites
 
--   A Chromium-based browser (Chrome, Edge, Brave, etc.)
--   A valid Google Gemini API key.
+- Chromium-based browser (Chrome, Edge, Brave, etc.)
+- A valid Google Gemini API Key
 
-### Installation
+### Steps
 
-1.  Clone or download this repository and unzip it.
-2.  Open your browser and navigate to `chrome://extensions/`.
-3.  Enable **Developer Mode** using the toggle in the top-right corner.
-4.  Click **Load Unpacked** and select the project folder you unzipped.
-5.  The GeminiAnswerBot icon will now appear in your browser's toolbar.
-
-### Configuration
-
-1.  Visit [Google AI Studio](https://aistudio.google.com/) to get your API key.
-2.  Right-click the extension icon in your toolbar and select **Options**.
-3.  In the **General** tab, paste your API key and click **Save Settings**.
-4.  Use the **Test Connection** button to validate your key.
+1. **Download** this repo and unzip it
+2. Open `chrome://extensions/` and enable Developer Mode
+3. Click **Load unpacked** and select the project folder
+4. Right-click the GeminiAnswerBot icon → **Options**
+5. Paste your Gemini API Key in the “General” tab → click Save
+6. Use the **Test Connection** button to verify you're set
 
 ---
 
-## Development & Architecture
+## Under the Hood
 
-This extension is built using Manifest V3 and follows a modern, modular, and performance-aware architecture that emphasizes a clear separation of concerns.
+GeminiAnswerBot is built with the following principles:
 
-### Key Scripts & Responsibilities
+- **Single Responsibility (SOLID)**  
+  Each module handles one job: no cross-dependency or shared global state
 
--   `js/background.js`: The service worker. Manages browser-level events, context menus, and acts as the central controller for reliable message passing between components.
--   `js/content.js`: Injected on-demand. Handles all direct DOM interaction, including the sophisticated **synchronous viewport calculation** for quiz extraction and the floating toolbar logic.
--   `js/popup.js`: Manages the entire UI and state of the popup window, including rendering skeleton loaders and handling user interactions.
--   `js/options/`: A **modularized directory** where each file (`nav.js`, `history.js`, `settings.js`, `ui.js`) handles a single responsibility on the options page, adhering to SOLID principles.
--   `js/prompts.js`: A centralized repository for all system prompts sent to the Gemini API, allowing for easy tuning and customization.
+- **On-Demand Injection**  
+  Scripts are loaded only when needed for zero memory overhead
 
-### Project Structure
+- **Robust Message Passing**  
+  Background, content, and popup scripts communicate via a structured protocol
 
-```Structure
-GeminiAnswerBot/
-├── assets/
-├── js/
-│ ├── options/
-│ │ ├── history.js
-│ │ ├── nav.js
-│ │ ├── settings.js
-│ │ └── ui.js
-│ ├── vendor/
-│ ├── background.js
-│ ├── content.js
-│ ├── options.js # (Main orchestrator)
-│ ├── popup.js
-│ ├── prompts.js
-│ └── utils.js
-├── ui/
-│ ├── options.html
-│ └── popup.html
-├── .gitignore
-├── manifest.json
-├── CHANGELOG.md
-└── README.md
-```
+- **Context-Aware DOM Parsing**  
+  DOM scanning adapts to what user sees on screen, not the full page
+
+---
+
+## Technology Stack
+
+- **Platform**: Chrome Manifest V3
+- **Core Language**: JavaScript (ES6+)
+- **Rendering**: DOMPurify + Marked.js (secure Markdown to HTML)
+- **Styling**: Plain CSS (with custom properties + BEM convention)
+- **Design Guideline**: Apple Human Interface Guidelines (HIG)
+
+---
+
+## What's Next
+
+- Firefox support
+- User-defined AI prompt profiles
+- Gemini 1.5 Pro integration toggle
+- Export/import configuration presets
+
+---
+
+## FAQ
+
+> **Does this extension send any data to a server?**  
+No. Everything runs locally. Only Gemini’s API is called directly using your key.
+
+> **Can I use this without an API Key?**  
+No. You must bring your own key from Google AI Studio.
+
+> **Does it work with long articles or dynamic content?**  
+Yes. Parsing engine adapts to dynamic layouts and supports scroll-aware rendering.
 
 ---
 
 ## License
 
 This project is licensed under the MIT License.
+
+---
+
+<p align="center">
+  <em>Built with care and craftsmanship by Hafizh Rizqullah — refined for seamless use.</em>
+</p>
