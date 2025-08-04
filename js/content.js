@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/content.js
-// 🕓 Created: 2024-05-21 20:05:00
+// 🕓 Created: 2024-05-22 13:00:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /**
@@ -17,7 +17,7 @@ class MarkerModule {
     if (typeof Mark !== 'undefined') {
       this.markerInstance = new Mark(document.body);
     } else {
-      console.error("Content Script: Pustaka Mark.js (window.Mark) tidak ditemukan.");
+      console.error("Content Script: Mark.js library (window.Mark) not found.");
     }
   }
 
@@ -56,116 +56,154 @@ class MarkerModule {
 
 /**
  * Mengelola semua logika terkait ekstraksi konten kuis dan pemeriksaan pra-pengiriman.
+ * REFACTORED: Now uses IntersectionObserver for viewport-aware quiz detection.
  */
 class QuizModule {
   constructor() {
     this.correctAiAnswer = null;
     this.quizContainer = null;
     this.submissionHandler = this.handleSubmissionClick.bind(this);
+    
+    this.observer = null;
+    this.currentlyVisibleQuizBlock = null;
+    this.initializeObserver();
   }
-  
+
+  /**
+   * Initializes the IntersectionObserver to watch for quiz blocks entering the viewport.
+   */
+  initializeObserver() {
+    const options = {
+      root: null, // viewport
+      rootMargin: '0px',
+      threshold: 0.5 // 50% of the element must be visible
+    };
+
+    this.observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          this.currentlyVisibleQuizBlock = entry.target;
+        } else {
+          // If the currently visible block goes out of view, clear it
+          if (this.currentlyVisibleQuizBlock === entry.target) {
+            this.currentlyVisibleQuizBlock = null;
+          }
+        }
+      });
+    }, options);
+
+    this.findAndObserveQuizBlocks();
+  }
+
+  /**
+   * Finds all potential quiz blocks on the page and starts observing them.
+   */
+  findAndObserveQuizBlocks() {
+    const quizBlocks = this._findQuizBlocks();
+    quizBlocks.forEach(block => this.observer.observe(block));
+  }
+
+  /**
+   * Finds container elements that likely represent a single quiz question block.
+   * A block is a container with both question text and multiple-choice inputs.
+   * @returns {HTMLElement[]} An array of potential quiz block elements.
+   */
+  _findQuizBlocks() {
+      const blocks = new Set();
+      const inputs = document.querySelectorAll('input[type="radio"], input[type="checkbox"]');
+      const questionSelectors = 'p, h1, h2, h3, h4, div[class*="question"], span';
+
+      inputs.forEach(input => {
+          if (!this._isVisible(input)) return;
+          
+          // Find a common ancestor that isn't too large (like the body)
+          let container = input.closest('form, fieldset, div.w3-panel, div[class*="quiz-item"]');
+          if (!container || container.tagName === 'BODY' || container.tagName === 'MAIN') {
+              container = input.parentElement?.closest('div');
+          }
+
+          if (container && this._isVisible(container)) {
+              // Check if this container has question-like text and multiple inputs
+              const hasQuestionText = container.querySelector(questionSelectors);
+              const hasMultipleInputs = container.querySelectorAll('input[type="radio"], input[type="checkbox"]').length > 1;
+
+              if (hasQuestionText && hasMultipleInputs) {
+                  blocks.add(container);
+              }
+          }
+      });
+
+      return Array.from(blocks);
+  }
+
+  /**
+   * Extracts content ONLY from the currently visible quiz block.
+   * @returns {string|null} Formatted quiz content or null if none is visible.
+   */
   extractContent() {
-    const optionGroups = this._findOptionGroups();
-    if (optionGroups.length === 0) return null;
-
-    const questionCandidates = this._findQuestionCandidates();
-    if (questionCandidates.length === 0) return null;
-
-    let bestPair = { score: -1, question: null, options: [], hasCheckboxes: false };
-
-    for (const group of optionGroups) {
-      for (const candidate of questionCandidates) {
-        const score = this._calculateProximityScore(candidate.element, group.container);
-        if (score > bestPair.score) {
-          bestPair = { 
-            score, 
-            question: candidate.text, 
-            options: group.options,
-            hasCheckboxes: group.hasCheckboxes 
-          };
-        }
-      }
-    }
-
-    if (bestPair.score > 0 && bestPair.question && bestPair.options.length > 1) {
-      let content = `Question: ${bestPair.question}\n\nOptions:\n${bestPair.options.map(opt => `- ${opt}`).join('\n')}`;
-      if (bestPair.hasCheckboxes) {
-        content += "\n\nNote: This question may have multiple correct answers. Select all that apply.";
-      }
-      return content;
+    if (!this.currentlyVisibleQuizBlock) {
+      // Fallback: if no block is actively visible, find the first one on the page.
+      const firstBlock = this._findQuizBlocks()[0];
+      if (!firstBlock) return null;
+      this.currentlyVisibleQuizBlock = firstBlock;
     }
     
-    return null;
+    return this._extractDataFromBlock(this.currentlyVisibleQuizBlock);
   }
 
-  _findOptionGroups() {
-    const groups = new Map();
-    const inputs = document.querySelectorAll('input[type="radio"], input[type="checkbox"]');
+  /**
+   * Helper to extract and format question and options from a given block element.
+   * @param {HTMLElement} block - The quiz block element.
+   * @returns {string|null} Formatted quiz content.
+   */
+  _extractDataFromBlock(block) {
+    if (!block) return null;
 
-    inputs.forEach(input => {
-        if (!this._isVisible(input)) return;
+    // Find the best question candidate within the block
+    let questionText = '';
+    const questionCandidates = block.querySelectorAll('p, h1, h2, h3, h4, div[class*="question"], span');
+    let bestCandidate = null;
 
-        const container = input.closest('form, fieldset, ol, ul, div');
-        if (!container) return;
-
-        const label = input.closest('label') || document.querySelector(`label[for="${input.id}"]`);
-        const optionText = label ? label.textContent.trim() : null;
-
-        if (optionText) {
-            if (!groups.has(container)) {
-                groups.set(container, { options: new Set(), hasCheckboxes: false });
-            }
-            const data = groups.get(container);
-            data.options.add(optionText);
-            if (input.type === 'checkbox') {
-                data.hasCheckboxes = true;
-            }
-        }
-    });
-
-    const validGroups = [];
-    groups.forEach((data, container) => {
-        if (data.options.size > 1) {
-            validGroups.push({ container, options: Array.from(data.options), hasCheckboxes: data.hasCheckboxes });
-        }
-    });
-    return validGroups;
-  }
-
-  _findQuestionCandidates() {
-    const candidates = [];
-    const elements = document.querySelectorAll('p, h1, h2, h3, h4, div[class*="question"], span');
-    
-    elements.forEach(el => {
+    questionCandidates.forEach(el => {
+      // Avoid text that is inside a label for an option
+      if (el.closest('label')) return;
+      
       const clone = el.cloneNode(true);
       clone.querySelectorAll('button, input, a, select, form, ul, ol').forEach(child => child.remove());
       const text = clone.textContent.trim().replace(/\s+/g, ' ');
 
-      const hasInteractiveChildren = el.querySelector('button, input, a, select');
-
-      if (this._isVisible(el) && text.length > 10 && text.length < 500 && !hasInteractiveChildren) {
-        if (!candidates.some(c => c.element.contains(el))) {
-          candidates.push({ element: el, text });
+      if (text.length > 10 && (!bestCandidate || text.length > bestCandidate.length)) {
+          bestCandidate = text;
+      }
+    });
+    questionText = bestCandidate || '';
+    
+    // Find all options within the block
+    const options = [];
+    const seenOptions = new Set();
+    let hasCheckboxes = false;
+    
+    block.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
+      if (input.type === 'checkbox') hasCheckboxes = true;
+      const label = input.closest('label') || document.querySelector(`label[for="${input.id}"]`);
+      if (label) {
+        const optionText = label.textContent.trim();
+        if (optionText && !seenOptions.has(optionText)) {
+          options.push(optionText);
+          seenOptions.add(optionText);
         }
       }
     });
-    return candidates;
-  }
 
-  _calculateProximityScore(questionEl, optionsContainer) {
-    if (optionsContainer.contains(questionEl)) return 10;
-    
-    let current = questionEl;
-    for (let i = 0; i < 5; i++) {
-        if (current.nextElementSibling === optionsContainer || current.previousElementSibling === optionsContainer) {
-            return 9 - i;
-        }
-        current = current.parentElement;
-        if (!current) break;
-        if (current === optionsContainer.parentElement) return 8 - i;
+    if (questionText && options.length > 1) {
+      let content = `Question: ${questionText}\n\nOptions:\n${options.map(opt => `- ${opt}`).join('\n')}`;
+      if (hasCheckboxes) {
+        content += "\n\nNote: This question may have multiple correct answers. Select all that apply.";
+      }
+      return content;
     }
-    
-    return 0;
+
+    return null;
   }
   
   _isVisible(el) {
@@ -173,19 +211,20 @@ class QuizModule {
   }
 
   extractOptions() {
+    const container = this.currentlyVisibleQuizBlock || document;
     const options = [];
     const seenOptions = new Set();
-    document.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
-        if (this._isVisible(input)) {
-            const label = input.closest('label') || (input.id && document.querySelector(`label[for="${input.id}"]`));
-            if (label) {
-                const optionContent = label.textContent.trim();
-                if (optionContent && !seenOptions.has(optionContent)) {
-                    options.push(optionContent);
-                    seenOptions.add(optionContent);
-                }
-            }
+    container.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
+      if (this._isVisible(input)) {
+        const label = input.closest('label') || (input.id && document.querySelector(`label[for="${input.id}"]`));
+        if (label) {
+          const optionContent = label.textContent.trim();
+          if (optionContent && !seenOptions.has(optionContent)) {
+            options.push(optionContent);
+            seenOptions.add(optionContent);
+          }
         }
+      }
     });
     return options;
   }
@@ -381,17 +420,22 @@ class ContentController {
   
   listenForMessages() {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      let content;
       switch (request.action) {
         case "ping_content_script":
           sendResponse({ ready: true, success: true });
           break;
         case "get_quiz_content":
           const selectedText = window.getSelection().toString().trim();
-          let content;
           if (selectedText.length > 20) {
               content = `Question: ${selectedText}`;
           } else {
-              content = this.quiz.extractContent() || this.page.fallbackContent();
+              content = this.quiz.extractContent();
+          }
+          // If viewport-aware extraction fails, fallback to full-page scan as a last resort.
+          if (!content) {
+              console.warn("Viewport-aware extraction failed. Falling back to page content.");
+              content = this.page.fallbackContent();
           }
           sendResponse({ content });
           break;
