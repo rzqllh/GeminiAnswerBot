@@ -1,12 +1,9 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/popup.js
-// 🕓 Created: 2024-05-22 12:35:00
+// 🕓 Created: 2024-05-22 15:10:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
-/**
- * Manages the entire lifecycle and UI of the popup.
- */
 class PopupApp {
     constructor() {
         this.state = {
@@ -67,38 +64,21 @@ class PopupApp {
         if (request.action === 'geminiStreamUpdate') this._handleStreamUpdate(request);
     }
 
-    /**
-     * Helper function to render a skeleton loader state inside a container.
-     * @param {HTMLElement} container - The container element to show the skeleton in.
-     * @param {boolean} show - True to show, false to hide.
-     * @param {string} type - 'answer' or 'explanation' to render a specific skeleton.
-     */
     _renderSkeletonState(container, show, type = 'answer') {
         if (!container) return;
         if (show) {
             let skeletonHtml = '';
             if (type === 'answer') {
-                skeletonHtml = `
-                    <div class="skeleton-loader">
-                        <div class="skeleton skeleton-text" style="width: 80%;"></div>
-                        <div class="skeleton skeleton-text" style="width: 60%; margin-top: 20px;"></div>
-                        <div class="skeleton skeleton-text" style="width: 90%;"></div>
-                    </div>`;
-            } else { // explanation
-                skeletonHtml = `
-                    <div class="skeleton-loader">
-                        <div class="skeleton skeleton-title"></div>
-                        <div class="skeleton skeleton-text"></div>
-                        <div class="skeleton skeleton-text" style="width: 90%;"></div>
-                        <div class="skeleton skeleton-text" style="width: 70%;"></div>
-                    </div>`;
+                skeletonHtml = `<div class="skeleton-loader"><div class="skeleton skeleton-text" style="width: 80%;"></div><div class="skeleton skeleton-text" style="width: 60%; margin-top: 20px;"></div><div class="skeleton skeleton-text" style="width: 90%;"></div></div>`;
+            } else {
+                skeletonHtml = `<div class="skeleton-loader"><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width: 90%;"></div><div class="skeleton skeleton-text" style="width: 70%;"></div></div>`;
             }
             container.innerHTML = skeletonHtml;
         } else {
             container.innerHTML = '';
         }
     }
-
+    
     async _ensureContentScripts(tabId) {
         try {
             await this._sendMessageToContentScript({ action: "ping_content_script" }, 200);
@@ -129,7 +109,7 @@ class PopupApp {
             }
 
             this.state.config = await chrome.storage.sync.get(null);
-            if (!this.state.config.geminiApiKey) throw { type: 'INVALID_API_KEY', message: 'API Key not set.' };
+            if (!this.state.config.geminiApiKey) throw { type: 'INVALID_API_KEY' };
             
             await this._ensureContentScripts(tab.id);
 
@@ -180,11 +160,11 @@ class PopupApp {
         } catch (error) {
             console.error("Initialization failed:", error);
             this.state.view = 'error';
-            this.state.error = (error && error.type) ? error : { type: 'INTERNAL_ERROR', message: `Could not establish connection. ${error ? error.message : 'Unknown error'}` };
+            this.state.error = ErrorHandler.format(error, 'init');
             this.render();
         }
     }
-
+    
     render() {
         this.elements.messageArea.classList.add('hidden');
         this.elements.quizModeContainer.classList.add('hidden');
@@ -253,20 +233,31 @@ class PopupApp {
     }
     
     _renderErrorState() {
-        let title = 'An Error Occurred', userMessage = 'Something went wrong.', actionsHtml = `<button id="error-retry-btn" class="button button-secondary">Try Again</button>`;
-        const query = this.state.cleanedContent || this.state.originalUserContent || '';
-        switch (this.state.error.type) {
-            case 'INVALID_API_KEY': title = 'Invalid API Key'; userMessage = 'The provided API key is not valid. Please check your key in the settings.'; actionsHtml = `<button id="error-settings-btn" class="button button-primary">Open Settings</button>`; break;
-            case 'QUOTA_EXCEEDED': title = 'API Quota Exceeded'; userMessage = 'You have exceeded your Google AI API quota.'; actionsHtml = `<button id="error-quota-btn" class="button button-secondary">Check Quota</button> <button id="error-retry-btn" class="button button-secondary">Try Again</button>`; break;
-            case 'NETWORK_ERROR': title = 'Network Error'; userMessage = 'Could not connect to the API. Check your internet connection.'; break;
-            case 'INTERNAL_ERROR': title = 'Connection Failed'; userMessage = 'Could not connect to the current page.'; break;
-            case 'API_ERROR': default: title = 'API Error'; userMessage = 'The API returned an error.'; if (query) actionsHtml += ` <button id="error-google-btn" class="button button-secondary">Search on Google</button>`; break;
+        const { title, message, technicalMessage, type } = this.state.error;
+        let actionsHtml = `<button id="error-retry-btn" class="button button-secondary">Try Again</button>`;
+        
+        if (type === 'INVALID_API_KEY') {
+            actionsHtml = `<button id="error-settings-btn" class="button button-primary">Open Settings</button>`;
+        } else if (type === 'QUOTA_EXCEEDED') {
+            actionsHtml = `<button id="error-quota-btn" class="button button-secondary">Check Quota</button> <button id="error-retry-btn" class="button button-secondary">Try Again</button>`;
         }
-        this.elements.messageArea.innerHTML = `<div class="error-panel"><div class="error-panel-header">${title}</div><div class="error-panel-body"><p>${userMessage}</p><details class="error-details"><summary>Technical Details</summary><code>${_escapeHtml(this.state.error.message)}</code></details></div><div class="error-panel-actions">${actionsHtml}</div>`;
+
+        this.elements.messageArea.innerHTML = `
+            <div class="error-panel">
+                <div class="error-panel-header">${_escapeHtml(title)}</div>
+                <div class="error-panel-body">
+                    <p>${_escapeHtml(message)}</p>
+                    <details class="error-details">
+                        <summary>Technical Details</summary>
+                        <code>${_escapeHtml(technicalMessage)}</code>
+                    </details>
+                </div>
+                <div class="error-panel-actions">${actionsHtml}</div>
+            </div>`;
+
         document.getElementById('error-retry-btn')?.addEventListener('click', () => this.init());
         document.getElementById('error-settings-btn')?.addEventListener('click', () => chrome.runtime.openOptionsPage());
         document.getElementById('error-quota-btn')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://aistudio.google.com/billing' }));
-        document.getElementById('error-google-btn')?.addEventListener('click', () => { if (!query) return; const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`; chrome.tabs.create({ url: searchUrl }); });
     }
 
     _handleRescan() {
@@ -292,13 +283,31 @@ class PopupApp {
             this._callGeminiStream('pageAnalysis', response.content);
         } catch (e) {
             this.state.view = 'error'; 
-            this.state.error = e; 
+            this.state.error = ErrorHandler.format(e, 'page_analysis'); 
             this.render();
         }
     }
 
     _handleFeedbackCorrect() { this.elements.feedbackCorrect.disabled = true; this.elements.feedbackIncorrect.disabled = true; this.elements.feedbackCorrect.classList.add('selected-correct'); }
-    async _handleFeedbackIncorrect() { this.elements.feedbackIncorrect.disabled = true; this.elements.feedbackCorrect.disabled = true; this.elements.feedbackIncorrect.classList.add('selected-incorrect'); this.elements.aiActionsWrapper.classList.add('hidden'); this.elements.correctionPanel.classList.remove('hidden'); this.elements.correctionOptions.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Fetching options...</p></div>`; try { const response = await this._sendMessageToContentScript({ action: "get_quiz_options" }); if (response?.options?.length > 0) this._renderCorrectionOptions(response.options); else this.elements.correctionOptions.innerHTML = '<p class="text-center">Could not find options on page.</p>'; } catch (e) { this.elements.correctionOptions.innerHTML = `<p class="text-center">Error fetching options: ${e.message}</p>`; } }
+    
+    async _handleFeedbackIncorrect() { 
+        this.elements.feedbackIncorrect.disabled = true; 
+        this.elements.feedbackCorrect.disabled = true; 
+        this.elements.feedbackIncorrect.classList.add('selected-incorrect'); 
+        this.elements.aiActionsWrapper.classList.add('hidden'); 
+        this.elements.correctionPanel.classList.remove('hidden'); 
+        this.elements.correctionOptions.innerHTML = `<div class="loading-state in-panel"><div class="spinner"></div><p>Fetching options...</p></div>`; 
+        try { 
+            const response = await this._sendMessageToContentScript({ action: "get_quiz_options" }); 
+            if (response?.options?.length > 0) {
+                this._renderCorrectionOptions(response.options);
+            } else {
+                this.elements.correctionOptions.innerHTML = '<p class="text-center">Could not find options on page.</p>'; 
+            }
+        } catch (e) { 
+            this.elements.correctionOptions.innerHTML = `<p class="text-center">Error fetching options: ${e.message}</p>`; 
+        } 
+    }
     
     _callGeminiStream(purpose, userContent, base64ImageData = null) {
         const { promptProfiles, activeProfile, selectedModel, geminiApiKey } = this.state.config;
@@ -353,7 +362,12 @@ class PopupApp {
 
     _handleStreamUpdate(request) {
         const { payload, purpose } = request;
-        if (!payload.success) { this.state.view = 'error'; this.state.error = payload.error; this.render(); return; }
+        if (!payload.success) {
+            this.state.view = 'error';
+            this.state.error = payload.error;
+            this.render();
+            return;
+        }
         
         const isGeneralTask = ['summarize', 'explain', 'translate', 'rephrase'].some(t => purpose.startsWith(t));
 

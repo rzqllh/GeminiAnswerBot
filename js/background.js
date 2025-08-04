@@ -1,11 +1,9 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/background.js
-// 🕓 Created: 2024-05-21 18:00:00
+// 🕓 Created: 2024-05-22 15:05:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
-// Variabel sementara di memori untuk menyimpan data konteks.
-// Ini adalah solusi andal untuk menghindari race condition dengan chrome.storage.
 let contextDataForPopup = null;
 
 async function fetchImageAsBase64(url) {
@@ -35,7 +33,7 @@ async function handleContextAction(info, tab) {
   
   const actionData = {
     action: info.menuItemId,
-    source: 'contextMenu' // Flag penting untuk identifikasi di popup
+    source: 'contextMenu'
   };
 
   if (info.selectionText) {
@@ -53,15 +51,12 @@ async function handleContextAction(info, tab) {
     }
   }
   
-  // [FIXED] Simpan data ke variabel sementara, bukan ke storage.
   contextDataForPopup = actionData;
 
-  // Buka popup. Tangani error jika gagal.
   try {
     await chrome.action.openPopup();
   } catch (e) {
     console.error("Failed to open popup programmatically:", e);
-    // Bersihkan data jika popup gagal dibuka untuk mencegah state basi.
     contextDataForPopup = null;
   }
 }
@@ -131,36 +126,6 @@ chrome.runtime.onStartup.addListener(updateContextMenus);
 async function performApiCall(payload) {
     const { apiKey, model, systemPrompt, userContent, base64ImageData, purpose } = payload;
     
-    const settings = await chrome.storage.sync.get(['promptProfiles', 'activeProfile', 'temperature']);
-    const activeProfileName = settings.activeProfile || 'Default';
-    const activeProfile = settings.promptProfiles?.[activeProfileName] || {};
-    const globalTemp = settings.temperature ?? 0.4;
-    const purposeBase = purpose.split('-')[0];
-    const tempKey = `${purposeBase}_temp`;
-    const finalTemperature = activeProfile[tempKey] ?? globalTemp;
-
-    const generationConfig = { temperature: finalTemperature };
-    const endpoint = 'streamGenerateContent';
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}&alt=sse`;
-  
-    const contentParts = [{ text: userContent }];
-    if (base64ImageData && base64ImageData.startsWith('data:image')) {
-        const [meta, data] = base64ImageData.split(',');
-        const mimeType = meta.match(/:(.*?);/)[1];
-        contentParts.push({
-            inline_data: { mime_type: mimeType, data }
-        });
-    }
-
-    const apiPayload = {
-      contents: [{ role: "user", parts: contentParts }],
-      generationConfig
-    };
-
-    if (systemPrompt && typeof systemPrompt === 'string' && systemPrompt.trim() !== '') {
-      apiPayload.system_instruction = { parts: [{ text: systemPrompt }] };
-    }
-  
     const streamCallback = (streamData) => {
       chrome.runtime.sendMessage({
         action: 'geminiStreamUpdate',
@@ -168,8 +133,38 @@ async function performApiCall(payload) {
         purpose: purpose
       });
     };
-  
+
     try {
+      const settings = await chrome.storage.sync.get(['promptProfiles', 'activeProfile', 'temperature']);
+      const activeProfileName = settings.activeProfile || 'Default';
+      const activeProfile = settings.promptProfiles?.[activeProfileName] || {};
+      const globalTemp = settings.temperature ?? 0.4;
+      const purposeBase = purpose.split('-')[0];
+      const tempKey = `${purposeBase}_temp`;
+      const finalTemperature = activeProfile[tempKey] ?? globalTemp;
+
+      const generationConfig = { temperature: finalTemperature };
+      const endpoint = 'streamGenerateContent';
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}&alt=sse`;
+    
+      const contentParts = [{ text: userContent }];
+      if (base64ImageData && base64ImageData.startsWith('data:image')) {
+          const [meta, data] = base64ImageData.split(',');
+          const mimeType = meta.match(/:(.*?);/)[1];
+          contentParts.push({
+              inline_data: { mime_type: mimeType, data }
+          });
+      }
+
+      const apiPayload = {
+        contents: [{ role: "user", parts: contentParts }],
+        generationConfig
+      };
+
+      if (systemPrompt && typeof systemPrompt === 'string' && systemPrompt.trim() !== '') {
+        apiPayload.system_instruction = { parts: [{ text: systemPrompt }] };
+      }
+    
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -179,10 +174,7 @@ async function performApiCall(payload) {
       if (!response.ok) {
         const errorBody = await response.json();
         const errorMessage = errorBody.error?.message || `Request failed with status ${response.status}`;
-        let errorType = 'API_ERROR';
-        if (errorMessage.includes("API key not valid")) errorType = 'INVALID_API_KEY';
-        else if (errorBody.error?.status === 'RESOURCE_EXHAUSTED' || errorMessage.includes("quota")) errorType = 'QUOTA_EXCEEDED';
-        throw { type: errorType, message: errorMessage };
+        throw { type: 'API_ERROR', message: errorMessage, status: errorBody.error?.status };
       }
 
       if (!response.body) throw { type: 'NETWORK_ERROR', message: 'Response body is empty.' };
@@ -216,10 +208,9 @@ async function performApiCall(payload) {
 
     } catch (error) {
       console.error("API call error:", error);
-      streamCallback({ success: false, error: {
-        type: error.type || 'NETWORK_ERROR',
-        message: error.message || 'Check your internet connection or the browser console for more details.'
-      }});
+      // REFACTORED: Use centralized error handler
+      const formattedError = ErrorHandler.format(error, 'api');
+      streamCallback({ success: false, error: formattedError });
     }
 }
   
@@ -262,10 +253,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         case 'popupReady':
             if (contextDataForPopup) {
                 sendResponse(contextDataForPopup);
-                contextDataForPopup = null; // Clear data after sending
+                contextDataForPopup = null;
             } else {
-                sendResponse(null); // No data to send
+                sendResponse(null);
             }
-            return true; // Required for async response
+            return true;
     }
 });
