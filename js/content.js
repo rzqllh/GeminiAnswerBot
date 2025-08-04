@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/content.js
-// 🕓 Created: 2024-05-22 13:30:00
+// 🕓 Created: 2024-05-22 14:00:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /**
@@ -81,7 +81,6 @@ class QuizModule {
     quizBlocks.forEach(block => {
       const rect = block.getBoundingClientRect();
       
-      // Basic check: element must be at least partially in the viewport
       if (rect.bottom > 0 && rect.top < viewportHeight) {
         const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
         const visibilityRatio = visibleHeight / rect.height;
@@ -93,13 +92,11 @@ class QuizModule {
       }
     });
     
-    // If no block is visible, default to the first one on the page.
     return bestCandidate || quizBlocks[0];
   }
 
   /**
    * Finds container elements that likely represent a single quiz question block.
-   * A block is a container with both question text and multiple-choice inputs.
    * @returns {HTMLElement[]} An array of potential quiz block elements.
    */
   _findQuizBlocks() {
@@ -170,13 +167,29 @@ class QuizModule {
     
     block.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
       if (input.type === 'checkbox') hasCheckboxes = true;
+      
+      // REFACTORED: Intelligent Text Association Logic
+      let optionText = '';
+      // 1. Prioritize the direct label
       const label = input.closest('label') || document.querySelector(`label[for="${input.id}"]`);
       if (label) {
-        const optionText = label.textContent.trim();
-        if (optionText && !seenOptions.has(optionText)) {
-          options.push(optionText);
-          seenOptions.add(optionText);
+        optionText = label.textContent.trim();
+      }
+
+      // 2. If label is empty or not found, check the parent's text content
+      if (!optionText) {
+        const parent = input.parentElement;
+        if (parent) {
+          // Clone to avoid modifying the live DOM, remove the input to get only the text
+          const clone = parent.cloneNode(true);
+          clone.querySelector('input')?.remove();
+          optionText = clone.textContent.trim();
         }
+      }
+      
+      if (optionText && !seenOptions.has(optionText)) {
+        options.push(optionText);
+        seenOptions.add(optionText);
       }
     });
 
@@ -419,7 +432,6 @@ class ContentController {
               content = this.quiz.extractContent();
           }
 
-          // REVISED: The fallback warning is removed as the new logic is more robust.
           if (!content) {
               console.log("No specific quiz block found. Falling back to full page content for analysis.");
               content = this.page.fallbackContent();
