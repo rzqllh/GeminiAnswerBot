@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/content.js
-// 🕓 Created: 2024-05-22 13:00:00
+// 🕓 Created: 2024-05-22 13:30:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /**
@@ -56,51 +56,45 @@ class MarkerModule {
 
 /**
  * Mengelola semua logika terkait ekstraksi konten kuis dan pemeriksaan pra-pengiriman.
- * REFACTORED: Now uses IntersectionObserver for viewport-aware quiz detection.
+ * REFACTORED: Now uses a synchronous, on-demand viewport calculation.
  */
 class QuizModule {
   constructor() {
     this.correctAiAnswer = null;
     this.quizContainer = null;
     this.submissionHandler = this.handleSubmissionClick.bind(this);
-    
-    this.observer = null;
-    this.currentlyVisibleQuizBlock = null;
-    this.initializeObserver();
   }
 
   /**
-   * Initializes the IntersectionObserver to watch for quiz blocks entering the viewport.
+   * Finds the quiz block most visible in the viewport at the moment of execution.
+   * @returns {HTMLElement|null} The most visible quiz block element.
    */
-  initializeObserver() {
-    const options = {
-      root: null, // viewport
-      rootMargin: '0px',
-      threshold: 0.5 // 50% of the element must be visible
-    };
-
-    this.observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          this.currentlyVisibleQuizBlock = entry.target;
-        } else {
-          // If the currently visible block goes out of view, clear it
-          if (this.currentlyVisibleQuizBlock === entry.target) {
-            this.currentlyVisibleQuizBlock = null;
-          }
-        }
-      });
-    }, options);
-
-    this.findAndObserveQuizBlocks();
-  }
-
-  /**
-   * Finds all potential quiz blocks on the page and starts observing them.
-   */
-  findAndObserveQuizBlocks() {
+  _findBestVisibleQuizBlock() {
     const quizBlocks = this._findQuizBlocks();
-    quizBlocks.forEach(block => this.observer.observe(block));
+    if (quizBlocks.length === 0) return null;
+
+    let bestCandidate = null;
+    let maxVisibility = 0;
+
+    const viewportHeight = window.innerHeight;
+
+    quizBlocks.forEach(block => {
+      const rect = block.getBoundingClientRect();
+      
+      // Basic check: element must be at least partially in the viewport
+      if (rect.bottom > 0 && rect.top < viewportHeight) {
+        const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+        const visibilityRatio = visibleHeight / rect.height;
+
+        if (visibilityRatio > maxVisibility) {
+          maxVisibility = visibilityRatio;
+          bestCandidate = block;
+        }
+      }
+    });
+    
+    // If no block is visible, default to the first one on the page.
+    return bestCandidate || quizBlocks[0];
   }
 
   /**
@@ -116,14 +110,12 @@ class QuizModule {
       inputs.forEach(input => {
           if (!this._isVisible(input)) return;
           
-          // Find a common ancestor that isn't too large (like the body)
           let container = input.closest('form, fieldset, div.w3-panel, div[class*="quiz-item"]');
           if (!container || container.tagName === 'BODY' || container.tagName === 'MAIN') {
               container = input.parentElement?.closest('div');
           }
 
-          if (container && this._isVisible(container)) {
-              // Check if this container has question-like text and multiple inputs
+          if (container && this._isVisible(container) && container.offsetHeight > 50) {
               const hasQuestionText = container.querySelector(questionSelectors);
               const hasMultipleInputs = container.querySelectorAll('input[type="radio"], input[type="checkbox"]').length > 1;
 
@@ -137,18 +129,14 @@ class QuizModule {
   }
 
   /**
-   * Extracts content ONLY from the currently visible quiz block.
-   * @returns {string|null} Formatted quiz content or null if none is visible.
+   * Extracts content from the most visible quiz block.
+   * @returns {string|null} Formatted quiz content or null if no block is found.
    */
   extractContent() {
-    if (!this.currentlyVisibleQuizBlock) {
-      // Fallback: if no block is actively visible, find the first one on the page.
-      const firstBlock = this._findQuizBlocks()[0];
-      if (!firstBlock) return null;
-      this.currentlyVisibleQuizBlock = firstBlock;
-    }
+    const visibleBlock = this._findBestVisibleQuizBlock();
+    if (!visibleBlock) return null;
     
-    return this._extractDataFromBlock(this.currentlyVisibleQuizBlock);
+    return this._extractDataFromBlock(visibleBlock);
   }
 
   /**
@@ -159,17 +147,15 @@ class QuizModule {
   _extractDataFromBlock(block) {
     if (!block) return null;
 
-    // Find the best question candidate within the block
     let questionText = '';
     const questionCandidates = block.querySelectorAll('p, h1, h2, h3, h4, div[class*="question"], span');
     let bestCandidate = null;
 
     questionCandidates.forEach(el => {
-      // Avoid text that is inside a label for an option
       if (el.closest('label')) return;
       
       const clone = el.cloneNode(true);
-      clone.querySelectorAll('button, input, a, select, form, ul, ol').forEach(child => child.remove());
+      clone.querySelectorAll('button, input, a, select, form, ul, ol, label').forEach(child => child.remove());
       const text = clone.textContent.trim().replace(/\s+/g, ' ');
 
       if (text.length > 10 && (!bestCandidate || text.length > bestCandidate.length)) {
@@ -178,7 +164,6 @@ class QuizModule {
     });
     questionText = bestCandidate || '';
     
-    // Find all options within the block
     const options = [];
     const seenOptions = new Set();
     let hasCheckboxes = false;
@@ -211,7 +196,8 @@ class QuizModule {
   }
 
   extractOptions() {
-    const container = this.currentlyVisibleQuizBlock || document;
+    const visibleBlock = this._findBestVisibleQuizBlock();
+    const container = visibleBlock || document;
     const options = [];
     const seenOptions = new Set();
     container.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
@@ -432,9 +418,10 @@ class ContentController {
           } else {
               content = this.quiz.extractContent();
           }
-          // If viewport-aware extraction fails, fallback to full-page scan as a last resort.
+
+          // REVISED: The fallback warning is removed as the new logic is more robust.
           if (!content) {
-              console.warn("Viewport-aware extraction failed. Falling back to page content.");
+              console.log("No specific quiz block found. Falling back to full page content for analysis.");
               content = this.page.fallbackContent();
           }
           sendResponse({ content });
@@ -458,7 +445,7 @@ class ContentController {
           sendResponse({ options });
           break;
       }
-      return true;
+      return true; // Keep the message channel open for async response
     });
   }
 }
