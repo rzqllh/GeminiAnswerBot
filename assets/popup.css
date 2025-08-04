@@ -26,6 +26,7 @@
   --info-bg: #eef5ff;
   --info-border: #d6eaff;
   --info-text: #004085;
+  --skeleton-bg: #e1e1e6;
   --base-font-size: 14px;
   --line-height: 1.5;
   --main-border-radius: 16px;
@@ -58,6 +59,7 @@
     --info-bg: #1c2a3e;
     --info-border: #2a4161;
     --info-text: #cce5ff;
+    --skeleton-bg: #3a3a3c;
   }
 }
 
@@ -81,7 +83,6 @@ body {
 .content-area::-webkit-scrollbar { width: 6px; }
 .content-area::-webkit-scrollbar-thumb { background-color: var(--tertiary-text); border-radius: 3px; }
 
-/* NEW: Flexbox container for automatic spacing */
 #panel-container {
   display: flex;
   flex-direction: column;
@@ -120,7 +121,7 @@ body {
 .panel-content > *:first-child { margin-top: 0; }
 .panel-content > *:last-child { margin-bottom: 0; }
 
-/* NEW: Centralized Typography System */
+/* Centralized Typography System */
 .panel-content p { margin: 0 0 0.8em 0; color: var(--secondary-text); }
 .panel-content p:last-child { margin-bottom: 0; }
 .panel-content strong { font-weight: 600; color: var(--primary-text); }
@@ -132,12 +133,16 @@ body {
   color: var(--action-button-bg); font-size: 18px;
 }
 .panel-content code {
-  background-color: var(--bg-color); border-radius: 4px;
-  padding: 2px 6px; font-family: 'SF Mono', 'Menlo', 'monospace';
-  font-size: 0.9em; color: var(--secondary-text);
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-family: 'SF Mono', 'Menlo', 'monospace';
+  font-size: 0.9em;
+  color: var(--primary-text);
 }
 .panel-content pre { margin: 1em 0; padding: 12px; border-radius: 8px; background-color: var(--bg-color); }
-.panel-content pre code { padding: 0; background-color: transparent; }
+.panel-content pre code { padding: 0; background-color: transparent; border: none; }
 
 /* == ACTION BUTTONS ==================== */
 .action-buttons-container { display: flex; gap: 12px; }
@@ -158,7 +163,7 @@ body {
 #answerDisplay .answer-highlight {
   border-left: 3px solid var(--action-button-bg); padding-left: 12px;
   font-size: 15px; font-weight: 500; animation: fadeIn 0.4s ease-in-out;
-  margin: 0; color: var(--primary-text); /* Override generic p color */
+  margin: 0; color: var(--primary-text);
 }
 .confidence-wrapper {
   margin-top: var(--panel-padding); padding-top: var(--panel-padding);
@@ -225,13 +230,38 @@ body {
   text-align: center;
 }
 .loading-state.full-page { min-height: 250px; }
-.loading-state.in-panel { min-height: 80px; padding: 20px 0; }
 .spinner {
   width: 28px; height: 28px; border-radius: 50%; margin-bottom: 16px;
   border: 4px solid var(--border-color); border-top-color: var(--action-button-bg);
   animation: spin 1s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* NEW: Skeleton Loader Styles */
+.skeleton-loader { display: flex; flex-direction: column; gap: 10px; }
+.skeleton {
+  background-color: var(--skeleton-bg);
+  border-radius: 5px;
+  position: relative;
+  overflow: hidden;
+}
+.skeleton.skeleton-text { height: 1em; }
+.skeleton.skeleton-title { width: 40%; height: 1.2em; margin-bottom: 12px; }
+.skeleton::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -150%;
+  height: 100%;
+  width: 150%;
+  background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%);
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+  0% { left: -150%; }
+  100% { left: 150%; }
+}
+
 .info-panel, .error-panel {
     border-radius: var(--main-border-radius); padding: var(--panel-padding);
     display: flex; flex-direction: column; gap: 12px;

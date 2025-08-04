@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/popup.js
-// 🕓 Created: 2024-05-22 11:30:00
+// 🕓 Created: 2024-05-22 12:35:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /**
@@ -68,18 +68,35 @@ class PopupApp {
     }
 
     /**
-     * Helper function to render a loading state inside a container.
-     * @param {HTMLElement} container - The container element to show loading in.
+     * Helper function to render a skeleton loader state inside a container.
+     * @param {HTMLElement} container - The container element to show the skeleton in.
      * @param {boolean} show - True to show, false to hide.
-     * @param {string} text - Optional text to display.
+     * @param {string} type - 'answer' or 'explanation' to render a specific skeleton.
      */
-    _renderLoadingState(container, show, text = '') {
-      if (!container) return;
-      if (show) {
-        container.innerHTML = `<div class="loading-state in-panel"><div class="spinner"></div>${text ? `<p>${_escapeHtml(text)}</p>` : ''}</div>`;
-      } else {
-        container.innerHTML = '';
-      }
+    _renderSkeletonState(container, show, type = 'answer') {
+        if (!container) return;
+        if (show) {
+            let skeletonHtml = '';
+            if (type === 'answer') {
+                skeletonHtml = `
+                    <div class="skeleton-loader">
+                        <div class="skeleton skeleton-text" style="width: 80%;"></div>
+                        <div class="skeleton skeleton-text" style="width: 60%; margin-top: 20px;"></div>
+                        <div class="skeleton skeleton-text" style="width: 90%;"></div>
+                    </div>`;
+            } else { // explanation
+                skeletonHtml = `
+                    <div class="skeleton-loader">
+                        <div class="skeleton skeleton-title"></div>
+                        <div class="skeleton skeleton-text"></div>
+                        <div class="skeleton skeleton-text" style="width: 90%;"></div>
+                        <div class="skeleton skeleton-text" style="width: 70%;"></div>
+                    </div>`;
+            }
+            container.innerHTML = skeletonHtml;
+        } else {
+            container.innerHTML = '';
+        }
     }
 
     async _ensureContentScripts(tabId) {
@@ -191,7 +208,7 @@ class PopupApp {
             this.elements.generalTaskDisplay.innerHTML = DOMPurify.sanitize(marked.parse(this.state.generalTaskResult));
             this.elements.copyGeneralTask.dataset.copyText = this.state.generalTaskResult;
         } else {
-            this._renderLoadingState(this.elements.generalTaskDisplay, true);
+            this._renderSkeletonState(this.elements.generalTaskDisplay, true, 'explanation');
         }
     }
 
@@ -299,7 +316,7 @@ class PopupApp {
     
     _getAnswer() {
         this.elements.answerContainer.classList.remove('hidden');
-        this._renderLoadingState(this.elements.answerDisplay, true);
+        this._renderSkeletonState(this.elements.answerDisplay, true, 'answer');
 
         if (this.state.isImageMode) {
             this._callGeminiStream('answer', '', this.state.base64ImageData);
@@ -329,7 +346,7 @@ class PopupApp {
         this.elements.explanationButton.disabled = true;
         this.elements.retryExplanation.disabled = true;
         this.elements.explanationContainer.classList.remove('hidden');
-        this._renderLoadingState(this.elements.explanationDisplay, true, 'Generating explanation...');
+        this._renderSkeletonState(this.elements.explanationDisplay, true, 'explanation');
         const contentForExplanation = `${this.state.cleanedContent}\n\nCorrect Answer: ${this.state.incorrectAnswer}`;
         this._callGeminiStream('explanation', contentForExplanation);
     }
@@ -379,7 +396,7 @@ class PopupApp {
     }
 
     _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0, thoughtProcess = null) {
-        this._renderLoadingState(this.elements.answerDisplay, false);
+        this._renderSkeletonState(this.elements.answerDisplay, false);
         const thoughtMatch = fullText.match(/\[THOUGHT\]([\s\S]*)\[ENDTHOUGHT\]/);
         this.state.thoughtProcess = thoughtProcess || (thoughtMatch ? thoughtMatch[1].trim() : null);
         const cleanText = fullText.replace(/\[THOUGHT\][\s\S]*\[ENDTHOUGHT\]\s*/, '');
@@ -434,7 +451,7 @@ class PopupApp {
     }
 
     _handleExplanationResult(fullText, fromCache = false) { 
-        this._renderLoadingState(this.elements.explanationDisplay, false);
+        this._renderSkeletonState(this.elements.explanationDisplay, false);
         this.state.explanationHTML = fullText; 
         this.elements.explanationDisplay.innerHTML = DOMPurify.sanitize(marked.parse(fullText)); 
         this.elements.copyExplanation.dataset.copyText = fullText; 
@@ -449,7 +466,8 @@ class PopupApp {
     
     _formatQuestionContent(content) {
         if (!content) return '';
-        return DOMPurify.sanitize(marked.parse(content.replace(/Question:/i, '### Question\n').replace(/Options:/i, '\n### Options\n')));
+        const renderedHtml = DOMPurify.sanitize(marked.parse(content.replace(/Question:/i, '### Question\n').replace(/Options:/i, '\n### Options\n')));
+        return renderedHtml;
     }
     
     _renderInlineMarkdown(text) {
@@ -468,7 +486,7 @@ class PopupApp {
                 const correctionContent = `The original quiz content was:\n${this.state.cleanedContent}\n\nMy previous incorrect answer was: \`${this.state.incorrectAnswer}\`\n\nThe user has indicated the correct answer is: \`${optionText}\``; 
                 this.elements.correctionPanel.classList.add('hidden'); 
                 this.elements.explanationContainer.classList.remove('hidden'); 
-                this._renderLoadingState(this.elements.explanationDisplay, true, 'Generating corrected explanation...');
+                this._renderSkeletonState(this.elements.explanationDisplay, true, 'explanation');
                 this._callGeminiStream('correction', correctionContent); 
             }); 
             this.elements.correctionOptions.appendChild(button); 
