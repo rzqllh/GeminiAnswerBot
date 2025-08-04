@@ -95,7 +95,7 @@ class PopupApp {
             console.log("Content script not found, injecting now.");
             try {
                 await chrome.scripting.insertCSS({ target: { tabId }, files: ['assets/highlighter.css', 'assets/dialog.css', 'assets/toolbar.css'] });
-                await chrome.scripting.executeScript({ target: { tabId }, files: ['js/utils.js', 'js/vendor/dompurify.min.js', 'js/vendor/marked.min.js', 'js/vendor/mark.min.js', 'js/content.js'] });
+                await chrome.scripting.executeScript({ target: { tabId }, files: ['js/utils/helpers.js', 'js/utils/errorHandler.js', 'js/vendor/dompurify.min.js', 'js/vendor/marked.min.js', 'js/vendor/mark.min.js', 'js/content.js'] });
                 await new Promise(resolve => setTimeout(resolve, 100));
             } catch (injectionError) {
                 console.error(`Failed to inject content scripts into tab ${tabId}:`, injectionError);
