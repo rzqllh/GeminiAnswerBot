@@ -1,10 +1,11 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/background.js
-// 🕓 Created: 2024-05-22 15:05:00
+// 🕓 Created: 2024-05-22 16:20:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 let contextDataForPopup = null;
+let verificationContext = {};
 
 async function fetchImageAsBase64(url) {
   try {
@@ -208,7 +209,6 @@ async function performApiCall(payload) {
 
     } catch (error) {
       console.error("API call error:", error);
-      // REFACTORED: Use centralized error handler
       const formattedError = ErrorHandler.format(error, 'api');
       streamCallback({ success: false, error: formattedError });
     }
@@ -232,6 +232,11 @@ function handleTestConnection(payload, sendResponse) {
       }
     })
     .catch(err => sendResponse({ success: false, error: err.message }));
+}
+
+function extractQuestionForSearch(cleanedContent) {
+    const match = cleanedContent.match(/Question:\s*([\s\S]*?)(?=\nOptions:|\n\n|$)/i);
+    return match ? match[1].trim() : cleanedContent;
 }
 
 chrome.contextMenus.onClicked.addListener(handleContextAction);
@@ -258,5 +263,66 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 sendResponse(null);
             }
             return true;
+        
+        case 'verifyAnswerWithSearch':
+            (async () => {
+                const { cleanedContent, initialAnswer } = request.payload;
+                const question = extractQuestionForSearch(cleanedContent);
+                const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(question)}`;
+                try {
+                    const tab = await chrome.tabs.create({ url: searchUrl, active: false });
+                    verificationContext[tab.id] = { cleanedContent, initialAnswer };
+                    const listener = (tabId, changeInfo) => {
+                        if (tabId === tab.id && changeInfo.status === 'complete') {
+                            chrome.scripting.executeScript({ target: { tabId }, files: ['js/googleScraper.js'] })
+                                .catch(err => console.error("Failed to inject scraper script:", err));
+                            chrome.tabs.onUpdated.removeListener(listener);
+                        }
+                    };
+                    chrome.tabs.onUpdated.addListener(listener);
+                } catch (error) {
+                    const formattedError = ErrorHandler.format(error, 'verification');
+                    chrome.runtime.sendMessage({ action: 'geminiStreamUpdate', payload: { success: false, error: formattedError }, purpose: 'answer' });
+                }
+            })();
+            break;
+
+        case 'scrapedData':
+            (async () => {
+                const context = verificationContext[sender.tab.id];
+                if (!context) {
+                    console.error("No verification context found for tab:", sender.tab.id);
+                    chrome.tabs.remove(sender.tab.id);
+                    return;
+                }
+                const searchSnippets = request.payload.map(r => `Snippet: ${r.title}\n${r.snippet}`).join('\n\n');
+                const verificationContent = `[BEGIN DATA]\n--- Original Quiz ---\n${context.cleanedContent}\n--- Initial Answer ---\nAnswer: ${context.initialAnswer}\n--- Web Search Results ---\n${searchSnippets || 'No relevant information found.'}\n[END DATA]`;
+                
+                const { geminiApiKey, selectedModel } = await chrome.storage.sync.get(['geminiApiKey', 'selectedModel']);
+                performApiCall({
+                    apiKey: geminiApiKey,
+                    model: selectedModel,
+                    systemPrompt: DEFAULT_PROMPTS.verification,
+                    userContent: verificationContent,
+                    purpose: 'verification'
+                });
+
+                delete verificationContext[sender.tab.id];
+                chrome.tabs.remove(sender.tab.id);
+            })();
+            break;
+        
+        case 'scrapingFailed':
+            (async () => {
+                console.error("Scraping failed:", request.error);
+                if (verificationContext[sender.tab.id]) {
+                    delete verificationContext[sender.tab.id];
+                }
+                chrome.tabs.remove(sender.tab.id);
+                const formattedError = ErrorHandler.format({ message: "Could not scrape Google Search results." }, 'verification');
+                chrome.runtime.sendMessage({ action: 'geminiStreamUpdate', payload: { success: false, error: formattedError }, purpose: 'answer' });
+            })();
+            break;
     }
+    return true;
 });

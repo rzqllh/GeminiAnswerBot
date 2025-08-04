@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+### Changed
+- **Error Handling Architecture**: Centralized all error handling logic into a new `errorHandler.js` module. This ensures consistent error processing and reporting across the extension, making the codebase more robust and easier to maintain.
+
 ## [3.0.0] - 2024-05-22
 
 This is a major architectural and user experience overhaul, focusing on reliability, accuracy, and a professional user interface. The extension's core logic has been re-engineered for robustness and maintainability.

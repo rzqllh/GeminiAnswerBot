@@ -159,6 +159,35 @@ body {
   cursor: not-allowed; filter: none;
 }
 
+/* NEW: Styles for the verification button */
+.verification-container {
+  padding: 12px var(--panel-padding) 0;
+  border-top: 1px solid var(--separator-color);
+  margin-top: var(--panel-padding);
+}
+
+.action-button.verify {
+  background-color: #ff9500; /* Orange for warning/attention */
+}
+@media (prefers-color-scheme: dark) {
+  .action-button.verify {
+    background-color: #ff9f0a;
+  }
+}
+.action-button.verify:hover {
+  background-color: #f59000;
+}
+.action-button.verify:disabled {
+  background-color: var(--border-color);
+}
+.action-button.verify .spinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+  border-top-color: var(--action-button-text);
+  margin: 0;
+}
+
 /* == ANSWER DISPLAY ========================================== */
 #answerDisplay .answer-highlight {
   border-left: 3px solid var(--action-button-bg); padding-left: 12px;
@@ -237,7 +266,6 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* NEW: Skeleton Loader Styles */
 .skeleton-loader { display: flex; flex-direction: column; gap: 10px; }
 .skeleton {
   background-color: var(--skeleton-bg);

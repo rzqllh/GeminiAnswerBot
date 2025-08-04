@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/popup.js
-// 🕓 Created: 2024-05-22 15:10:00
+// 🕓 Created: 2024-05-22 16:15:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 class PopupApp {
@@ -37,7 +37,8 @@ class PopupApp {
             'feedbackIncorrect', 'correctionPanel', 'correctionOptions', 
             'imagePreviewContainer', 'imagePreview', 'imageStatusText', 'answerCardTitle',
             'generalTaskContainer', 'generalTaskTitle', 'generalTaskDisplay', 'copyGeneralTask',
-            'showReasoningButton', 'reasoningDisplay'
+            'showReasoningButton', 'reasoningDisplay',
+            'verificationContainer', 'verifyButton'
         ];
         ids.forEach(id => {
             const key = id.replace(/-([a-z])/g, g => g[1].toUpperCase());
@@ -58,10 +59,18 @@ class PopupApp {
         this.elements.copyExplanation.addEventListener('click', e => this._copyToClipboard(e.currentTarget));
         this.elements.copyGeneralTask.addEventListener('click', e => this._copyToClipboard(e.currentTarget));
         this.elements.showReasoningButton.addEventListener('click', () => this._toggleReasoningDisplay());
+        this.elements.verifyButton.addEventListener('click', () => this._handleVerification());
     }
 
     _handleMessages(request) {
-        if (request.action === 'geminiStreamUpdate') this._handleStreamUpdate(request);
+        if (request.action === 'geminiStreamUpdate') {
+            if (request.purpose === 'verification') {
+                this.state.answerHTML = null;
+                this.streamAccumulator.answer = '';
+                this.streamAccumulator.verification = (this.streamAccumulator.verification || '') + request.payload.chunk;
+            }
+            this._handleStreamUpdate(request);
+        }
     }
 
     _renderSkeletonState(container, show, type = 'answer') {
@@ -378,13 +387,16 @@ class PopupApp {
             if (isGeneralTask) {
                 this._handleGeneralTaskResult(fullText);
             } else {
+                const finalPurpose = purpose === 'verification' ? 'answer' : purpose;
                 const purposeHandlers = {
                     'cleaning': text => this._handleCleaningResult(text),
                     'answer': text => this._handleAnswerResult(text, false, payload.totalTokenCount),
                     'explanation': text => this._handleExplanationResult(text, false),
                     'correction': text => this._handleCorrectionResult(text),
                 };
-                if (purposeHandlers[purpose]) purposeHandlers[purpose](fullText);
+                if (purposeHandlers[finalPurpose]) {
+                    purposeHandlers[finalPurpose](fullText);
+                }
             }
         } else if (payload.chunk) {
             this.streamAccumulator[purpose] = (this.streamAccumulator[purpose] || '') + payload.chunk;
@@ -449,6 +461,15 @@ class PopupApp {
         this.elements.showReasoningButton.classList.toggle('hidden', !this.state.thoughtProcess);
         this._resetFeedbackButtons();
         
+        if (confidenceMatch && confidenceMatch[1].toLowerCase() === 'low') {
+            this.elements.verificationContainer.classList.remove('hidden');
+        } else {
+            this.elements.verificationContainer.classList.add('hidden');
+        }
+
+        this.elements.verifyButton.disabled = false;
+        this.elements.verifyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"></path><line x1="16" y1="8" x2="2" y2="22"></line><line x1="17.5" y1="15" x2="9" y2="15"></line></svg> Verify with Google`;
+
         const answersToHighlight = this.state.incorrectAnswer.split(',').map(s => s.trim());
         if (this.state.config.autoHighlight && !this.state.isImageMode) {
             this._sendMessageToContentScript({ action: 'highlight-answer', text: answersToHighlight })
@@ -590,6 +611,19 @@ class PopupApp {
             hash |= 0; 
         } 
         return 'cache_' + new Uint32Array([hash])[0].toString(16); 
+    }
+
+    _handleVerification() {
+        this.elements.verifyButton.disabled = true;
+        this.elements.verifyButton.innerHTML = `<div class="spinner"></div> Verifying...`;
+
+        chrome.runtime.sendMessage({
+            action: 'verifyAnswerWithSearch',
+            payload: {
+                cleanedContent: this.state.cleanedContent,
+                initialAnswer: this.state.incorrectAnswer
+            }
+        });
     }
 }
 
