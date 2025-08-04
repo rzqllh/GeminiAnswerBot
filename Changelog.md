@@ -1,9 +1,3 @@
-// === Hafizh Rizqullah | GeminiAnswerBot ===
-// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
-// 📄 CHANGELOG.md
-// 🕓 Created: 2024-05-22 14:30:00
-// 🧠 Modular | DRY | SOLID | Apple HIG Compliant
-
 # Changelog
 
 All notable changes to this project will be documented in this file.
