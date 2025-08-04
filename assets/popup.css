@@ -1,8 +1,8 @@
-/* === Hafizh Rizqullah | GeminiAnswerBot === */
-/* 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant */
-/* 📄 assets/popup.css */
-/* 🕓 Created: 2024-05-21 18:10:00 */
-/* 🧠 Modular | DRY | SOLID | Apple HIG Compliant */
+// === Hafizh Rizqullah | GeminiAnswerBot ===
+// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
+// 📄 assets/popup.css
+// 🕓 Created: 2024-05-22 11:30:00
+// 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /* == BASE COLORS & VARIABLES (Light Mode First) ================= */
 :root {
@@ -33,6 +33,7 @@
   --main-padding: 16px;
   --panel-padding: 16px;
   --header-padding: 12px 16px;
+  --spacing-medium: 12px; /* <-- ADDED FOR CONSISTENT SPACING */
 }
 
 /* == DARK MODE COLORS =========================================== */
@@ -104,14 +105,20 @@ body {
   border-radius: 3px;
 }
 
+/* MODIFIED: Added spacing for all direct children of main containers */
+#quizModeContainer > *,
+#generalTaskContainer > * {
+  margin-bottom: var(--spacing-medium);
+}
+#quizModeContainer > *:last-child,
+#generalTaskContainer > *:last-child {
+  margin-bottom: 0;
+}
+
 .main-panel {
   background-color: var(--panel-bg);
   border-radius: var(--main-border-radius);
-  margin-bottom: 12px;
-}
-
-.main-panel:last-child {
-  margin-bottom: 0;
+  /* Removed margin-bottom from here to control it from parent */
 }
 
 /* == HEADER (Top Bar) ========================================== */
@@ -230,13 +237,12 @@ body {
   color: var(--secondary-text);
 }
 
-
 /* == ACTION BUTTONS (Rescan, Explanation) ==================== */
 .action-buttons-container {
   display: flex;
   gap: 12px;
   background-color: transparent;
-  border-radius: 0; /* Override main-panel style */
+  border-radius: 0;
 }
 
 .action-button {
@@ -389,9 +395,18 @@ body {
 /* == GENERIC STATES (Loading, Error, Info) =================== */
 .loading-state {
   display: flex; flex-direction: column; justify-content: center;
-  align-items: center; flex-grow: 1; min-height: 250px;
+  align-items: center; flex-grow: 1;
   color: var(--secondary-text); text-align: center;
 }
+/* ADDED: Min-height for specific loading contexts */
+.loading-state.full-page {
+  min-height: 250px;
+}
+.loading-state.in-panel {
+  min-height: 80px;
+  padding: 20px 0;
+}
+
 .spinner {
   width: 28px; height: 28px; border-radius: 50%;
   margin-bottom: 16px; border: 4px solid var(--border-color);

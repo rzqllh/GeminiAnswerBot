@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/popup.js
-// 🕓 Created: 2024-05-21 20:10:00
+// 🕓 Created: 2024-05-22 11:30:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 /**
@@ -67,6 +67,21 @@ class PopupApp {
         if (request.action === 'geminiStreamUpdate') this._handleStreamUpdate(request);
     }
 
+    /**
+     * Helper function to render a loading state inside a container.
+     * @param {HTMLElement} container - The container element to show loading in.
+     * @param {boolean} show - True to show, false to hide.
+     * @param {string} text - Optional text to display.
+     */
+    _renderLoadingState(container, show, text = '') {
+      if (!container) return;
+      if (show) {
+        container.innerHTML = `<div class="loading-state in-panel"><div class="spinner"></div>${text ? `<p>${_escapeHtml(text)}</p>` : ''}</div>`;
+      } else {
+        container.innerHTML = '';
+      }
+    }
+
     async _ensureContentScripts(tabId) {
         try {
             await this._sendMessageToContentScript({ action: "ping_content_script" }, 200);
@@ -91,7 +106,9 @@ class PopupApp {
             this.state.tab = tab;
 
             if (['chrome://', 'https://chrome.google.com/'].some(url => tab.url.startsWith(url))) {
-                this.state.view = 'info'; this.render(); return;
+                this.state.view = 'info'; 
+                this.elements.messageArea.innerHTML = `<div class="info-panel"><div class="info-panel-header">Page Not Supported</div><div class="info-panel-body"><p>For your security, Chrome extensions cannot run on special browser pages.</p></div></div>`;
+                this.render(); return;
             }
 
             this.state.config = await chrome.storage.sync.get(null);
@@ -134,8 +151,8 @@ class PopupApp {
                     const response = await this._sendMessageToContentScript({ action: "get_quiz_content" });
                     if (!response || !response.content?.trim()) {
                         this.state.view = 'info';
+                        this.elements.messageArea.innerHTML = `<div class="info-panel"><div class="info-panel-header">No Quiz Found</div><div class="info-panel-body"><p>We couldn't detect a quiz on this page. Try using the "Analyze Full Page" button or highlight text to start.</p></div></div>`;
                         this.render();
-                        this.elements.messageArea.innerHTML = `<div class="info-panel"><div class="info-panel-header">No Quiz Found</div><div class="info-panel-body"><p>We couldn't detect a quiz on this page. Try highlighting a question and its options, then use the right-click menu.</p></div></div>`;
                         return;
                     }
                     this.state.url = this.state.tab.url;
@@ -157,7 +174,7 @@ class PopupApp {
         this.elements.generalTaskContainer.classList.add('hidden');
         
         switch (this.state.view) {
-            case 'loading': this.elements.messageArea.classList.remove('hidden'); this.elements.messageArea.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Scanning for quiz...</p></div>`; break;
+            case 'loading': this.elements.messageArea.classList.remove('hidden'); this.elements.messageArea.innerHTML = `<div class="loading-state full-page"><div class="spinner"></div><p>Scanning for quiz...</p></div>`; break;
             case 'info': this.elements.messageArea.classList.remove('hidden'); break;
             case 'error': this.elements.messageArea.classList.remove('hidden'); this._renderErrorState(); break;
             case 'general': this.elements.generalTaskContainer.classList.remove('hidden'); this._renderGeneralTaskState(); break;
@@ -174,7 +191,7 @@ class PopupApp {
             this.elements.generalTaskDisplay.innerHTML = DOMPurify.sanitize(marked.parse(this.state.generalTaskResult));
             this.elements.copyGeneralTask.dataset.copyText = this.state.generalTaskResult;
         } else {
-            this.elements.generalTaskDisplay.innerHTML = `<div class="loading-state" style="min-height: 150px;"><div class="spinner"></div></div>`;
+            this._renderLoadingState(this.elements.generalTaskDisplay, true);
         }
     }
 
@@ -184,9 +201,7 @@ class PopupApp {
         this.elements.imagePreviewContainer.classList.toggle('hidden', !this.state.isImageMode);
         this.elements.contentDisplayWrapper.classList.toggle('hidden', this.state.isImageMode);
 
-        if (this.state.isImageMode) {
-            this.elements.imagePreview.src = this.state.imageUrl;
-        }
+        if (this.state.isImageMode) this.elements.imagePreview.src = this.state.imageUrl;
 
         const contentToDisplay = this.state.cleanedContent || this.state.originalUserContent;
         if (contentToDisplay && !this.state.isImageMode) {
@@ -283,6 +298,9 @@ class PopupApp {
     }
     
     _getAnswer() {
+        this.elements.answerContainer.classList.remove('hidden');
+        this._renderLoadingState(this.elements.answerDisplay, true);
+
         if (this.state.isImageMode) {
             this._callGeminiStream('answer', '', this.state.base64ImageData);
             return;
@@ -311,6 +329,7 @@ class PopupApp {
         this.elements.explanationButton.disabled = true;
         this.elements.retryExplanation.disabled = true;
         this.elements.explanationContainer.classList.remove('hidden');
+        this._renderLoadingState(this.elements.explanationDisplay, true, 'Generating explanation...');
         const contentForExplanation = `${this.state.cleanedContent}\n\nCorrect Answer: ${this.state.incorrectAnswer}`;
         this._callGeminiStream('explanation', contentForExplanation);
     }
@@ -360,6 +379,7 @@ class PopupApp {
     }
 
     _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0, thoughtProcess = null) {
+        this._renderLoadingState(this.elements.answerDisplay, false);
         const thoughtMatch = fullText.match(/\[THOUGHT\]([\s\S]*)\[ENDTHOUGHT\]/);
         this.state.thoughtProcess = thoughtProcess || (thoughtMatch ? thoughtMatch[1].trim() : null);
         const cleanText = fullText.replace(/\[THOUGHT\][\s\S]*\[ENDTHOUGHT\]\s*/, '');
@@ -414,6 +434,7 @@ class PopupApp {
     }
 
     _handleExplanationResult(fullText, fromCache = false) { 
+        this._renderLoadingState(this.elements.explanationDisplay, false);
         this.state.explanationHTML = fullText; 
         this.elements.explanationDisplay.innerHTML = DOMPurify.sanitize(marked.parse(fullText)); 
         this.elements.copyExplanation.dataset.copyText = fullText; 
@@ -447,7 +468,7 @@ class PopupApp {
                 const correctionContent = `The original quiz content was:\n${this.state.cleanedContent}\n\nMy previous incorrect answer was: \`${this.state.incorrectAnswer}\`\n\nThe user has indicated the correct answer is: \`${optionText}\``; 
                 this.elements.correctionPanel.classList.add('hidden'); 
                 this.elements.explanationContainer.classList.remove('hidden'); 
-                this.elements.explanationDisplay.innerHTML = `<div class="loading-state" style="min-height: 50px;"><div class="spinner"></div><p>Generating corrected explanation...</p></div>`; 
+                this._renderLoadingState(this.elements.explanationDisplay, true, 'Generating corrected explanation...');
                 this._callGeminiStream('correction', correctionContent); 
             }); 
             this.elements.correctionOptions.appendChild(button); 
