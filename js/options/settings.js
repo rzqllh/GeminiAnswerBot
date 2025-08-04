@@ -1,7 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
 // 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
 // 📄 js/options/settings.js
-// 🕓 Created: 2024-05-22 10:15:00
+// 🕓 Created: 2024-05-22 15:30:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
 const SettingsModule = (() => {
@@ -9,7 +9,7 @@ const SettingsModule = (() => {
   let PROMPT_TEXTAREAS = {};
   let PROMPT_TEMP_SLIDERS = {};
   let REPHRASE_LANGUAGES_INPUT = null;
-  let globalTemperature = 0.4;
+  let globalTemperature = 0.4; // Internal state for global temperature
 
   async function loadGeneralSettings() {
     const settings = await chrome.storage.sync.get(['geminiApiKey', 'selectedModel', 'autoHighlight', 'preSubmissionCheck', 'responseTone', 'temperature']);
@@ -22,7 +22,7 @@ const SettingsModule = (() => {
     const temp = settings.temperature !== undefined ? settings.temperature : 0.4;
     ELS.temperatureSlider.value = temp;
     ELS.temperatureValue.textContent = parseFloat(temp).toFixed(1);
-    globalTemperature = temp;
+    globalTemperature = temp; // Sync internal state on load
   }
 
   function saveGeneralSettings() {
@@ -36,8 +36,8 @@ const SettingsModule = (() => {
       'temperature': newGlobalTemp
     };
     chrome.storage.sync.set(settingsToSave, () => {
-      globalTemperature = newGlobalTemp;
-      loadPromptsForActiveProfile();
+      globalTemperature = newGlobalTemp; // Sync internal state on save
+      loadPromptsForActiveProfile(); // Reload prompts to reflect new global temp
       UIModule.showToast('Success', 'General settings have been saved.', 'success');
     });
   }
@@ -81,8 +81,9 @@ const SettingsModule = (() => {
         const tempValue = activeProfileData[`${key}_temp`] !== undefined ? activeProfileData[`${key}_temp`] : globalTemperature;
         slider.value = tempValue;
         if (valueDisplay) valueDisplay.textContent = parseFloat(tempValue).toFixed(1);
+        
         const controlGroup = slider.closest('.temperature-control-group');
-        const isOverridden = Math.abs(tempValue - globalTemperature) > 0.01;
+        const isOverridden = Math.abs(parseFloat(slider.value) - globalTemperature) > 0.01;
         if(controlGroup) controlGroup.classList.toggle('temp-override', isOverridden);
       }
     }
@@ -106,12 +107,21 @@ const SettingsModule = (() => {
     let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
     const currentProfileData = promptProfiles[activeProfile] || {};
     for (const key in PROMPT_TEXTAREAS) currentProfileData[key] = PROMPT_TEXTAREAS[key].value.trim() || DEFAULT_PROMPTS[key];
-    for (const key in PROMPT_TEMP_SLIDERS) currentProfileData[`${key}_temp`] = parseFloat(PROMPT_TEMP_SLIDERS[key].value);
+    for (const key in PROMPT_TEMP_SLIDERS) {
+        const sliderValue = parseFloat(PROMPT_TEMP_SLIDERS[key].value);
+        // Only save the override if it's different from the global temperature
+        if (Math.abs(sliderValue - globalTemperature) > 0.01) {
+            currentProfileData[`${key}_temp`] = sliderValue;
+        } else {
+            delete currentProfileData[`${key}_temp`]; // Clean up if it matches global
+        }
+    }
     currentProfileData.rephraseLanguages = REPHRASE_LANGUAGES_INPUT.value.trim();
     promptProfiles[activeProfile] = currentProfileData;
     await chrome.storage.sync.set({ promptProfiles });
     chrome.runtime.sendMessage({ action: 'updateContextMenus' });
     UIModule.showToast('Success', `Prompts for "${activeProfile}" have been saved.`, 'success');
+    await loadPromptsForActiveProfile(); // Reload to reflect saved state
   }
 
   function testConnection() {
@@ -163,6 +173,33 @@ const SettingsModule = (() => {
         ELS.revealApiKey.querySelector('.icon-eye-slash').classList.toggle('hidden', isPassword);
     });
 
+    // FIX: Add event listener for global temperature slider
+    ELS.temperatureSlider.addEventListener('input', (e) => {
+        const newTemp = parseFloat(e.target.value);
+        ELS.temperatureValue.textContent = newTemp.toFixed(1);
+        globalTemperature = newTemp; // Update internal state in real-time
+        // Update all prompt sliders to reflect the new global baseline
+        for (const key in PROMPT_TEMP_SLIDERS) {
+            const slider = PROMPT_TEMP_SLIDERS[key];
+            const controlGroup = slider.closest('.temperature-control-group');
+            const isOverridden = Math.abs(parseFloat(slider.value) - globalTemperature) > 0.01;
+            controlGroup.classList.toggle('temp-override', isOverridden);
+        }
+    });
+
+    // FIX: Add event listeners for all prompt-specific temperature sliders
+    for (const key in PROMPT_TEMP_SLIDERS) {
+        const slider = PROMPT_TEMP_SLIDERS[key];
+        const valueDisplay = document.getElementById(slider.dataset.target);
+        slider.addEventListener('input', (e) => {
+            const newTempValue = parseFloat(e.target.value);
+            if (valueDisplay) valueDisplay.textContent = newTempValue.toFixed(1);
+            const controlGroup = slider.closest('.temperature-control-group');
+            const isOverridden = Math.abs(newTempValue - globalTemperature) > 0.01;
+            controlGroup.classList.toggle('temp-override', isOverridden);
+        });
+    }
+
     ELS.profileSelect.addEventListener('change', async () => {
         const newActiveProfile = ELS.profileSelect.value;
         await chrome.storage.sync.set({ activeProfile: newActiveProfile });
@@ -182,8 +219,48 @@ const SettingsModule = (() => {
         await initializePromptManager();
         UIModule.showToast('Success', `Profile "${newName}" created.`, 'success');
     });
+    
+    ELS.renameProfileBtn.addEventListener('click', async () => {
+        let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+        const newName = prompt(`Enter a new name for the "${activeProfile}" profile:`, activeProfile);
+        if (!newName || newName.trim() === '' || newName === activeProfile) return;
+        if (promptProfiles[newName]) {
+            UIModule.showToast('Error', 'A profile with that name already exists.', 'error');
+            return;
+        }
+        promptProfiles[newName] = promptProfiles[activeProfile];
+        delete promptProfiles[activeProfile];
+        await chrome.storage.sync.set({ promptProfiles, activeProfile: newName });
+        await initializePromptManager();
+        UIModule.showToast('Success', `Profile renamed to "${newName}".`, 'success');
+    });
 
-    // ... (rename, delete, reset buttons) ...
+    ELS.deleteProfileBtn.addEventListener('click', async () => {
+        let { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+        const confirmed = await UIModule.showConfirm({
+            title: `Delete Profile`,
+            message: `Are you sure you want to delete the "${activeProfile}" profile? This cannot be undone.`,
+            okLabel: 'Delete',
+            okClass: 'button-danger'
+        });
+        if (confirmed) {
+            delete promptProfiles[activeProfile];
+            const newActiveProfile = 'Default';
+            await chrome.storage.sync.set({ promptProfiles, activeProfile: newActiveProfile });
+            await initializePromptManager();
+            UIModule.showToast('Success', `Profile "${activeProfile}" has been deleted.`, 'success');
+        }
+    });
+
+    ELS.promptResetButtons.forEach(button => {
+        button.addEventListener('click', (e) => {
+            const key = e.currentTarget.dataset.promptKey;
+            if (key && PROMPT_TEXTAREAS[key] && DEFAULT_PROMPTS[key]) {
+                PROMPT_TEXTAREAS[key].value = DEFAULT_PROMPTS[key];
+                UIModule.showToast('Prompt Reset', `The "${key}" prompt has been reset to its default.`, 'info');
+            }
+        });
+    });
   }
   
   async function initialize(elements, prompts, temps, rephraseInput) {
