@@ -48,6 +48,18 @@
         <h1>General Settings</h1>
         <p class="section-description">Configure your API key, select the AI model, and adjust core extension behaviors.</p>
         
+        <div id="syncWarning" class="settings-card hidden" style="border-color: var(--accent-yellow); background-color: rgba(255, 204, 0, 0.1);">
+            <div class="card-content" style="padding: 16px 20px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-yellow); flex-shrink: 0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    <div>
+                        <h3 style="margin: 0 0 4px 0; font-size: 16px;">Sync Unavailable</h3>
+                        <p class="form-hint" style="margin:0;">Your browser settings are preventing sync. Settings are saved locally to this device only.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="settings-card">
           <div class="card-header"><h2>API Configuration</h2></div>
           <div class="card-content">
@@ -307,6 +319,7 @@
   <script src="../js/vendor/dompurify.min.js"></script>
   <script src="../js/utils/helpers.js"></script>
   <script src="../js/utils/errorHandler.js"></script>
+  <script src="../js/utils/storage.js"></script> <!-- ADDED NEW SCRIPT -->
   <script src="../js/vendor/marked.min.js"></script>
   <script src="../js/prompts.js"></script>
   
