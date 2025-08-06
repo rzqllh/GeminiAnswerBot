@@ -16,7 +16,6 @@ const HistoryModule = (() => {
     const card = document.createElement('div');
     card.className = 'history-card';
 
-    // Parsing yang lebih aman dan tangguh
     const question = item.cleanedContent?.match(/Question:\s*([\s\S]*?)(?=\nOptions:|\n\n|$)/i)?.[1].trim() || 'Question not found';
     const optionsMatch = item.cleanedContent?.match(/Options:\s*([\s\S]*)/i);
     const optionsHtml = optionsMatch
@@ -61,7 +60,7 @@ const HistoryModule = (() => {
    */
   async function loadHistory() {
     ELS.historyListContainer.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading history...</p></div>';
-    const { history = [] } = await chrome.storage.local.get('history');
+    const { history = [] } = await StorageManager.local.get('history');
 
     if (history.length === 0) {
       ELS.historyListContainer.innerHTML = `
@@ -93,15 +92,14 @@ const HistoryModule = (() => {
       okClass: 'button-danger'
     });
     if (confirmed) {
-      chrome.storage.local.remove('history', () => {
-        UIModule.showToast('Success', 'All history has been cleared.', 'success');
-        loadHistory();
-      });
+      await StorageManager.local.remove('history');
+      UIModule.showToast('Success', 'All history has been cleared.', 'success');
+      loadHistory();
     }
   }
 
   async function exportHistory() {
-    const { history = [] } = await chrome.storage.local.get('history');
+    const { history = [] } = await StorageManager.local.get('history');
     if (history.length === 0) {
       UIModule.showToast('No History', 'There is no history to export.', 'info');
       return;
@@ -123,7 +121,6 @@ const HistoryModule = (() => {
     ELS = elements;
     ELS.clearHistoryButton.addEventListener('click', clearHistory);
     ELS.exportHistoryButton.addEventListener('click', exportHistory);
-    // Listen for the custom event from the nav module
     document.addEventListener('historyTabActivated', loadHistory);
   }
 

@@ -117,7 +117,7 @@ class PopupApp {
                 this.render(); return;
             }
 
-            this.state.config = await chrome.storage.sync.get(null);
+            this.state.config = await StorageManager.get(null);
             if (!this.state.config.geminiApiKey) throw { type: 'INVALID_API_KEY' };
             
             await this._ensureContentScripts(tab.id);
@@ -346,7 +346,7 @@ class PopupApp {
         this.state.cacheKey = fingerprint ? this._simpleHash(fingerprint) : null;
         
         if (this.state.cacheKey) {
-            chrome.storage.local.get(this.state.cacheKey).then(cachedResult => {
+            StorageManager.local.get(this.state.cacheKey).then(cachedResult => {
                 if (cachedResult[this.state.cacheKey]?.answerHTML) {
                     this._handleAnswerResult(cachedResult[this.state.cacheKey].answerHTML, true, cachedResult[this.state.cacheKey].totalTokenCount, cachedResult[this.state.cacheKey].thoughtProcess);
                 } else { this._continueGetAnswer(); }
@@ -476,7 +476,7 @@ class PopupApp {
                 .catch(err => console.warn('Could not highlight answer on page:', err.message));
         }
         if (!fromCache && this.state.cacheKey) {
-            chrome.storage.local.set({ [this.state.cacheKey]: { answerHTML: cleanText, totalTokenCount, thoughtProcess: this.state.thoughtProcess } });
+            StorageManager.local.set({ [this.state.cacheKey]: { answerHTML: cleanText, totalTokenCount, thoughtProcess: this.state.thoughtProcess } });
         }
         
         this._saveCurrentViewState();
@@ -561,11 +561,11 @@ class PopupApp {
     }
 
     _getPersistedState() { 
-        return this.state.tab ? chrome.storage.local.get(this.state.tab.id.toString()).then(r => r[this.state.tab.id.toString()] || null) : Promise.resolve(null); 
+        return this.state.tab ? StorageManager.local.get(this.state.tab.id.toString()).then(r => r[this.state.tab.id.toString()] || null) : Promise.resolve(null); 
     }
     
     _clearPersistedState() { 
-        return this.state.tab ? chrome.storage.local.remove(this.state.tab.id.toString()) : Promise.resolve(null); 
+        return this.state.tab ? StorageManager.local.remove(this.state.tab.id.toString()) : Promise.resolve(null); 
     }
     
     _saveCurrentViewState() { 
@@ -574,16 +574,16 @@ class PopupApp {
         const stateToSave = { ...this.state };
         delete stateToSave.tab;
         delete stateToSave.config;
-        chrome.storage.local.set({ [key]: stateToSave }); 
+        StorageManager.local.set({ [key]: stateToSave }); 
     }
 
     async _saveToHistory(stateData, actionType) { 
         if (!this.state.tab) return; 
-        const { history = [] } = await chrome.storage.local.get('history'); 
+        const { history = [] } = await StorageManager.local.get('history'); 
         const newEntry = { ...stateData, id: Date.now(), url: this.state.tab.url, title: this.state.tab.title, timestamp: new Date().toISOString(), actionType }; 
         history.unshift(newEntry); 
         if (history.length > 100) history.pop(); 
-        await chrome.storage.local.set({ history }); 
+        await StorageManager.local.set({ history }); 
     }
 
     _sendMessageToContentScript(message, timeout = 5000) { 
@@ -628,7 +628,13 @@ class PopupApp {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    new PopupApp().init().catch(err => {
-        console.error("Critical initialization error:", err);
-    });
+    // We need to load storage.js before popup.js, so we ensure it's available
+    const script = document.createElement('script');
+    script.src = '../js/utils/storage.js';
+    script.onload = () => {
+        new PopupApp().init().catch(err => {
+            console.error("Critical initialization error:", err);
+        });
+    };
+    document.head.appendChild(script);
 });

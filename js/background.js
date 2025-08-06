@@ -4,6 +4,11 @@
 // 🕓 Created: 2024-05-22 16:20:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
+// Import the storage manager if it's not already available globally
+if (typeof StorageManager === 'undefined') {
+  importScripts('../js/utils/storage.js', '../js/utils/errorHandler.js', '../js/prompts.js');
+}
+
 let contextDataForPopup = null;
 let verificationContext = {};
 
@@ -83,7 +88,7 @@ async function updateContextMenus() {
     });
   });
 
-  const { promptProfiles, activeProfile } = await chrome.storage.sync.get(['promptProfiles', 'activeProfile']);
+  const { promptProfiles, activeProfile } = await StorageManager.get(['promptProfiles', 'activeProfile']);
   const defaultLanguages = 'English, Indonesian';
   const currentProfile = promptProfiles?.[activeProfile] || promptProfiles?.['Default'] || {};
   const rephraseLanguages = currentProfile.rephraseLanguages || defaultLanguages;
@@ -136,7 +141,7 @@ async function performApiCall(payload) {
     };
 
     try {
-      const settings = await chrome.storage.sync.get(['promptProfiles', 'activeProfile', 'temperature']);
+      const settings = await StorageManager.get(['promptProfiles', 'activeProfile', 'temperature']);
       const activeProfileName = settings.activeProfile || 'Default';
       const activeProfile = settings.promptProfiles?.[activeProfileName] || {};
       const globalTemp = settings.temperature ?? 0.4;
@@ -298,7 +303,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const searchSnippets = request.payload.map(r => `Snippet: ${r.title}\n${r.snippet}`).join('\n\n');
                 const verificationContent = `[BEGIN DATA]\n--- Original Quiz ---\n${context.cleanedContent}\n--- Initial Answer ---\nAnswer: ${context.initialAnswer}\n--- Web Search Results ---\n${searchSnippets || 'No relevant information found.'}\n[END DATA]`;
                 
-                const { geminiApiKey, selectedModel } = await chrome.storage.sync.get(['geminiApiKey', 'selectedModel']);
+                const { geminiApiKey, selectedModel } = await StorageManager.get(['geminiApiKey', 'selectedModel']);
                 performApiCall({
                     apiKey: geminiApiKey,
                     model: selectedModel,
