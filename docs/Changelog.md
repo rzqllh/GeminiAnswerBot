@@ -1,37 +1,63 @@
-# Changelog
-
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-### Changed
-- **Error Handling Architecture**: Centralized all error handling logic into a new `errorHandler.js` module. This ensures consistent error processing and reporting across the extension, making the codebase more robust and easier to maintain.
-
-## [3.0.0] - 2024-05-22
-
-This is a major architectural and user experience overhaul, focusing on reliability, accuracy, and a professional user interface. The extension's core logic has been re-engineered for robustness and maintainability.
-
-### Added
-- **Viewport-Aware Quiz Detection**: Implemented a synchronous, on-demand viewport calculation to intelligently identify the quiz block currently visible to the user. This provides a massive accuracy boost on long pages with multiple questions.
-- **Skeleton Loaders**: Replaced generic spinners with elegant, content-aware skeleton loaders in the popup UI. This enhances the user experience by improving perceived performance while waiting for API responses.
-- **Centralized UI Components**: Created a dedicated `ui.js` module in the options page to handle reusable components like toasts and modals, adhering to the DRY principle.
-- **Git Tagging for Backups**: Integrated a workflow step to create version tags in Git as safe checkpoints before major refactoring sprints.
-
-### Changed
-- **Core Architecture (Options Page)**: The monolithic `js/options.js` has been completely refactored into smaller, single-responsibility modules (`nav.js`, `history.js`, `settings.js`, `ui.js`), significantly improving maintainability and scalability.
-- **Quiz Extraction Algorithm**: The entire quiz detection logic was re-architected. It now identifies self-contained "quiz blocks" (question + options) and analyzes the one most visible in the viewport, replacing the older, less reliable proximity-scoring method.
-- **Popup UI/UX**: The popup layout has been revamped using a modern flexbox structure with consistent `gap` spacing, eliminating overlapping elements. A centralized typography system was also implemented for a consistent and polished look across all information cards.
-- **Context Menu Reliability**: Re-architected the communication between the background script and the popup to use a robust, real-time message-passing system, fixing critical race conditions.
-
-### Fixed
-- **Critical Accuracy Bug**: Solved the core issue where the extension would inaccurately solve the first quiz on a long page, regardless of the user's scroll position. The extension is now fully context-aware.
-- **Option Extraction Failure**: Enhanced the option detection algorithm to correctly parse quizzes that use non-standard HTML layouts (e.g., text without `<label>` tags), making it more resilient.
-- **Unresponsive UI Feedback**: Eliminated abrupt content loading by implementing contextual skeleton loaders, providing clear feedback to the user during API calls.
-- **Unreadable History Page**: The history page now correctly parses and renders past interactions into clean, readable, and consistently formatted cards.
-- **Code Formatting Issues**: Resolved a bug where inline `<code>` tags in rendered markdown were not displayed correctly.
+Berikut versi changelog Anda yang sudah diperbaiki agar terlihat lebih profesional, konsisten, dan terstruktur:
 
 ---
 
-## [2.0.0] - 2024-05-21
-- Initial stable release after reverting a problematic feature branch. Established a reliable baseline for future development.
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## Unreleased
+
+### Added
+
+* **Interactive Slider Tooltips** – All temperature sliders now display a tooltip with the current value on hover, providing clearer feedback and aligning with modern UI standards.
+
+### Changed
+
+* **UI/UX Refinement** – Restyled form controls, especially sliders, to comply with Apple’s Human Interface Guidelines (HIG) for a cleaner and more professional appearance.
+* **Error Handling Architecture** – Centralized error handling into a dedicated `errorHandler.js` module to ensure consistent error processing and simplify maintenance.
+
+### Fixed
+
+* **Password Visibility Toggle** – Fixed a bug where the "Show/Hide API Key" button was non-functional. It now properly toggles input field visibility.
+* **Options Page Blank** – Resolved an issue where the options page displayed as blank due to missing HTML structure. All setting panes (`General`, `Prompts`, `History`, `Data`) are now correctly implemented in `ui/options.html`.
+
+---
+
+## \[3.0.0] - 2024-05-22
+
+Major architectural and UI/UX overhaul focusing on reliability, accuracy, and professional design.
+
+### Added
+
+* **Viewport-Aware Quiz Detection** – Implemented an on-demand viewport calculation to accurately detect which quiz block is currently visible, improving precision on pages with multiple questions.
+* **Skeleton Loaders** – Replaced generic spinners with content-aware skeleton loaders in the popup, enhancing perceived performance during API calls.
+* **Centralized UI Components** – Introduced a `ui.js` module to manage reusable UI elements (toasts, modals), improving code reusability and maintainability.
+* **Git Tagging for Backups** – Integrated a workflow to automatically create version tags as safe checkpoints before major refactoring.
+
+### Changed
+
+* **Core Architecture (Options Page)** – Split the monolithic `js/options.js` into smaller single-responsibility modules (`nav.js`, `history.js`, `settings.js`, `ui.js`), significantly improving scalability and maintainability.
+* **Quiz Extraction Algorithm** – Redesigned detection logic to analyze complete quiz blocks (question + options) based on viewport visibility, replacing the older proximity-scoring method.
+* **Popup UI/UX** – Revamped layout using a modern flexbox structure with consistent spacing and centralized typography for a polished appearance.
+* **Context Menu Reliability** – Improved background–popup communication with a real-time message-passing system, resolving race condition issues.
+
+### Fixed
+
+* **Critical Accuracy Bug** – Corrected behavior where the extension always targeted the first quiz on long pages, regardless of scroll position.
+* **Option Extraction Failure** – Enhanced detection to handle quizzes using unconventional HTML structures (e.g., missing `<label>` tags).
+* **Unresponsive UI Feedback** – Removed abrupt content loading by adding contextual skeleton loaders for smoother user feedback.
+* **Unreadable History Page** – History page now correctly renders past interactions into clean, consistently formatted cards.
+* **Code Formatting Issues** – Inline `<code>` tags in markdown are now displayed correctly.
+
+---
+
+## \[2.0.0] - 2024-05-21
+
+* Initial stable release after reverting a problematic feature branch. Established a reliable foundation for further development.
+
+---
+
+Mau saya rapikan lagi supaya setiap versi punya subjudul **“Highlights”** di atas daftar *Added/Changed/Fixed* agar pembaca bisa langsung menangkap perubahan penting?

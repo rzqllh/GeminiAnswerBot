@@ -11,18 +11,44 @@ const SettingsModule = (() => {
   let REPHRASE_LANGUAGES_INPUT = null;
   let globalTemperature = 0.4; // Internal state for global temperature
 
+  /**
+   * Updates the position and content of a slider's tooltip.
+   * @param {HTMLInputElement} slider - The slider element.
+   */
+  function updateSliderTooltip(slider) {
+    const tooltip = slider.previousElementSibling;
+    if (!tooltip || !tooltip.classList.contains('slider-value-display')) return;
+
+    const value = parseFloat(slider.value);
+    tooltip.textContent = value.toFixed(1);
+
+    const min = parseFloat(slider.min);
+    const max = parseFloat(slider.max);
+    const percent = (value - min) / (max - min);
+    
+    const thumbWidth = 24; // As defined in CSS
+    const tooltipWidth = tooltip.offsetWidth;
+    const trackWidth = slider.offsetWidth;
+    
+    let newLeft = percent * (trackWidth - thumbWidth) + (thumbWidth / 2) - (tooltipWidth / 2);
+    
+    // Clamp the position to prevent the tooltip from going off-screen
+    newLeft = Math.max(0, Math.min(newLeft, trackWidth - tooltipWidth));
+
+    tooltip.style.left = `${newLeft}px`;
+  }
+
   async function loadGeneralSettings() {
     const settings = await chrome.storage.sync.get(['geminiApiKey', 'selectedModel', 'autoHighlight', 'preSubmissionCheck', 'responseTone', 'temperature']);
     ELS.apiKeyInput.value = settings.geminiApiKey || '';
     ELS.modelSelect.value = settings.selectedModel || 'gemini-1.5-pro-latest';
-    ELS.responseToneSelect.value = settings.responseTone || 'normal';
     ELS.autoHighlightToggle.checked = settings.autoHighlight ?? true;
     ELS.preSubmissionCheckToggle.checked = settings.preSubmissionCheck ?? true;
 
     const temp = settings.temperature !== undefined ? settings.temperature : 0.4;
     ELS.temperatureSlider.value = temp;
-    ELS.temperatureValue.textContent = parseFloat(temp).toFixed(1);
     globalTemperature = temp; // Sync internal state on load
+    updateSliderTooltip(ELS.temperatureSlider);
   }
 
   function saveGeneralSettings() {
@@ -30,7 +56,6 @@ const SettingsModule = (() => {
     const settingsToSave = {
       'geminiApiKey': ELS.apiKeyInput.value.trim(),
       'selectedModel': ELS.modelSelect.value,
-      'responseTone': ELS.responseToneSelect.value,
       'autoHighlight': ELS.autoHighlightToggle.checked,
       'preSubmissionCheck': ELS.preSubmissionCheckToggle.checked,
       'temperature': newGlobalTemp
@@ -77,10 +102,9 @@ const SettingsModule = (() => {
     for (const key in PROMPT_TEMP_SLIDERS) {
       const slider = PROMPT_TEMP_SLIDERS[key];
       if (slider) {
-        const valueDisplay = document.getElementById(slider.dataset.target);
         const tempValue = activeProfileData[`${key}_temp`] !== undefined ? activeProfileData[`${key}_temp`] : globalTemperature;
         slider.value = tempValue;
-        if (valueDisplay) valueDisplay.textContent = parseFloat(tempValue).toFixed(1);
+        updateSliderTooltip(slider);
         
         const controlGroup = slider.closest('.temperature-control-group');
         const isOverridden = Math.abs(parseFloat(slider.value) - globalTemperature) > 0.01;
@@ -109,11 +133,10 @@ const SettingsModule = (() => {
     for (const key in PROMPT_TEXTAREAS) currentProfileData[key] = PROMPT_TEXTAREAS[key].value.trim() || DEFAULT_PROMPTS[key];
     for (const key in PROMPT_TEMP_SLIDERS) {
         const sliderValue = parseFloat(PROMPT_TEMP_SLIDERS[key].value);
-        // Only save the override if it's different from the global temperature
         if (Math.abs(sliderValue - globalTemperature) > 0.01) {
             currentProfileData[`${key}_temp`] = sliderValue;
         } else {
-            delete currentProfileData[`${key}_temp`]; // Clean up if it matches global
+            delete currentProfileData[`${key}_temp`];
         }
     }
     currentProfileData.rephraseLanguages = REPHRASE_LANGUAGES_INPUT.value.trim();
@@ -121,7 +144,7 @@ const SettingsModule = (() => {
     await chrome.storage.sync.set({ promptProfiles });
     chrome.runtime.sendMessage({ action: 'updateContextMenus' });
     UIModule.showToast('Success', `Prompts for "${activeProfile}" have been saved.`, 'success');
-    await loadPromptsForActiveProfile(); // Reload to reflect saved state
+    await loadPromptsForActiveProfile();
   }
 
   function testConnection() {
@@ -166,19 +189,25 @@ const SettingsModule = (() => {
     ELS.testButton.addEventListener('click', testConnection);
     ELS.resetSettingsButton.addEventListener('click', resetAllSettings);
     ELS.savePromptsButton.addEventListener('click', savePrompts);
+    
     ELS.revealApiKey.addEventListener('click', () => {
         const isPassword = ELS.apiKeyInput.type === 'password';
         ELS.apiKeyInput.type = isPassword ? 'text' : 'password';
-        ELS.revealApiKey.querySelector('.icon-eye').classList.toggle('hidden', !isPassword);
-        ELS.revealApiKey.querySelector('.icon-eye-slash').classList.toggle('hidden', isPassword);
+        ELS.revealApiKey.querySelector('.icon-eye').classList.toggle('hidden', isPassword);
+        ELS.revealApiKey.querySelector('.icon-eye-slash').classList.toggle('hidden', !isPassword);
     });
 
-    // FIX: Add event listener for global temperature slider
+    // Add event listeners for all sliders to update their tooltips
+    document.querySelectorAll('input[type="range"]').forEach(slider => {
+      slider.addEventListener('input', () => updateSliderTooltip(slider));
+      // Also update on load
+      updateSliderTooltip(slider);
+    });
+
+    // Special handling for global temperature slider
     ELS.temperatureSlider.addEventListener('input', (e) => {
         const newTemp = parseFloat(e.target.value);
-        ELS.temperatureValue.textContent = newTemp.toFixed(1);
-        globalTemperature = newTemp; // Update internal state in real-time
-        // Update all prompt sliders to reflect the new global baseline
+        globalTemperature = newTemp;
         for (const key in PROMPT_TEMP_SLIDERS) {
             const slider = PROMPT_TEMP_SLIDERS[key];
             const controlGroup = slider.closest('.temperature-control-group');
@@ -187,15 +216,12 @@ const SettingsModule = (() => {
         }
     });
 
-    // FIX: Add event listeners for all prompt-specific temperature sliders
+    // Special handling for prompt-specific sliders
     for (const key in PROMPT_TEMP_SLIDERS) {
         const slider = PROMPT_TEMP_SLIDERS[key];
-        const valueDisplay = document.getElementById(slider.dataset.target);
-        slider.addEventListener('input', (e) => {
-            const newTempValue = parseFloat(e.target.value);
-            if (valueDisplay) valueDisplay.textContent = newTempValue.toFixed(1);
+        slider.addEventListener('input', () => {
             const controlGroup = slider.closest('.temperature-control-group');
-            const isOverridden = Math.abs(newTempValue - globalTemperature) > 0.01;
+            const isOverridden = Math.abs(parseFloat(slider.value) - globalTemperature) > 0.01;
             controlGroup.classList.toggle('temp-override', isOverridden);
         });
     }
