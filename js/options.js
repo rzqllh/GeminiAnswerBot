@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', function() {
         apiKeyInput: document.getElementById('apiKey'),
         revealApiKey: document.getElementById('revealApiKey'),
         modelSelect: document.getElementById('modelSelect'),
-        responseToneSelect: document.getElementById('responseToneSelect'),
         autoHighlightToggle: document.getElementById('autoHighlightToggle'),
         preSubmissionCheckToggle: document.getElementById('preSubmissionCheckToggle'),
         temperatureSlider: document.getElementById('temperatureSlider'),
