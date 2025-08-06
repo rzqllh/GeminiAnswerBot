@@ -4,9 +4,11 @@
 // 🕓 Created: 2024-05-22 16:20:00
 // 🧠 Modular | DRY | SOLID | Apple HIG Compliant
 
-// Import the storage manager if it's not already available globally
-if (typeof StorageManager === 'undefined') {
+// CRITICAL: Scripts must be imported at the top level of the service worker.
+try {
   importScripts('../js/utils/storage.js', '../js/utils/errorHandler.js', '../js/prompts.js');
+} catch (e) {
+  console.error('Failed to import scripts in background worker:', e);
 }
 
 let contextDataForPopup = null;

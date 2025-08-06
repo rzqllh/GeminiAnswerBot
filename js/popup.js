@@ -628,13 +628,9 @@ class PopupApp {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // We need to load storage.js before popup.js, so we ensure it's available
-    const script = document.createElement('script');
-    script.src = '../js/utils/storage.js';
-    script.onload = () => {
-        new PopupApp().init().catch(err => {
-            console.error("Critical initialization error:", err);
-        });
-    };
-    document.head.appendChild(script);
+    // The necessary scripts are now loaded in order via <script> tags in popup.html.
+    // The dynamic script loading is no longer needed and has been removed.
+    new PopupApp().init().catch(err => {
+        console.error("Critical initialization error:", err);
+    });
 });
