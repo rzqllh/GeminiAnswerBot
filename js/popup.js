@@ -107,28 +107,38 @@ class PopupApp {
     }
     
     async _ensureContentScripts(tabId) {
-        // HANDSHAKE PROTOCOL: Poll the content script until it's ready.
+        // Step 1: Attempt to inject the scripts. This will do nothing if they are already injected.
+        try {
+            await chrome.scripting.insertCSS({ target: { tabId }, files: ['assets/highlighter.css', 'assets/dialog.css', 'assets/toolbar.css'] });
+            await chrome.scripting.executeScript({ target: { tabId }, files: ['js/utils/helpers.js', 'js/utils/errorHandler.js', 'js/vendor/dompurify.min.js', 'js/vendor/marked.min.js', 'js/vendor/mark.min.js', 'js/content.js'] });
+            StorageManager.log('Injection', 'Script injection attempted.');
+        } catch (e) {
+            // This error is expected if the scripts are already injected, so we can safely ignore it.
+            StorageManager.log('Injection', 'Could not inject scripts (might be already there):', e.message);
+        }
+    
+        // Step 2: HANDSHAKE PROTOCOL: Poll the content script until it's ready.
         return new Promise((resolve, reject) => {
             let attempts = 0;
-            const maxAttempts = 10;
+            const maxAttempts = 15;
             const interval = 200;
-
+    
             const poll = async () => {
                 StorageManager.log('Handshake', `Attempt #${attempts + 1}...`);
                 try {
-                    const response = await this._sendMessageToContentScript({ action: "ping_content_script" }, 500);
+                    const response = await this._sendMessageToContentScript({ action: "ping_content_script" }, interval - 50);
                     if (response && response.ready) {
                         StorageManager.log('Handshake', 'Content script is ready.');
                         resolve();
                         return;
                     }
                 } catch (e) {
-                    // This is expected if the script is not yet injected
+                    // This is expected if the script is not yet ready
                 }
-
+    
                 attempts++;
                 if (attempts >= maxAttempts) {
-                    StorageManager.log('Handshake', 'Content script failed to respond.');
+                    StorageManager.log('Handshake', 'Content script failed to respond after injection.');
                     reject(new Error('Content script timeout.'));
                 } else {
                     setTimeout(poll, interval);
@@ -157,7 +167,6 @@ class PopupApp {
 
             if (!config.geminiApiKey) throw { type: 'INVALID_API_KEY' };
             
-            // The handshake will handle waiting for injection if needed.
             await this._ensureContentScripts(tab.id);
 
             const contextData = await chrome.runtime.sendMessage({ action: 'popupReady' });
@@ -478,7 +487,6 @@ class PopupApp {
             incorrectAnswer
         });
 
-        // ... (rendering logic remains the same, but reads from local vars)
         const confidenceMatch = cleanText.match(/Confidence:\s*(High|Medium|Low)/i);
         let answerHtml = `<p class="answer-highlight">${this._renderInlineMarkdown(answerText)}</p>`;
         let confidenceHtml = '';
