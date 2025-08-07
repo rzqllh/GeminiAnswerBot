@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
   "name": "GeminiAnswerBot",
-  "version": "3.2.0",
-  "description": "A smart, privacy-first Chrome extension powered by the Google Gemini API.",
-  "minimum_chrome_version": "102",
+  "version": "3.2.1",
+  "description": "A smart Chrome extension powered by the Google Gemini API.",
   "permissions": [
+    "activeTab",
+    "scripting",
     "storage",
-    "contextMenus",
-    "activeTab"
+    "contextMenus"
   ],
   "host_permissions": [
     "<all_urls>"

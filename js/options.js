@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Data
         resetSettingsButton: document.getElementById('resetSettingsButton'),
+        debugModeToggle: document.getElementById('debugModeToggle'),
 
         // Prompts & Profil
         profileSelect: document.getElementById('profileSelect'),
@@ -41,7 +42,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Peta Textarea Prompt
     const PROMPT_TEXTAREAS = {
-        cleaning: document.getElementById('cleaningPrompt'),
         answer: document.getElementById('answerPrompt'),
         explanation: document.getElementById('explanationPrompt'),
         summarize: document.getElementById('summarizePrompt'),

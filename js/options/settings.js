@@ -27,33 +27,26 @@ const SettingsModule = (() => {
     tooltip.style.left = `${newLeft}px`;
   }
 
-  /**
-   * Encapsulates all interaction logic for a single slider to make the tooltip dynamic.
-   * @param {HTMLInputElement} slider - The slider element to enhance.
-   */
   function initializeSliderInteractions(slider) {
     const tooltip = slider.previousElementSibling;
     if (!tooltip || !tooltip.classList.contains('slider-value-display')) return;
-
     const showTooltip = () => tooltip.classList.add('tooltip-visible');
     const hideTooltip = () => tooltip.classList.remove('tooltip-visible');
-
     slider.addEventListener('input', () => updateSliderTooltip(slider));
     slider.addEventListener('mousedown', showTooltip);
     slider.addEventListener('mouseup', hideTooltip);
     slider.addEventListener('mouseenter', showTooltip);
     slider.addEventListener('mouseleave', hideTooltip);
-    
-    // Initial update on load
     updateSliderTooltip(slider);
   }
 
   async function loadGeneralSettings() {
-    const settings = await StorageManager.get(['geminiApiKey', 'selectedModel', 'autoHighlight', 'preSubmissionCheck', 'temperature']);
+    const settings = await StorageManager.get(['geminiApiKey', 'selectedModel', 'autoHighlight', 'preSubmissionCheck', 'temperature', 'debugMode']);
     ELS.apiKeyInput.value = settings.geminiApiKey || '';
     ELS.modelSelect.value = settings.selectedModel || 'gemini-1.5-pro-latest';
     ELS.autoHighlightToggle.checked = settings.autoHighlight ?? true;
     ELS.preSubmissionCheckToggle.checked = settings.preSubmissionCheck ?? true;
+    ELS.debugModeToggle.checked = settings.debugMode ?? false;
     const temp = settings.temperature !== undefined ? settings.temperature : 0.4;
     ELS.temperatureSlider.value = temp;
     globalTemperature = temp;
@@ -142,7 +135,11 @@ const SettingsModule = (() => {
   async function savePrompts() {
     let { promptProfiles, activeProfile } = await StorageManager.get(['promptProfiles', 'activeProfile']);
     const currentProfileData = promptProfiles[activeProfile] || {};
-    for (const key in PROMPT_TEXTAREAS) currentProfileData[key] = PROMPT_TEXTAREAS[key].value.trim() || DEFAULT_PROMPTS[key];
+    for (const key in PROMPT_TEXTAREAS) {
+        if (PROMPT_TEXTAREAS[key]) {
+            currentProfileData[key] = PROMPT_TEXTAREAS[key].value.trim() || DEFAULT_PROMPTS[key];
+        }
+    }
     for (const key in PROMPT_TEMP_SLIDERS) {
         const sliderValue = parseFloat(PROMPT_TEMP_SLIDERS[key].value);
         if (Math.abs(sliderValue - globalTemperature) > 0.01) {
@@ -208,10 +205,18 @@ const SettingsModule = (() => {
         ELS.revealApiKey.querySelector('.icon-eye-slash').classList.toggle('hidden', !isPassword);
     });
     
-    // Initialize all sliders with the dynamic tooltip behavior
     document.querySelectorAll('input[type="range"]').forEach(initializeSliderInteractions);
 
-    // Event listeners for logic updates (separate from UI interaction)
+    ELS.debugModeToggle.addEventListener('change', async (e) => {
+        const isEnabled = e.target.checked;
+        try {
+            await StorageManager.set({ debugMode: isEnabled });
+            UIModule.showToast('Debug Mode', `Debug mode has been ${isEnabled ? 'enabled' : 'disabled'}.`, 'info');
+        } catch (error) {
+            UIModule.showToast('Error', 'Could not save debug mode setting.', 'error');
+        }
+    });
+
     ELS.temperatureSlider.addEventListener('input', (e) => {
         const newTemp = parseFloat(e.target.value);
         globalTemperature = newTemp;
