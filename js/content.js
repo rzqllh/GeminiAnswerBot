@@ -168,19 +168,15 @@ class QuizModule {
     block.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
       if (input.type === 'checkbox') hasCheckboxes = true;
       
-      // REFACTORED: Intelligent Text Association Logic
       let optionText = '';
-      // 1. Prioritize the direct label
       const label = input.closest('label') || document.querySelector(`label[for="${input.id}"]`);
       if (label) {
         optionText = label.textContent.trim();
       }
 
-      // 2. If label is empty or not found, check the parent's text content
       if (!optionText) {
         const parent = input.parentElement;
         if (parent) {
-          // Clone to avoid modifying the live DOM, remove the input to get only the text
           const clone = parent.cloneNode(true);
           clone.querySelector('input')?.remove();
           optionText = clone.textContent.trim();
@@ -422,7 +418,7 @@ class ContentController {
       let content;
       switch (request.action) {
         case "ping_content_script":
-          sendResponse({ ready: true, success: true });
+          sendResponse({ ready: true });
           break;
         case "get_quiz_content":
           const selectedText = window.getSelection().toString().trim();
