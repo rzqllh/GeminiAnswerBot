@@ -174,8 +174,8 @@ input:checked + .slider:before { transform: translateX(20px); }
 
 .slider-container .slider-value-display {
   position: absolute;
-  top: -35px; /* Position above the slider */
-  left: 50%; /* Will be updated by JS */
+  top: -35px;
+  left: 50%;
   transform: translateX(-50%);
   background-color: var(--primary-text);
   color: var(--bg-color);
@@ -185,8 +185,12 @@ input:checked + .slider:before { transform: translateX(20px); }
   font-weight: 600;
   white-space: nowrap;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.15s ease-in-out;
   pointer-events: none;
+}
+
+.slider-container .slider-value-display.tooltip-visible {
+  opacity: 1;
 }
 
 .slider-container .slider-value-display::after {
@@ -198,10 +202,6 @@ input:checked + .slider:before { transform: translateX(20px); }
   border-width: 5px;
   border-style: solid;
   border-color: var(--primary-text) transparent transparent transparent;
-}
-
-.slider-container:hover .slider-value-display {
-  opacity: 1;
 }
 
 input[type="range"] {

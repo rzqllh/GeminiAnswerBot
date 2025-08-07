@@ -27,6 +27,27 @@ const SettingsModule = (() => {
     tooltip.style.left = `${newLeft}px`;
   }
 
+  /**
+   * Encapsulates all interaction logic for a single slider to make the tooltip dynamic.
+   * @param {HTMLInputElement} slider - The slider element to enhance.
+   */
+  function initializeSliderInteractions(slider) {
+    const tooltip = slider.previousElementSibling;
+    if (!tooltip || !tooltip.classList.contains('slider-value-display')) return;
+
+    const showTooltip = () => tooltip.classList.add('tooltip-visible');
+    const hideTooltip = () => tooltip.classList.remove('tooltip-visible');
+
+    slider.addEventListener('input', () => updateSliderTooltip(slider));
+    slider.addEventListener('mousedown', showTooltip);
+    slider.addEventListener('mouseup', hideTooltip);
+    slider.addEventListener('mouseenter', showTooltip);
+    slider.addEventListener('mouseleave', hideTooltip);
+    
+    // Initial update on load
+    updateSliderTooltip(slider);
+  }
+
   async function loadGeneralSettings() {
     const settings = await StorageManager.get(['geminiApiKey', 'selectedModel', 'autoHighlight', 'preSubmissionCheck', 'temperature']);
     ELS.apiKeyInput.value = settings.geminiApiKey || '';
@@ -186,10 +207,11 @@ const SettingsModule = (() => {
         ELS.revealApiKey.querySelector('.icon-eye').classList.toggle('hidden', isPassword);
         ELS.revealApiKey.querySelector('.icon-eye-slash').classList.toggle('hidden', !isPassword);
     });
-    document.querySelectorAll('input[type="range"]').forEach(slider => {
-      slider.addEventListener('input', () => updateSliderTooltip(slider));
-      updateSliderTooltip(slider);
-    });
+    
+    // Initialize all sliders with the dynamic tooltip behavior
+    document.querySelectorAll('input[type="range"]').forEach(initializeSliderInteractions);
+
+    // Event listeners for logic updates (separate from UI interaction)
     ELS.temperatureSlider.addEventListener('input', (e) => {
         const newTemp = parseFloat(e.target.value);
         globalTemperature = newTemp;
@@ -208,6 +230,7 @@ const SettingsModule = (() => {
             controlGroup.classList.toggle('temp-override', isOverridden);
         });
     }
+
     ELS.profileSelect.addEventListener('change', async () => {
         const newActiveProfile = ELS.profileSelect.value;
         await StorageManager.set({ activeProfile: newActiveProfile });
