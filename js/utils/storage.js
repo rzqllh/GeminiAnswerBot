@@ -9,11 +9,12 @@
  * @description A resilient wrapper for chrome.storage API.
  * It attempts to use `sync` storage first and gracefully falls back to `local` storage
  * if `sync` is unavailable (e.g., due to browser policies or disabled third-party cookies).
- * It also provides a mechanism to check the availability of sync storage.
+ * It also provides a mechanism to check the availability of sync storage and a debug logger.
  */
 const StorageManager = (() => {
   let isSyncAvailable = true;
   let hasCheckedSync = false;
+  let isDebugMode = false;
 
   /**
    * Checks if chrome.storage.sync is available and writable.
@@ -126,13 +127,48 @@ const StorageManager = (() => {
     });
   }
 
+  /**
+   * Logs messages to the console only if debug mode is enabled.
+   * @param {string} context - The context of the log (e.g., 'Popup', 'Content').
+   * @param {...any} args - The messages or objects to log.
+   */
+  function log(context, ...args) {
+    if (isDebugMode) {
+      console.log(`[GAB-Debug|${context}]`, ...args);
+    }
+  }
+
+  /**
+   * Initializes the debug mode state from storage.
+   */
+  async function initDebugMode() {
+    try {
+      const { debugMode } = await get(['debugMode']);
+      isDebugMode = !!debugMode;
+    } catch (e) {
+      console.error("Could not initialize debug mode state:", e);
+      isDebugMode = false;
+    }
+  }
+
+  // Initialize debug mode as soon as the manager is loaded.
+  initDebugMode();
+
+  // Listen for changes to debugMode to update it in real-time.
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (changes.debugMode) {
+      isDebugMode = !!changes.debugMode.newValue;
+      log('StorageManager', `Debug mode is now ${isDebugMode ? 'ON' : 'OFF'}`);
+    }
+  });
+
   return {
     get,
     set,
     remove,
     clear,
+    log,
     isSyncAvailable: () => ready.then(() => isSyncAvailable),
-    // Exposing local and sync directly for specific cases like history (local) vs settings (sync)
     local: chrome.storage.local,
     sync: chrome.storage.sync,
   };

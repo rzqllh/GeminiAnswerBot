@@ -285,6 +285,23 @@
         <h1>Data Management</h1>
         <p class="section-description">Manage extension data stored on your local machine.</p>
         <div class="settings-card">
+            <div class="card-header"><h2>Developer</h2></div>
+            <div class="card-content">
+                <div class="form-row">
+                    <div class="form-row-label">
+                        <label for="debugModeToggle">Debug Mode</label>
+                        <p class="form-hint">Enable detailed logging to the console for troubleshooting.</p>
+                    </div>
+                    <div class="form-row-control">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="debugModeToggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="settings-card">
           <div class="card-header"><h2>Danger Zone</h2></div>
           <div class="card-content">
             <div class="form-row">
@@ -319,7 +336,7 @@
   <script src="../js/vendor/dompurify.min.js"></script>
   <script src="../js/utils/helpers.js"></script>
   <script src="../js/utils/errorHandler.js"></script>
-  <script src="../js/utils/storage.js"></script> <!-- ADDED NEW SCRIPT -->
+  <script src="../js/utils/storage.js"></script>
   <script src="../js/vendor/marked.min.js"></script>
   <script src="../js/prompts.js"></script>
   
