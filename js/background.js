@@ -81,7 +81,7 @@ async function updateContextMenus() {
 
   const standardActions = [
     { id: 'summarize', title: 'Summarize Selection' },
-    { id: 'explain', title: 'Explain Selection' },
+    { id: 'explanation', title: 'Explain Selection' },
     { id: 'translate', title: 'Translate Selection' }
   ];
   standardActions.forEach(action => {

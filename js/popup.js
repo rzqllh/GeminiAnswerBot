@@ -155,7 +155,7 @@ class PopupApp {
 
             if (contextData && contextData.source === 'contextMenu' && !isRescan) {
                 await this._clearPersistedState();
-                const isGeneralTask = ['summarize', 'explain', 'translate', 'rephrase'].some(t => contextData.action.startsWith(t));
+                const isGeneralTask = ['summarize', 'explanation', 'translate', 'rephrase'].some(t => contextData.action.startsWith(t));
                 
                 this.store.setState({
                     action: contextData.action,
@@ -222,13 +222,28 @@ class PopupApp {
 
     _renderGeneralTaskState() {
         const state = this.store.getState();
-        const titleMap = { 'summarize': 'Summary', 'explain': 'Explanation', 'translate': 'Translation', 'rephrase': 'Rephrased Text' };
-        const baseAction = state.action ? state.action.split('-')[0] : '';
+        const titleMap = { 'summarize': 'Summary', 'explanation': 'Explanation', 'translate': 'Translation', 'rephrase': 'Rephrased Text', 'pageAnalysis': 'Page Analysis' };
+        const baseAction = state.action ? state.action.split('-')[0] : 'pageAnalysis';
         this.elements.generalTaskTitle.textContent = titleMap[baseAction] || 'Result';
         
         if (state.generalTaskResult) {
-            this.elements.generalTaskDisplay.innerHTML = DOMPurify.sanitize(marked.parse(state.generalTaskResult));
-            this.elements.copyGeneralTask.dataset.copyText = state.generalTaskResult;
+            let displayHtml = '';
+            if (baseAction === 'pageAnalysis') {
+                 try {
+                    const data = JSON.parse(state.generalTaskResult);
+                    displayHtml += `<h3>Summary</h3><p>${_escapeHtml(data.tldr)}</p>`;
+                    if (data.takeaways && data.takeaways.length > 0) {
+                        displayHtml += `<h3>Key Takeaways</h3><ul>${data.takeaways.map(t => `<li>${_escapeHtml(t)}</li>`).join('')}</ul>`;
+                    }
+                } catch (e) {
+                    displayHtml = DOMPurify.sanitize(marked.parse(state.generalTaskResult));
+                }
+            } else {
+                 displayHtml = DOMPurify.sanitize(marked.parse(state.generalTaskResult));
+            }
+
+            this.elements.generalTaskDisplay.innerHTML = displayHtml;
+            this.elements.copyGeneralTask.dataset.copyText = this.elements.generalTaskDisplay.innerText;
         } else {
             this._renderLoadingState(this.elements.generalTaskDisplay);
         }
@@ -275,7 +290,7 @@ class PopupApp {
         const titleMap = {
             'image-quiz': 'Quiz from Image', 'image-analyze': 'Image Analysis',
             'image-translate': 'Translate Image', 'summarize': 'Summary',
-            'explain': 'Explanation', 'translate': 'Translation',
+            'explanation': 'Explanation', 'translate': 'Translation',
             'rephrase': 'Rephrased Text'
         };
         const baseAction = action?.startsWith('rephrase-') ? 'rephrase' : action;
@@ -329,7 +344,7 @@ class PopupApp {
             const response = await this._sendMessageToContentScript({ action: "get_full_page_content" });
             if (!response || !response.content?.trim()) throw new Error("No significant text content for analysis.");
             
-            this.store.setState({ url: this.store.getState().tab.url });
+            this.store.setState({ url: this.store.getState().tab.url, view: 'general' });
             this._callGeminiStream('pageAnalysis', response.content);
         } catch (e) {
             this.store.setState({ view: 'error', error: ErrorHandler.format(e, 'page_analysis') });
@@ -410,7 +425,7 @@ class PopupApp {
 
         setTimeout(() => {
             const contentForExplanation = `${state.cleanedContent}\n\nCorrect Answer: ${state.incorrectAnswer}`;
-            this._callGeminiStream('explanation', contentForExplanation);
+            this._callGeminiStream('quiz_explanation', contentForExplanation);
         }, 0);
     }
 
@@ -421,27 +436,37 @@ class PopupApp {
             return;
         }
         
-        const isGeneralTask = ['summarize', 'explain', 'translate', 'rephrase'].some(t => purpose.startsWith(t));
-        const purposeMap = {
+        const targetElementMap = {
             'answer': this.elements.answerDisplay,
-            'explanation': this.elements.explanationDisplay,
+            'quiz_explanation': this.elements.explanationDisplay,
             'correction': this.elements.explanationDisplay,
             'verification': this.elements.answerDisplay,
+            'general': this.elements.generalTaskDisplay,
         };
-        if (isGeneralTask) {
-            purposeMap.general = this.elements.generalTaskDisplay;
-        }
 
-        const targetElement = purposeMap[purpose] || (isGeneralTask ? purposeMap.general : null);
+        const quizHandlers = {
+            'cleaning': text => this._handleCleaningResult(text),
+            'answer': text => this._handleAnswerResult(text, false, payload.totalTokenCount),
+            'quiz_explanation': text => this._handleExplanationResult(text, false),
+            'correction': text => this._handleCorrectionResult(text),
+            'verification': text => this._handleAnswerResult(text, false, payload.totalTokenCount, this.store.getState().thoughtProcess),
+        };
+
+        let streamTarget = null;
+        if(quizHandlers[purpose]) {
+            streamTarget = targetElementMap[purpose] || targetElementMap['answer'];
+        } else {
+            streamTarget = targetElementMap['general'];
+        }
 
         if (payload.chunk) {
             if (!this.streamAccumulator[purpose]) {
                 this.streamAccumulator[purpose] = '';
-                if (targetElement) targetElement.innerHTML = ''; // Clear loader on first chunk
+                if (streamTarget) streamTarget.innerHTML = ''; // Clear loader on first chunk
             }
             this.streamAccumulator[purpose] += payload.chunk;
-            if (targetElement) {
-                targetElement.innerHTML = DOMPurify.sanitize(marked.parse(this.streamAccumulator[purpose]));
+            if (streamTarget) {
+                streamTarget.innerHTML = DOMPurify.sanitize(marked.parse(this.streamAccumulator[purpose]));
             }
         }
 
@@ -449,26 +474,18 @@ class PopupApp {
             const fullText = payload.fullText || this.streamAccumulator[purpose] || '';
             delete this.streamAccumulator[purpose];
 
-            if (isGeneralTask) {
-                this._handleGeneralTaskResult(fullText);
+            if (quizHandlers[purpose]) {
+                quizHandlers[purpose](fullText);
             } else {
-                const finalPurpose = purpose === 'verification' ? 'answer' : purpose;
-                const purposeHandlers = {
-                    'cleaning': text => this._handleCleaningResult(text),
-                    'answer': text => this._handleAnswerResult(text, false, payload.totalTokenCount),
-                    'explanation': text => this._handleExplanationResult(text, false),
-                    'correction': text => this._handleCorrectionResult(text),
-                };
-                if (purposeHandlers[finalPurpose]) {
-                    purposeHandlers[finalPurpose](fullText);
-                }
+                this._handleGeneralTaskResult(fullText);
             }
         }
     }
 
     _handleGeneralTaskResult(fullText) {
+        const action = this.store.getState().action || 'pageAnalysis';
         this.store.setState({ generalTaskResult: fullText, view: 'general' });
-        this._saveToHistory({ originalUserContent: this.store.getState().originalUserContent, generalTaskResult: fullText }, this.store.getState().action);
+        this._saveToHistory({ originalUserContent: this.store.getState().originalUserContent, generalTaskResult: fullText }, action);
     }
     
     _handleCleaningResult(fullText) {
