@@ -353,23 +353,26 @@ class PopupApp {
         this.elements.answerContainer.classList.remove('hidden');
         this._renderSkeletonState(this.elements.answerDisplay, true, 'answer');
 
-        if (state.isImageMode) {
-            this._callGeminiStream('answer', '', state.base64ImageData);
-            return;
-        }
-        if (!state.cleanedContent) return;
-        
-        const fingerprint = this._createQuizFingerprint(state.cleanedContent);
-        const cacheKey = fingerprint ? this._simpleHash(fingerprint) : null;
-        this.store.setState({ cacheKey });
-        
-        if (cacheKey) {
-            StorageManager.local.get(cacheKey).then(cachedResult => {
-                if (cachedResult[cacheKey]?.answerHTML) {
-                    this._handleAnswerResult(cachedResult[cacheKey].answerHTML, true, cachedResult[cacheKey].totalTokenCount, cachedResult[cacheKey].thoughtProcess);
-                } else { this._continueGetAnswer(); }
-            });
-        } else { this._continueGetAnswer(); }
+        // Defer the API call to allow the browser to render the skeleton first.
+        setTimeout(() => {
+            if (state.isImageMode) {
+                this._callGeminiStream('answer', '', state.base64ImageData);
+                return;
+            }
+            if (!state.cleanedContent) return;
+            
+            const fingerprint = this._createQuizFingerprint(state.cleanedContent);
+            const cacheKey = fingerprint ? this._simpleHash(fingerprint) : null;
+            this.store.setState({ cacheKey });
+            
+            if (cacheKey) {
+                StorageManager.local.get(cacheKey).then(cachedResult => {
+                    if (cachedResult[cacheKey]?.answerHTML) {
+                        this._handleAnswerResult(cachedResult[cacheKey].answerHTML, true, cachedResult[cacheKey].totalTokenCount, cachedResult[cacheKey].thoughtProcess);
+                    } else { this._continueGetAnswer(); }
+                });
+            } else { this._continueGetAnswer(); }
+        }, 0);
     }
     
     _continueGetAnswer() {
@@ -384,8 +387,12 @@ class PopupApp {
         this.elements.retryExplanation.disabled = true;
         this.elements.explanationContainer.classList.remove('hidden');
         this._renderSkeletonState(this.elements.explanationDisplay, true, 'explanation');
-        const contentForExplanation = `${state.cleanedContent}\n\nCorrect Answer: ${state.incorrectAnswer}`;
-        this._callGeminiStream('explanation', contentForExplanation);
+
+        // Defer the API call to allow the browser to render the skeleton first.
+        setTimeout(() => {
+            const contentForExplanation = `${state.cleanedContent}\n\nCorrect Answer: ${state.incorrectAnswer}`;
+            this._callGeminiStream('explanation', contentForExplanation);
+        }, 0);
     }
 
     _handleStreamUpdate(request) {
