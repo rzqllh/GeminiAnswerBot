@@ -7,19 +7,29 @@ const DEFAULT_PROMPTS = {
   'cleaning': `You are an extremely precise text cleaner and quiz extractor. Your ONLY objective is to extract the **single quiz question** and its **associated answer options** from the provided text.
 
 CRITICAL RULES FOR EXTRACTION:
-1.  **Single Question Only:** Locate and extract the main quiz question. IGNORE any question numbers, category labels (e.g., "Category: Verbal"), or other metadata.
+1.  **Single Question Only:** Locate and extract the main quiz question. IGNORE any question numbers, category labels, or other metadata.
 2.  **All Relevant Options:** Extract *all* answer choices tied directly to that question.
-3.  **Strict Formatting:** You MUST format the options as a Markdown list using hyphens (-). Each option MUST be on a new line.
+3.  **Strict Formatting:** You MUST format the options as a simple list. Each option MUST be on a new line, prefixed with a hyphen and a space ('- ').
 4.  **Preserve Exact Original Text:** Do not modify spelling, symbols, spacing, punctuation, or case of the actual question and options.
-5.  **CRITICAL CODE HANDLING:** If an option contains HTML tags (e.g., text with '<' and '>'), you MUST treat the entire option as a code literal and wrap it in backticks (\`). For example, if the option is '<p>Hello</p>', the output must be \`- \`<p>Hello</p>\`\`.
+5.  **CRITICAL CODE HANDLING:** Do NOT add any Markdown formatting like backticks (\`) to the options, even if they contain code. Return the literal text of the options.
 6.  **Direct Output:**
-    - Return ONLY the cleaned, extracted content in Markdown.
+    - Return ONLY the cleaned, extracted content.
     - NO prefaces, no commentary, no summaries.
     - NO formatting explanations.
     - NO translations.
 7.  **CRITICAL LANGUAGE RULE:**
     - Detect the language of the input text.
     - Output MUST be in the **exact same language**. Never translate or switch languages.
+
+**EXAMPLE:**
+*INPUT TEXT:* "Question 1 of 10. Choose the correct HTML element. a) <p> b) <div> c) <span>"
+*CORRECT OUTPUT:*
+Question: Choose the correct HTML element
+
+Options:
+- <p>
+- <div>
+- <span>
 `,
   answer: `Act as a highly knowledgeable quiz solver. Given a cleaned quiz consisting of only one question and its multiple-choice options, follow these rules precisely.
 
@@ -30,9 +40,9 @@ CRITICAL FORMATTING RULES:
 **EXAMPLE SCENARIO:**
 *INPUT QUESTION:* "Choose the correct HTML element to define important text"
 *INPUT OPTIONS:*
-- \`<i>\`
-- \`<important>\`
-- \`<strong>\`
+- <i>
+- <important>
+- <strong>
 *CORRECT OUTPUT:*
 Answer: \`<strong>\`
 Confidence: High

@@ -553,7 +553,29 @@ class PopupApp {
     
     _formatQuestionContent(content) {
         if (!content) return '';
-        return DOMPurify.sanitize(marked.parse(content.replace(/Question:/i, '### Question\n').replace(/Options:/i, '\n### Options\n')));
+        
+        const parts = content.split('Options:');
+        const question = parts[0].replace(/Question:/i, '### Question\n');
+        let options = '';
+
+        if (parts.length > 1) {
+            const optionLines = parts[1].trim().split('\n');
+            const formattedOptions = optionLines.map(line => {
+                const trimmedLine = line.trim();
+                if (trimmedLine.startsWith('-')) {
+                    const optionText = trimmedLine.substring(1).trim();
+                    // Check if the option looks like code and wrap it in backticks
+                    if (optionText.includes('<') && optionText.includes('>')) {
+                        return `- \`${optionText}\``;
+                    }
+                }
+                return line; // Return original line if it's not a code option
+            }).join('\n');
+            options = '\n### Options\n' + formattedOptions;
+        }
+
+        const reconstructedContent = question + options;
+        return DOMPurify.sanitize(marked.parse(reconstructedContent));
     }
     
     _renderInlineMarkdown(text) {
