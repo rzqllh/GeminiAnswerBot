@@ -391,7 +391,11 @@ class ToolbarModule {
   }
 
   create() {
-    if (document.getElementById('gemini-answer-bot-toolbar')) return;
+    const existingToolbar = document.getElementById('gemini-answer-bot-toolbar');
+    if (existingToolbar) {
+        this.toolbarElement = existingToolbar;
+        return;
+    }
     this.toolbarElement = document.createElement('div');
     this.toolbarElement.id = 'gemini-answer-bot-toolbar';
     this.toolbarElement.className = 'gemini-answer-bot-toolbar';
@@ -435,7 +439,7 @@ class ToolbarModule {
 
   show() {
     const selection = window.getSelection();
-    if (!selection || selection.isCollapsed) { this.hide(); return; }
+    if (!selection || selection.isCollapsed || !this.toolbarElement) { this.hide(); return; }
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
     if (rect.width < 5 && rect.height < 5) { this.hide(); return; }
