@@ -29,41 +29,45 @@ async function fetchImageAsBase64(url) {
   }
 }
 
-// This function is now ONLY for the native context menu clicks.
+// MODIFIED: This function now triggers the in-page dialog via messaging.
 async function handleContextAction(info, tab) {
   if (!tab || !tab.id) {
     console.error("Context action triggered without a valid tab.");
     return;
   }
   
-  const actionData = {
-    action: info.menuItemId,
-    source: 'contextMenu'
-  };
-
-  if (info.selectionText) {
-    actionData.selectionText = info.selectionText;
-  }
-  
+  // For images, we still need the popup as the dialog is text-only for now.
   if (info.mediaType === 'image' && info.srcUrl) {
-    actionData.srcUrl = info.srcUrl;
+    const actionData = {
+      action: info.menuItemId,
+      source: 'contextMenu',
+      srcUrl: info.srcUrl,
+    };
     const base64Data = await fetchImageAsBase64(info.srcUrl);
     if (base64Data) {
       actionData.base64ImageData = base64Data;
+      await StorageManager.session.set({ [`contextData_${tab.id}`]: actionData });
+      try {
+        await chrome.action.openPopup();
+      } catch (e) {
+        console.error("Failed to open popup for image action:", e);
+        await StorageManager.session.remove(`contextData_${tab.id}`);
+      }
     } else {
-      console.error("Could not fetch and convert image. Aborting action.");
-      return;
+      console.error("Could not fetch and convert image. Aborting image action.");
     }
+    return;
   }
-  
-  await StorageManager.session.set({ [`contextData_${tab.id}`]: actionData });
 
-  try {
-    // This is valid here because it's a direct result of a native menu click.
-    await chrome.action.openPopup();
-  } catch (e) {
-    console.error("Failed to open popup programmatically:", e);
-    await StorageManager.session.remove(`contextData_${tab.id}`);
+  // For text selections, message the content script to show the dialog.
+  if (info.selectionText) {
+    chrome.tabs.sendMessage(tab.id, {
+      action: 'showDialogForContextMenu',
+      payload: {
+        action: info.menuItemId,
+        selectionText: info.selectionText
+      }
+    }).catch(err => console.error("Could not send message to content script:", err.message));
   }
 }
 
@@ -132,7 +136,6 @@ chrome.runtime.onStartup.addListener(updateContextMenus);
 async function performApiCall(payload) {
     const { apiKey, model, systemPrompt, userContent, base64ImageData, purpose, tabId } = payload;
     
-    // MODIFIED: Stream callback now sends directly to the originating tab if tabId is present.
     const streamCallback = (streamData) => {
       const message = {
         action: 'geminiStreamUpdate',
@@ -147,7 +150,6 @@ async function performApiCall(payload) {
           }
         });
       } else {
-        // Fallback for requests from the popup itself
         chrome.runtime.sendMessage(message).catch(err => {
           if (!err.message.includes('Receiving end does not exist')) {
             console.warn('Error sending stream update to runtime:', err);
@@ -260,14 +262,12 @@ function extractQuestionForSearch(cleanedContent) {
     return match ? match[1].trim() : cleanedContent;
 }
 
-// Native context menu clicks call this.
 chrome.contextMenus.onClicked.addListener(handleContextAction);
   
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const tabId = sender.tab?.id;
     switch(request.action) {
         case 'callGeminiStream':
-            // This path is used by the popup. No tabId is needed as results are broadcast.
             performApiCall({ ...request.payload, tabId: null });
             break;
         case 'testApiConnection':
@@ -277,7 +277,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             updateContextMenus();
             break;
         
-        // MODIFIED: This is now the entry point for in-page toolbar actions.
         case 'triggerContextMenuAction':
             (async () => {
                 const { action, selectionText } = request.payload;
@@ -300,7 +299,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     systemPrompt,
                     userContent,
                     purpose: action,
-                    tabId: tab.id, // Critical: Pass tabId to target the response
+                    tabId: tab.id,
                 });
             })();
             break;
@@ -368,7 +367,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     systemPrompt: DEFAULT_PROMPTS.verification,
                     userContent: verificationContent,
                     purpose: 'verification',
-                    tabId: null // Result goes to the popup, not the scraper tab
+                    tabId: null
                 });
 
                 await StorageManager.session.remove(key);

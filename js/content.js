@@ -385,7 +385,7 @@ class PageModule {
 class ToolbarModule {
   constructor(dialogModule) {
     this.toolbarElement = null;
-    this.dialogModule = dialogModule; // Store reference to the dialog module
+    this.dialogModule = dialogModule;
     this.create();
     this.bindEvents();
   }
@@ -414,7 +414,7 @@ class ToolbarModule {
         this.hide();
         const selectedText = window.getSelection().toString();
         if (selectedText.trim()) {
-          this.dialogModule.show(item.title); // Show dialog immediately
+          this.dialogModule.show(item.title);
           chrome.runtime.sendMessage({
             action: 'triggerContextMenuAction',
             payload: { action: item.action, selectionText: selectedText }
@@ -428,7 +428,7 @@ class ToolbarModule {
   
   bindEvents() {
     document.addEventListener('mouseup', () => setTimeout(() => {
-      if (this.dialogModule.isVisible()) return; // Don't show toolbar if dialog is open
+      if (this.dialogModule.isVisible()) return;
       const selectionText = window.getSelection().toString().trim();
       if (selectionText.length > 5) { this.show(); } else { this.hide(); }
     }, 10));
@@ -465,16 +465,12 @@ class ToolbarModule {
   }
 }
 
-/**
- * Manages the floating result dialog injected into the page.
- */
 class DialogModule {
     constructor() {
         this.overlay = null;
         this.contentArea = null;
         this.titleArea = null;
         this.streamAccumulator = '';
-        // NEW: Pre-bind the event handler for correct `this` context
         this.boundEscapeHandler = this._handleEscapeKey.bind(this);
     }
 
@@ -490,7 +486,7 @@ class DialogModule {
     }
 
     create() {
-        if (this.overlay) return; // MODIFIED: Prevent re-creation if it already exists
+        if (this.overlay) return;
         this._ensureStylesheet();
         
         this.overlay = document.createElement('div');
@@ -526,7 +522,7 @@ class DialogModule {
     }
 
     show(title = 'Result') {
-        this.create(); // It's safe to call this every time now.
+        this.create();
         this.titleArea.textContent = _escapeHtml(title);
         this.streamAccumulator = '';
         this.contentArea.innerHTML = `
@@ -535,33 +531,27 @@ class DialogModule {
             </div>
         `;
         
-        // Use setTimeout to ensure the element is in the DOM before adding the class
         setTimeout(() => this.overlay.classList.add('visible'), 10);
-        // NEW: Add Escape key listener
         document.addEventListener('keydown', this.boundEscapeHandler);
     }
 
-    // MODIFIED: Complete rewrite of hide() for robust removal
     hide() {
         if (!this.overlay) return;
         
-        // NEW: Remove Escape key listener to prevent memory leaks
         document.removeEventListener('keydown', this.boundEscapeHandler);
 
         this.overlay.classList.remove('visible');
         
-        // Listen for the transition to end, then remove the element from the DOM
         this.overlay.addEventListener('transitionend', () => {
             if (this.overlay) {
                 this.overlay.remove();
-                this.overlay = null; // Reset state
+                this.overlay = null;
                 this.contentArea = null;
                 this.titleArea = null;
             }
-        }, { once: true }); // Listener will auto-remove itself after firing once
+        }, { once: true });
     }
 
-    // NEW: Handler for the Escape key
     _handleEscapeKey(event) {
         if (event.key === 'Escape') {
             this.hide();
@@ -600,7 +590,8 @@ class ContentController {
   
   listenForMessages() {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      switch (request.action) {
+      const { action, payload } = request;
+      switch (action) {
         case "ping_content_script":
           sendResponse({ ready: true });
           break;
@@ -623,7 +614,6 @@ class ContentController {
           return true;
         
         case "geminiStreamUpdate":
-          const { payload } = request;
           if (!payload.success) {
               this.dialog.handleError(payload.error);
               return;
@@ -632,15 +622,31 @@ class ContentController {
               this.dialog.update(payload.chunk);
           }
           break;
+        
+        // NEW: Handles the unified context menu flow
+        case "showDialogForContextMenu":
+            const titleMap = {
+                summarize: 'Summary',
+                explanation: 'Explanation',
+                translate: 'Translation',
+            };
+            const title = titleMap[payload.action.split('-')[0]] || 'Result';
+            this.dialog.show(title);
+            // Now that the dialog is visible, ask the background to start the API call
+            chrome.runtime.sendMessage({
+                action: 'triggerContextMenuAction',
+                payload: payload
+            });
+            break;
 
         case "get_full_page_content":
           const fullContent = this.page.extractFullContent();
           sendResponse({ content: fullContent });
           break;
         case "highlight-answer":
-          this.marker.highlight(request.text, () => {
-              if (request.preSubmissionCheck) {
-                  this.quiz.activatePreSubmissionCheck(request.text[0]);
+          this.marker.highlight(payload.text, () => {
+              if (payload.preSubmissionCheck) {
+                  this.quiz.activatePreSubmissionCheck(payload.text[0]);
               }
           });
           sendResponse({ success: true });
