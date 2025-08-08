@@ -1,13 +1,18 @@
+/* === Hafizh Signature Code ===
+Author: Hafizh Rizqullah — GeminiAnswerBot
+File: manifest.json
+Created: 2025-08-08 16:42:03 */
 {
   "manifest_version": 3,
   "name": "GeminiAnswerBot",
-  "version": "3.2.1",
+  "version": "3.2.2",
   "description": "A smart Chrome extension powered by the Google Gemini API.",
   "permissions": [
     "activeTab",
     "scripting",
     "storage",
-    "contextMenus"
+    "contextMenus",
+    "tabs"
   ],
   "host_permissions": [
     "<all_urls>"
