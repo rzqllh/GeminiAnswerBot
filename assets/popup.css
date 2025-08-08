@@ -1,8 +1,7 @@
-/* === Hafizh Rizqullah | GeminiAnswerBot === */
-/* 🔒 Created by Hafizh Rizqullah || Refined by AI Assistant */
-/* 📄 assets/popup.css */
-/* 🕓 Created: 2024-05-22 11:30:00 */
-/* 🧠 Modular | DRY | SOLID | Apple HIG Compliant */
+/* === Hafizh Signature Code ===
+Author: Hafizh Rizqullah — GeminiAnswerBot
+File: assets/popup.css
+Created: 2025-eight-08 16:42:03 */
 
 /* == BASE COLORS & VARIABLES (Light Mode First) ================= */
 :root {
@@ -27,6 +26,8 @@
   --info-border: #d6eaff;
   --info-text: #004085;
   --skeleton-bg: #e1e1e6;
+  --loader-primary: #007aff;
+  --loader-secondary: #ffffff;
   --base-font-size: 14px;
   --line-height: 1.5;
   --main-border-radius: 16px;
@@ -60,6 +61,8 @@
     --info-border: #2a4161;
     --info-text: #cce5ff;
     --skeleton-bg: #3a3a3c;
+    --loader-primary: #0a84ff;
+    --loader-secondary: #1c1c1e;
   }
 }
 
@@ -259,12 +262,42 @@ body {
   text-align: center;
 }
 .loading-state.full-page { min-height: 250px; }
+
+/* Old spinner, kept for verification button */
 .spinner {
-  width: 28px; height: 28px; border-radius: 50%; margin-bottom: 16px;
+  width: 28px; height: 28px; border-radius: 50%;
   border: 4px solid var(--border-color); border-top-color: var(--action-button-bg);
   animation: spin 1s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* NEW LOADER */
+.loader {
+  width: 60px; /* Adjusted size for popup */
+  aspect-ratio: 1;
+  border: 8px solid var(--loader-primary); /* Adjusted border */
+  box-sizing: border-box;
+  background: 
+    radial-gradient(farthest-side,var(--loader-secondary) 98%,#0000) top,
+    radial-gradient(farthest-side,var(--loader-secondary) 98%,#0000) top,
+    radial-gradient(farthest-side,var(--loader-secondary) 98%,#0000) left,
+    radial-gradient(farthest-side,var(--loader-secondary) 98%,#0000) right,
+    radial-gradient(farthest-side,var(--loader-secondary) 98%,#0000) bottom,
+    var(--loader-primary);
+  background-size: 16px 16px; /* Adjusted size */
+  background-repeat: no-repeat;
+  filter: blur(3px) contrast(10); /* Adjusted blur */
+  animation: l19 2s infinite;
+  margin-bottom: 16px;
+}
+@keyframes l19 {
+  0%   {background-position:top,top,left,right,bottom}
+  25%  {background-position:right,top,left,right,bottom}
+  50%  {background-position:bottom,top,left,right,bottom}
+  75%  {background-position:left,top,left,right,bottom}
+  100% {background-position:top,top,left,right,bottom}
+}
+
 
 .skeleton-loader { display: flex; flex-direction: column; gap: 10px; }
 .skeleton {

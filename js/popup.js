@@ -184,7 +184,7 @@ class PopupApp {
         switch (state.view) {
             case 'loading': 
                 this.elements.messageArea.classList.remove('hidden'); 
-                this.elements.messageArea.innerHTML = `<div class="loading-state full-page"><div class="spinner"></div><p>Scanning for quiz...</p></div>`; 
+                this.elements.messageArea.innerHTML = `<div class="loading-state full-page"><div class="loader"></div><p>Scanning for quiz...</p></div>`; 
                 break;
             case 'info': 
                 this.elements.messageArea.classList.remove('hidden');
@@ -455,7 +455,8 @@ class PopupApp {
     _handleCleaningResult(fullText) {
         this.store.setState({ cleanedContent: fullText, view: 'quiz' });
         this._saveCurrentViewState();
-        this._getAnswer();
+        // Defer the _getAnswer call to allow the main quiz view to render first.
+        setTimeout(() => this._getAnswer(), 0);
     }
 
     _renderAnswerContent(fullText, fromCache, totalTokenCount, thoughtProcess) {
