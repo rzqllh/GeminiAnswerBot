@@ -1,8 +1,7 @@
-// === Hafizh Rizqullah | GeminiAnswerBot ===
-// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
-// 📄 js/options/settings.js
-// 🕓 Created: 2024-05-22 15:30:00
-// 🧠 Modular | DRY | SOLID | Apple HIG Compliant
+// === Hafizh Signature Code ===
+// Author: Hafizh Rizqullah — GeminiAnswerBot
+// File: js/options/settings.js
+// Created: 2025-08-08 16:42:03
 
 const SettingsModule = (() => {
   let ELS = {};
@@ -12,32 +11,40 @@ const SettingsModule = (() => {
   let globalTemperature = 0.4;
 
   function updateSliderTooltip(slider) {
-    const tooltip = slider.previousElementSibling;
-    if (!tooltip || !tooltip.classList.contains('slider-value-display')) return;
+    const tooltip = slider.parentElement.querySelector('.slider-value-display');
+    if (!tooltip) return;
     const value = parseFloat(slider.value);
     tooltip.textContent = value.toFixed(1);
+    
+    // Position the tooltip above the thumb
     const min = parseFloat(slider.min);
     const max = parseFloat(slider.max);
     const percent = (value - min) / (max - min);
-    const thumbWidth = 24;
-    const tooltipWidth = tooltip.offsetWidth;
+    const thumbWidth = 24; 
     const trackWidth = slider.offsetWidth;
+    const tooltipWidth = tooltip.offsetWidth;
+    
     let newLeft = percent * (trackWidth - thumbWidth) + (thumbWidth / 2) - (tooltipWidth / 2);
     newLeft = Math.max(0, Math.min(newLeft, trackWidth - tooltipWidth));
     tooltip.style.left = `${newLeft}px`;
   }
 
   function initializeSliderInteractions(slider) {
-    const tooltip = slider.previousElementSibling;
-    if (!tooltip || !tooltip.classList.contains('slider-value-display')) return;
+    const tooltip = slider.parentElement.querySelector('.slider-value-display');
+    if (!tooltip) return;
+
     const showTooltip = () => tooltip.classList.add('tooltip-visible');
     const hideTooltip = () => tooltip.classList.remove('tooltip-visible');
+
     slider.addEventListener('input', () => updateSliderTooltip(slider));
     slider.addEventListener('mousedown', showTooltip);
     slider.addEventListener('mouseup', hideTooltip);
     slider.addEventListener('mouseenter', showTooltip);
     slider.addEventListener('mouseleave', hideTooltip);
-    updateSliderTooltip(slider);
+    
+    // Initial positioning
+    // Use a timeout to ensure the element is rendered and has a width
+    setTimeout(() => updateSliderTooltip(slider), 50);
   }
 
   async function loadGeneralSettings() {

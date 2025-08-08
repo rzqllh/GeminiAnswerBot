@@ -1,8 +1,4 @@
-// === Hafizh Rizqullah | GeminiAnswerBot ===
-// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
-// 📄 js/utils/errorHandler.js
-// 🕓 Created: 2024-05-22 15:00:00
-// 🧠 Modular | DRY | SOLID | Apple HIG Compliant
+
 
 /**
  * @typedef {Object} FormattedError
@@ -23,6 +19,17 @@ const ErrorHandler = (() => {
    * @returns {FormattedError}
    */
   function format(error, context = 'general') {
+    // SPECIAL HANDLING: Intercept stack overflow errors to prevent recursion inside the error handler itself.
+    if (error instanceof RangeError && error.message.includes('Maximum call stack size exceeded')) {
+      const { title, message } = _getErrorMessages('STACK_OVERFLOW', context);
+      return {
+        type: 'STACK_OVERFLOW',
+        title,
+        message,
+        technicalMessage: 'Maximum call stack size exceeded', // Use a safe, hardcoded string
+      };
+    }
+
     const technicalMessage = error.message || 'An unknown error occurred.';
     let type = error.type || 'UNKNOWN_ERROR';
 
@@ -78,6 +85,11 @@ const ErrorHandler = (() => {
         return {
           title: 'API Error',
           message: 'The API returned an unexpected error. Please try again later.',
+        };
+      case 'STACK_OVERFLOW':
+        return {
+            title: 'An Unknown Error Occurred',
+            message: 'Something went wrong. Please check the console for more details.',
         };
       default:
         return {

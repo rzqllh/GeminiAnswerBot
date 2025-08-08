@@ -1,12 +1,11 @@
-// === Hafizh Rizqullah | GeminiAnswerBot ===
-// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
-// 📄 js/popup.js
-// 🕓 Created: 2024-05-22 16:15:00
-// 🧠 Modular | DRY | SOLID | Apple HIG Compliant
+// === Hafizh Signature Code ===
+// Author: Hafizh Rizqullah — GeminiAnswerBot
+// File: js/popup.js
+// Created: 2025-08-08 16:42:03
 
 class PopupApp {
     constructor() {
-        // ARCHITECTURE REFACTOR: Centralized state management
+        // Centralized state management
         this.store = {
             _state: {
                 tab: null, config: {}, view: 'loading', lastView: 'quiz', url: null,
@@ -17,28 +16,24 @@ class PopupApp {
                 action: null, generalTaskResult: null,
             },
             _listeners: [],
-            
-            getState() {
-                return this._state;
-            },
-            
+            getState() { return this._state; },
             setState(newState) {
                 this._state = { ...this._state, ...newState };
                 StorageManager.log('PopupState', 'State changed:', this._state);
                 this._listeners.forEach(listener => listener(this._state));
             },
-            
-            subscribe(listener) {
-                this._listeners.push(listener);
-            }
+            subscribe(listener) { this._listeners.push(listener); }
         };
 
         this.elements = {};
         this.streamAccumulator = {};
         this._messageHandler = this._handleMessages.bind(this);
 
+        // --- ONE-TIME SETUP LOGIC ---
         this._queryElements();
         this._bindEvents();
+        this.store.subscribe(this.render.bind(this));
+        chrome.runtime.onMessage.addListener(this._messageHandler);
 
         window.addEventListener('unload', () => {
             chrome.runtime.onMessage.removeListener(this._messageHandler);
@@ -67,7 +62,7 @@ class PopupApp {
     _bindEvents() {
         this.elements.settingsButton.addEventListener('click', () => chrome.runtime.openOptionsPage());
         this.elements.analyzePageButton.addEventListener('click', () => this._handlePageAnalysis());
-        this.elements.rescanButton.addEventListener('click', () => this._handleRescan());
+        this.elements.rescanButton.addEventListener('click', () => this.start(true));
         this.elements.explanationButton.addEventListener('click', () => this._getExplanation());
         this.elements.retryAnswer.addEventListener('click', () => this._getAnswer());
         this.elements.retryExplanation.addEventListener('click', () => this._getExplanation());
@@ -82,11 +77,6 @@ class PopupApp {
 
     _handleMessages(request) {
         if (request.action === 'geminiStreamUpdate') {
-            if (request.purpose === 'verification') {
-                this.store.setState({ answerHTML: null });
-                this.streamAccumulator.answer = '';
-                this.streamAccumulator.verification = (this.streamAccumulator.verification || '') + request.payload.chunk;
-            }
             this._handleStreamUpdate(request);
         }
     }
@@ -107,52 +97,29 @@ class PopupApp {
     }
     
     async _ensureContentScripts(tabId) {
-        // Step 1: Attempt to inject the scripts. This will do nothing if they are already injected.
+        StorageManager.log('Injection', 'Ensuring content scripts are present...');
         try {
-            await chrome.scripting.insertCSS({ target: { tabId }, files: ['assets/highlighter.css', 'assets/dialog.css', 'assets/toolbar.css'] });
-            await chrome.scripting.executeScript({ target: { tabId }, files: ['js/utils/helpers.js', 'js/utils/errorHandler.js', 'js/vendor/dompurify.min.js', 'js/vendor/marked.min.js', 'js/vendor/mark.min.js', 'js/content.js'] });
-            StorageManager.log('Injection', 'Script injection attempted.');
+            const response = await chrome.tabs.sendMessage(tabId, { action: 'ping_content_script' });
+            if (response && response.ready) {
+                StorageManager.log('Injection', 'Content script already loaded and ready.');
+                return;
+            }
         } catch (e) {
-            // This error is expected if the scripts are already injected, so we can safely ignore it.
-            StorageManager.log('Injection', 'Could not inject scripts (might be already there):', e.message);
+            // This error is expected if the script isn't injected yet.
+            StorageManager.log('Injection', 'Content script not found, injecting now...');
+            try {
+                await chrome.scripting.insertCSS({ target: { tabId }, files: ['assets/highlighter.css', 'assets/dialog.css', 'assets/toolbar.css'] });
+                await chrome.scripting.executeScript({ target: { tabId }, files: ['js/utils/helpers.js', 'js/utils/errorHandler.js', 'js/vendor/dompurify.min.js', 'js/vendor/marked.min.js', 'js/vendor/mark.min.js', 'js/content.js'] });
+                // Give a brief moment for the script to initialize after injection
+                await new Promise(resolve => setTimeout(resolve, 100));
+            } catch (injectionError) {
+                StorageManager.log('Injection', 'Critical injection failure:', injectionError);
+                throw new Error('Script injection failed. This page may not be supported.');
+            }
         }
-    
-        // Step 2: HANDSHAKE PROTOCOL: Poll the content script until it's ready.
-        return new Promise((resolve, reject) => {
-            let attempts = 0;
-            const maxAttempts = 15;
-            const interval = 200;
-    
-            const poll = async () => {
-                StorageManager.log('Handshake', `Attempt #${attempts + 1}...`);
-                try {
-                    const response = await this._sendMessageToContentScript({ action: "ping_content_script" }, interval - 50);
-                    if (response && response.ready) {
-                        StorageManager.log('Handshake', 'Content script is ready.');
-                        resolve();
-                        return;
-                    }
-                } catch (e) {
-                    // This is expected if the script is not yet ready
-                }
-    
-                attempts++;
-                if (attempts >= maxAttempts) {
-                    StorageManager.log('Handshake', 'Content script failed to respond after injection.');
-                    reject(new Error('Content script timeout.'));
-                } else {
-                    setTimeout(poll, interval);
-                }
-            };
-            
-            poll();
-        });
     }
 
-    async init() {
-        this.store.subscribe(this.render.bind(this));
-        chrome.runtime.onMessage.addListener(this._messageHandler);
-        
+    async start(isRescan = false) {
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (!tab || !tab.id) throw new Error('Cannot find the active tab.');
@@ -171,7 +138,7 @@ class PopupApp {
 
             const contextData = await chrome.runtime.sendMessage({ action: 'popupReady' });
 
-            if (contextData && contextData.source === 'contextMenu') {
+            if (contextData && contextData.source === 'contextMenu' && !isRescan) {
                 await this._clearPersistedState();
                 const isGeneralTask = ['summarize', 'explain', 'translate', 'rephrase'].some(t => contextData.action.startsWith(t));
                 
@@ -188,7 +155,7 @@ class PopupApp {
                 this._callGeminiStream(contextData.action, this.store.getState().originalUserContent, this.store.getState().base64ImageData);
             } else {
                 const persistedState = await this._getPersistedState();
-                if (persistedState && persistedState.url === tab.url) {
+                if (persistedState && persistedState.url === tab.url && !isRescan) {
                     this.store.setState(persistedState);
                 } else {
                     await this._clearPersistedState();
@@ -241,7 +208,7 @@ class PopupApp {
     _renderGeneralTaskState() {
         const state = this.store.getState();
         const titleMap = { 'summarize': 'Summary', 'explain': 'Explanation', 'translate': 'Translation', 'rephrase': 'Rephrased Text' };
-        const baseAction = state.action.split('-')[0];
+        const baseAction = state.action ? state.action.split('-')[0] : '';
         this.elements.generalTaskTitle.textContent = titleMap[baseAction] || 'Result';
         
         if (state.generalTaskResult) {
@@ -269,16 +236,14 @@ class PopupApp {
             this.elements.contentDisplayWrapper.classList.add('hidden');
         }
 
-        this.elements.answerContainer.classList.toggle('hidden', !state.answerHTML);
+        this.elements.answerContainer.classList.toggle('hidden', !state.answerHTML && !this.streamAccumulator.answer);
         if (state.answerHTML) {
-            this._handleAnswerResult(state.answerHTML, true, state.totalTokenCount, state.thoughtProcess);
-        } else if ((state.cleanedContent || state.isImageMode) && !state.error) {
-            this._getAnswer();
+            this._renderAnswerContent(state.answerHTML, true, state.totalTokenCount, state.thoughtProcess);
         }
         
-        this.elements.explanationContainer.classList.toggle('hidden', !state.explanationHTML);
+        this.elements.explanationContainer.classList.toggle('hidden', !state.explanationHTML && !this.streamAccumulator.explanation);
         if (state.explanationHTML) {
-            this._handleExplanationResult(state.explanationHTML, true);
+            this._renderExplanationContent(state.explanationHTML);
         }
     }
 
@@ -316,7 +281,7 @@ class PopupApp {
                 <div class="error-panel-actions">${actionsHtml}</div>
             </div>`;
 
-        document.getElementById('error-retry-btn')?.addEventListener('click', () => this.init());
+        document.getElementById('error-retry-btn')?.addEventListener('click', () => this.start(true));
         document.getElementById('error-settings-btn')?.addEventListener('click', () => chrome.runtime.openOptionsPage());
         document.getElementById('error-quota-btn')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://aistudio.google.com/billing' }));
     }
@@ -325,9 +290,8 @@ class PopupApp {
         const { tab, config } = this.store.getState();
         if (!tab) return;
         this._clearPersistedState().then(() => {
-            // Reset state but keep essential parts
             this.store.setState({ ...new PopupApp().store._state, tab, config });
-            this.init();
+            this.start(true);
         });
     }
 
@@ -370,7 +334,7 @@ class PopupApp {
     }
     
     _callGeminiStream(purpose, userContent, base64ImageData = null) {
-        const { config } = this.store.getState();
+        const { config, tab } = this.store.getState();
         const { promptProfiles, activeProfile, selectedModel, geminiApiKey } = config;
         const currentPrompts = (promptProfiles?.[activeProfile]) || DEFAULT_PROMPTS;
         let systemPrompt = currentPrompts[purpose] || DEFAULT_PROMPTS[purpose];
@@ -381,7 +345,7 @@ class PopupApp {
             userContent = `Target Language: ${language}\n\nText to rephrase:\n${userContent}`;
         }
     
-        chrome.runtime.sendMessage({ action: 'callGeminiStream', payload: { apiKey: geminiApiKey, model: selectedModel, systemPrompt, userContent, base64ImageData, purpose } });
+        chrome.runtime.sendMessage({ action: 'callGeminiStream', payload: { apiKey: geminiApiKey, model: selectedModel, systemPrompt, userContent, base64ImageData, purpose, tabId: tab.id } });
     }
     
     _getAnswer() {
@@ -432,6 +396,28 @@ class PopupApp {
         }
         
         const isGeneralTask = ['summarize', 'explain', 'translate', 'rephrase'].some(t => purpose.startsWith(t));
+        const purposeMap = {
+            'answer': this.elements.answerDisplay,
+            'explanation': this.elements.explanationDisplay,
+            'correction': this.elements.explanationDisplay,
+            'verification': this.elements.answerDisplay,
+        };
+        if (isGeneralTask) {
+            purposeMap.general = this.elements.generalTaskDisplay;
+        }
+
+        const targetElement = purposeMap[purpose] || (isGeneralTask ? purposeMap.general : null);
+
+        if (payload.chunk) {
+            if (!this.streamAccumulator[purpose]) {
+                this.streamAccumulator[purpose] = '';
+                if (targetElement) targetElement.innerHTML = ''; // Clear skeleton on first chunk
+            }
+            this.streamAccumulator[purpose] += payload.chunk;
+            if (targetElement) {
+                targetElement.innerHTML = DOMPurify.sanitize(marked.parse(this.streamAccumulator[purpose]));
+            }
+        }
 
         if (payload.done) {
             const fullText = payload.fullText || this.streamAccumulator[purpose] || '';
@@ -451,11 +437,6 @@ class PopupApp {
                     purposeHandlers[finalPurpose](fullText);
                 }
             }
-        } else if (payload.chunk) {
-            this.streamAccumulator[purpose] = (this.streamAccumulator[purpose] || '') + payload.chunk;
-            if (isGeneralTask) {
-                this.store.setState({ generalTaskResult: this.streamAccumulator[purpose] });
-            }
         }
     }
 
@@ -467,11 +448,13 @@ class PopupApp {
     _handleCleaningResult(fullText) {
         this.store.setState({ cleanedContent: fullText, view: 'quiz' });
         this._saveCurrentViewState();
+        this._getAnswer();
     }
 
-    _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0, thoughtProcess = null) {
+    _renderAnswerContent(fullText, fromCache, totalTokenCount, thoughtProcess) {
         const state = this.store.getState();
         this._renderSkeletonState(this.elements.answerDisplay, false);
+        
         const thoughtMatch = fullText.match(/\[THOUGHT\]([\s\S]*)\[ENDTHOUGHT\]/);
         const currentThoughtProcess = thoughtProcess || (thoughtMatch ? thoughtMatch[1].trim() : null);
         const cleanText = fullText.replace(/\[THOUGHT\][\s\S]*\[ENDTHOUGHT\]\s*/, '');
@@ -480,13 +463,6 @@ class PopupApp {
         const answerText = answerMatch ? answerMatch[1].trim() : cleanText.trim();
         const incorrectAnswer = answerText.replace(/`/g, '');
         
-        this.store.setState({
-            answerHTML: cleanText,
-            totalTokenCount,
-            thoughtProcess: currentThoughtProcess,
-            incorrectAnswer
-        });
-
         const confidenceMatch = cleanText.match(/Confidence:\s*(High|Medium|Low)/i);
         let answerHtml = `<p class="answer-highlight">${this._renderInlineMarkdown(answerText)}</p>`;
         let confidenceHtml = '';
@@ -521,23 +497,37 @@ class PopupApp {
             this._sendMessageToContentScript({ action: 'highlight-answer', text: answersToHighlight })
                 .catch(err => StorageManager.log('Popup', 'Could not highlight answer on page:', err.message));
         }
+    }
+
+    _handleAnswerResult(fullText, fromCache = false, totalTokenCount = 0, thoughtProcess = null) {
+        const state = this.store.getState();
+        this.store.setState({
+            answerHTML: fullText,
+            totalTokenCount,
+            thoughtProcess,
+            incorrectAnswer: fullText.match(/Answer:\s*(.*)/i)?.[1].trim().replace(/`/g, '') || ''
+        });
+        
         if (!fromCache && state.cacheKey) {
-            StorageManager.local.set({ [state.cacheKey]: { answerHTML: cleanText, totalTokenCount, thoughtProcess: currentThoughtProcess } });
+            StorageManager.local.set({ [state.cacheKey]: { answerHTML: fullText, totalTokenCount, thoughtProcess } });
         }
         
         this._saveCurrentViewState();
         if (!fromCache) {
-            this._saveToHistory({ cleanedContent: state.cleanedContent, answerHTML: cleanText, thoughtProcess: currentThoughtProcess }, 'quiz');
+            this._saveToHistory({ cleanedContent: state.cleanedContent, answerHTML: fullText, thoughtProcess }, 'quiz');
         }
     }
 
-    _handleExplanationResult(fullText, fromCache = false) { 
-        this.store.setState({ explanationHTML: fullText });
+    _renderExplanationContent(fullText) {
         this.elements.explanationDisplay.innerHTML = DOMPurify.sanitize(marked.parse(fullText)); 
         this.elements.copyExplanation.dataset.copyText = fullText; 
         this.elements.explanationButton.disabled = false; 
         this.elements.retryExplanation.disabled = false; 
         this.elements.explanationContainer.classList.remove('hidden'); 
+    }
+
+    _handleExplanationResult(fullText, fromCache = false) { 
+        this.store.setState({ explanationHTML: fullText });
         this._saveCurrentViewState(); 
         if (!fromCache) this._saveToHistory({ ...this.store.getState() }, 'explanation'); 
     }
@@ -546,8 +536,7 @@ class PopupApp {
     
     _formatQuestionContent(content) {
         if (!content) return '';
-        const renderedHtml = DOMPurify.sanitize(marked.parse(content.replace(/Question:/i, '### Question\n').replace(/Options:/i, '\n### Options\n')));
-        return renderedHtml;
+        return DOMPurify.sanitize(marked.parse(content.replace(/Question:/i, '### Question\n').replace(/Options:/i, '\n### Options\n')));
     }
     
     _renderInlineMarkdown(text) {
@@ -669,6 +658,10 @@ class PopupApp {
         const state = this.store.getState();
         this.elements.verifyButton.disabled = true;
         this.elements.verifyButton.innerHTML = `<div class="spinner"></div> Verifying...`;
+        this.streamAccumulator.answer = '';
+        this.streamAccumulator.verification = '';
+        this.elements.answerDisplay.innerHTML = '';
+        this._renderSkeletonState(this.elements.answerDisplay, true, 'answer');
 
         chrome.runtime.sendMessage({
             action: 'verifyAnswerWithSearch',
@@ -680,6 +673,7 @@ class PopupApp {
     }
 }
 
+const app = new PopupApp();
 document.addEventListener('DOMContentLoaded', () => {
-    new PopupApp().init();
+    app.start();
 });

@@ -1,8 +1,7 @@
-// === Hafizh Rizqullah | GeminiAnswerBot ===
-// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
-// 📄 js/utils/storage.js
-// 🕓 Created: 2025-08-01 00:28:37
-// 🧠 Modular | DRY | SOLID | Apple HIG Compliant
+// === Hafizh Signature Code ===
+// Author: Hafizh Rizqullah — GeminiAnswerBot
+// File: js/utils/storage.js
+// Created: 2025-08-08 16:42:03
 
 /**
  * @module StorageManager
@@ -24,6 +23,13 @@ const StorageManager = (() => {
   async function checkSyncAvailability() {
     if (hasCheckedSync) {
       return isSyncAvailable;
+    }
+
+    if (!chrome.storage || !chrome.storage.sync) {
+        console.warn('StorageManager: chrome.storage.sync API is not available.');
+        isSyncAvailable = false;
+        hasCheckedSync = true;
+        return isSyncAvailable;
     }
 
     return new Promise((resolve) => {
@@ -128,13 +134,38 @@ const StorageManager = (() => {
   }
 
   /**
+   * Safely truncates large strings within an object for logging purposes.
+   * @param {any} data - The data to be sanitized for logging.
+   * @param {number} maxLength - The maximum length for strings.
+   * @returns {any} The sanitized data.
+   */
+  function sanitizeForLogging(data, maxLength = 2000) {
+    if (typeof data === 'string') {
+      return data.length > maxLength ? data.substring(0, maxLength) + '... (truncated)' : data;
+    }
+    if (typeof data === 'object' && data !== null) {
+      // Create a shallow copy to avoid mutating the original state object
+      const newObj = { ...data };
+      for (const key in newObj) {
+        if (typeof newObj[key] === 'string' && newObj[key].length > maxLength) {
+          newObj[key] = newObj[key].substring(0, maxLength) + '... (truncated)';
+        }
+      }
+      return newObj;
+    }
+    return data;
+  }
+
+  /**
    * Logs messages to the console only if debug mode is enabled.
+   * Sanitizes large data to prevent console crashes.
    * @param {string} context - The context of the log (e.g., 'Popup', 'Content').
    * @param {...any} args - The messages or objects to log.
    */
   function log(context, ...args) {
     if (isDebugMode) {
-      console.log(`[GAB-Debug|${context}]`, ...args);
+      const sanitizedArgs = args.map(arg => sanitizeForLogging(arg));
+      console.log(`[GAB-Debug|${context}]`, ...sanitizedArgs);
     }
   }
 
@@ -171,5 +202,7 @@ const StorageManager = (() => {
     isSyncAvailable: () => ready.then(() => isSyncAvailable),
     local: chrome.storage.local,
     sync: chrome.storage.sync,
+    // Expose session storage for robust, non-persistent state
+    session: chrome.storage.session,
   };
 })();

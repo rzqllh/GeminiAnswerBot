@@ -56,7 +56,6 @@ class MarkerModule {
 
 /**
  * Mengelola semua logika terkait ekstraksi konten kuis dan pemeriksaan pra-pengiriman.
- * REFACTORED: Now uses a synchronous, on-demand viewport calculation.
  */
 class QuizModule {
   constructor() {
@@ -65,10 +64,6 @@ class QuizModule {
     this.submissionHandler = this.handleSubmissionClick.bind(this);
   }
 
-  /**
-   * Finds the quiz block most visible in the viewport at the moment of execution.
-   * @returns {HTMLElement|null} The most visible quiz block element.
-   */
   _findBestVisibleQuizBlock() {
     const quizBlocks = this._findQuizBlocks();
     if (quizBlocks.length === 0) return null;
@@ -95,10 +90,6 @@ class QuizModule {
     return bestCandidate || quizBlocks[0];
   }
 
-  /**
-   * Finds container elements that likely represent a single quiz question block.
-   * @returns {HTMLElement[]} An array of potential quiz block elements.
-   */
   _findQuizBlocks() {
       const blocks = new Set();
       const inputs = document.querySelectorAll('input[type="radio"], input[type="checkbox"]');
@@ -125,10 +116,6 @@ class QuizModule {
       return Array.from(blocks);
   }
 
-  /**
-   * Extracts content from the most visible quiz block.
-   * @returns {string|null} Formatted quiz content or null if no block is found.
-   */
   extractContent() {
     const visibleBlock = this._findBestVisibleQuizBlock();
     if (!visibleBlock) return null;
@@ -136,11 +123,6 @@ class QuizModule {
     return this._extractDataFromBlock(visibleBlock);
   }
 
-  /**
-   * Helper to extract and format question and options from a given block element.
-   * @param {HTMLElement} block - The quiz block element.
-   * @returns {string|null} Formatted quiz content.
-   */
   _extractDataFromBlock(block) {
     if (!block) return null;
 
@@ -296,10 +278,11 @@ class QuizModule {
   }
 }
 
-/**
- * Mengelola ekstraksi konten dari seluruh halaman.
- */
 class PageModule {
+    constructor() {
+        this.MAX_CONTENT_LENGTH = 50000;
+    }
+
     extractFullContent() {
         const mainContentSelectors = ['main', 'article', 'div[role="main"]', 'div[id*="content"]', 'div[class*="content"]'];
         let mainContentArea = mainContentSelectors.map(s => document.querySelector(s)).find(el => el) || document.body;
@@ -312,19 +295,28 @@ class PageModule {
         clone.querySelectorAll(selectorsToRemove.join(', ')).forEach(el => el.remove());
         let content = clone.innerText;
         content = content.replace(/\s{3,}/g, '\n\n').trim();
+        
+        if (content.length > this.MAX_CONTENT_LENGTH) {
+            console.warn(`Content truncated from ${content.length} to ${this.MAX_CONTENT_LENGTH} characters.`);
+            content = content.substring(0, this.MAX_CONTENT_LENGTH);
+        }
+
         return content.length > 100 ? content : this.fallbackContent();
     }
 
     fallbackContent() {
         const clone = document.body.cloneNode(true);
         clone.querySelectorAll('script, style, noscript, iframe').forEach(el => el.remove());
-        return clone.innerText.trim();
+        let content = clone.innerText.trim();
+
+        if (content.length > this.MAX_CONTENT_LENGTH) {
+            console.warn(`Fallback content truncated from ${content.length} to ${this.MAX_CONTENT_LENGTH} characters.`);
+            content = content.substring(0, this.MAX_CONTENT_LENGTH);
+        }
+        return content;
     }
 }
 
-/**
- * Mengelola pembuatan dan perilaku floating toolbar.
- */
 class ToolbarModule {
   constructor() {
     this.toolbarElement = null;
@@ -401,9 +393,6 @@ class ToolbarModule {
   }
 }
 
-/**
- * Controller utama yang menginisialisasi dan mengelola semua modul di content script.
- */
 class ContentController {
   constructor() {
     this.marker = new MarkerModule();
@@ -415,32 +404,35 @@ class ContentController {
   
   listenForMessages() {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      let content;
       switch (request.action) {
         case "ping_content_script":
           sendResponse({ ready: true });
           break;
         case "get_quiz_content":
-          const selectedText = window.getSelection().toString().trim();
-          if (selectedText.length > 20) {
-              content = `Question: ${selectedText}`;
-          } else {
-              content = this.quiz.extractContent();
-          }
+          setTimeout(() => {
+            const selectedText = window.getSelection().toString().trim();
+            let content;
+            if (selectedText.length > 20) {
+                content = `Question: ${selectedText}`;
+            } else {
+                content = this.quiz.extractContent();
+            }
 
-          if (!content) {
-              console.log("No specific quiz block found. Falling back to full page content for analysis.");
-              content = this.page.fallbackContent();
-          }
-          sendResponse({ content });
-          break;
+            if (!content) {
+                console.log("No specific quiz block found. Falling back to full page content for analysis.");
+                content = this.page.fallbackContent();
+            }
+            sendResponse({ content });
+          }, 150);
+          return true;
+
         case "get_full_page_content":
           const fullContent = this.page.extractFullContent();
           sendResponse({ content: fullContent });
           break;
         case "highlight-answer":
           this.marker.highlight(request.text, () => {
-              chrome.storage.sync.get('preSubmissionCheck', (settings) => {
+              StorageManager.local.get('preSubmissionCheck', (settings) => {
                   if (settings.preSubmissionCheck ?? true) {
                       this.quiz.activatePreSubmissionCheck(request.text[0]);
                   }
@@ -453,13 +445,13 @@ class ContentController {
           sendResponse({ options });
           break;
       }
-      return true; // Keep the message channel open for async response
+      return true;
     });
   }
 }
 
-// Inisialisasi controller hanya jika belum pernah dimuat sebelumnya.
-if (typeof window.geminiAnswerBotContentScriptLoaded === 'undefined') {
-  window.geminiAnswerBotContentScriptLoaded = true;
+// This check prevents re-declaration errors.
+if (typeof window.geminiAnswerBotContentLoaded === 'undefined') {
+  window.geminiAnswerBotContentLoaded = true;
   new ContentController();
 }

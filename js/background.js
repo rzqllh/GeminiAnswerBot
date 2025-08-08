@@ -1,8 +1,7 @@
-// === Hafizh Rizqullah | GeminiAnswerBot ===
-// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
-// 📄 js/background.js
-// 🕓 Created: 2024-05-22 16:20:00
-// 🧠 Modular | DRY | SOLID | Apple HIG Compliant
+// === Hafizh Signature Code ===
+// Author: Hafizh Rizqullah — GeminiAnswerBot
+// File: js/background.js
+// Created: 2025-08-08 16:42:03
 
 // CRITICAL: Scripts must be imported at the top level of the service worker.
 try {
@@ -11,8 +10,8 @@ try {
   console.error('Failed to import scripts in background worker:', e);
 }
 
-let contextDataForPopup = null;
-let verificationContext = {};
+// REMOVED: Global variables `contextDataForPopup` and `verificationContext`.
+// State is now managed in `chrome.storage.session` for reliability.
 
 async function fetchImageAsBase64(url) {
   try {
@@ -59,13 +58,15 @@ async function handleContextAction(info, tab) {
     }
   }
   
-  contextDataForPopup = actionData;
+  // Use session storage for robust state passing
+  await StorageManager.session.set({ [`contextData_${tab.id}`]: actionData });
 
   try {
     await chrome.action.openPopup();
   } catch (e) {
     console.error("Failed to open popup programmatically:", e);
-    contextDataForPopup = null;
+    // Clean up if popup fails to open
+    await StorageManager.session.remove(`contextData_${tab.id}`);
   }
 }
 
@@ -132,13 +133,18 @@ chrome.runtime.onInstalled.addListener(updateContextMenus);
 chrome.runtime.onStartup.addListener(updateContextMenus);
 
 async function performApiCall(payload) {
-    const { apiKey, model, systemPrompt, userContent, base64ImageData, purpose } = payload;
+    const { apiKey, model, systemPrompt, userContent, base64ImageData, purpose, tabId } = payload;
     
     const streamCallback = (streamData) => {
       chrome.runtime.sendMessage({
         action: 'geminiStreamUpdate',
         payload: { ...streamData, originalUserContent: userContent },
         purpose: purpose
+      }).catch(err => {
+        // This can happen if the popup closes mid-stream. It's not a critical error.
+        if (!err.message.includes('Receiving end does not exist')) {
+            console.warn('Error sending stream update:', err);
+        }
       });
     };
 
@@ -249,9 +255,10 @@ function extractQuestionForSearch(cleanedContent) {
 chrome.contextMenus.onClicked.addListener(handleContextAction);
   
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    const tabId = sender.tab?.id;
     switch(request.action) {
         case 'callGeminiStream':
-            performApiCall(request.payload);
+            performApiCall({ ...request.payload, tabId });
             break;
         case 'testApiConnection':
             handleTestConnection(request.payload, sendResponse);
@@ -263,9 +270,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             handleContextAction({ menuItemId: request.payload.action, selectionText: request.payload.selectionText }, sender.tab);
             break;
         case 'popupReady':
-            if (contextDataForPopup) {
-                sendResponse(contextDataForPopup);
-                contextDataForPopup = null;
+            if (tabId) {
+                (async () => {
+                    const key = `contextData_${tabId}`;
+                    const data = await StorageManager.session.get(key);
+                    if (data[key]) {
+                        sendResponse(data[key]);
+                        await StorageManager.session.remove(key); // Clean up
+                    } else {
+                        sendResponse(null);
+                    }
+                })();
             } else {
                 sendResponse(null);
             }
@@ -278,10 +293,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(question)}`;
                 try {
                     const tab = await chrome.tabs.create({ url: searchUrl, active: false });
-                    verificationContext[tab.id] = { cleanedContent, initialAnswer };
-                    const listener = (tabId, changeInfo) => {
-                        if (tabId === tab.id && changeInfo.status === 'complete') {
-                            chrome.scripting.executeScript({ target: { tabId }, files: ['js/googleScraper.js'] })
+                    const verificationContext = { cleanedContent, initialAnswer };
+                    await StorageManager.session.set({ [`verification_${tab.id}`]: verificationContext });
+
+                    const listener = (updatedTabId, changeInfo) => {
+                        if (updatedTabId === tab.id && changeInfo.status === 'complete') {
+                            chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['js/googleScraper.js'] })
                                 .catch(err => console.error("Failed to inject scraper script:", err));
                             chrome.tabs.onUpdated.removeListener(listener);
                         }
@@ -296,7 +313,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         case 'scrapedData':
             (async () => {
-                const context = verificationContext[sender.tab.id];
+                const key = `verification_${sender.tab.id}`;
+                const data = await StorageManager.session.get(key);
+                const context = data[key];
+
                 if (!context) {
                     console.error("No verification context found for tab:", sender.tab.id);
                     chrome.tabs.remove(sender.tab.id);
@@ -314,7 +334,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     purpose: 'verification'
                 });
 
-                delete verificationContext[sender.tab.id];
+                await StorageManager.session.remove(key);
                 chrome.tabs.remove(sender.tab.id);
             })();
             break;
@@ -322,9 +342,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         case 'scrapingFailed':
             (async () => {
                 console.error("Scraping failed:", request.error);
-                if (verificationContext[sender.tab.id]) {
-                    delete verificationContext[sender.tab.id];
-                }
+                const key = `verification_${sender.tab.id}`;
+                await StorageManager.session.remove(key);
                 chrome.tabs.remove(sender.tab.id);
                 const formattedError = ErrorHandler.format({ message: "Could not scrape Google Search results." }, 'verification');
                 chrome.runtime.sendMessage({ action: 'geminiStreamUpdate', payload: { success: false, error: formattedError }, purpose: 'answer' });
