@@ -156,36 +156,15 @@ class QuizModule {
   _extractDataFromBlock(block) {
     if (!block) return null;
 
-    let questionText = '';
-    // Prioritize elements that are not direct parents of options.
-    const questionCandidates = block.querySelectorAll('p, h1, h2, h3, h4, div, span');
-    let bestCandidate = null;
-
-    questionCandidates.forEach(el => {
-        // Skip if the element is or contains a label/input, or is an option itself.
-        if (el.querySelector('input, label') || el.closest('label')) return;
-
-        const clone = el.cloneNode(true);
-        // More aggressive cleaning of potential option/control elements
-        clone.querySelectorAll('button, input, a, select, form, ul, ol, label, div[class*="option"], div[class*="answer"]').forEach(child => child.remove());
-        const text = clone.textContent.trim().replace(/\s+/g, ' ');
-
-        // A good question is usually a single, reasonably long sentence.
-        if (text.length > 15 && text.length < 200 && (!bestCandidate || text.length > bestCandidate.length)) {
-            bestCandidate = text;
-        }
-    });
-    questionText = bestCandidate || '';
-    
     const options = [];
     const seenOptions = new Set();
     let hasCheckboxes = false;
+    const inputs = block.querySelectorAll('input[type="radio"], input[type="checkbox"]');
     
-    block.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
+    inputs.forEach(input => {
       if (input.type === 'checkbox') hasCheckboxes = true;
       
       let optionText = '';
-      // Find label more robustly
       let label = input.closest('label');
       if (!label && input.id) {
           label = document.querySelector(`label[for="${input.id}"]`);
@@ -195,7 +174,6 @@ class QuizModule {
         optionText = label.textContent.trim();
       }
 
-      // Fallback if no label is found
       if (!optionText) {
         const parent = input.parentElement;
         if (parent) {
@@ -210,6 +188,33 @@ class QuizModule {
         seenOptions.add(optionText);
       }
     });
+
+    if (options.length < 2) return null; // Not a valid quiz without options.
+
+    // **NEW Proximity-Based Question Finding Logic**
+    let questionText = '';
+    const firstInput = inputs[0];
+    if (firstInput) {
+        const allElements = Array.from(block.getElementsByTagName('*'));
+        const firstInputIndex = allElements.indexOf(firstInput.parentElement.closest('div, p, li') || firstInput);
+
+        let bestCandidate = null;
+        // Search backwards from the first option for the nearest preceding text.
+        for (let i = firstInputIndex - 1; i >= 0; i--) {
+            const el = allElements[i];
+            if (el.querySelector('input, label, button')) continue; // Skip elements that contain other options/controls.
+
+            const clone = el.cloneNode(true);
+            clone.querySelectorAll('script, style, svg, button, input, a, select, form, ul, ol, label').forEach(child => child.remove());
+            const text = clone.textContent.trim().replace(/\s+/g, ' ');
+
+            if (text.length > 15 && text.length < 300) {
+                bestCandidate = text;
+                break; // Found the closest valid candidate, stop searching.
+            }
+        }
+        questionText = bestCandidate || '';
+    }
 
     if (questionText && options.length > 1) {
       let content = `Question: ${questionText}\n\nOptions:\n${options.map(opt => `- ${opt}`).join('\n')}`;
