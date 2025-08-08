@@ -29,19 +29,20 @@ class PopupApp {
         this.streamAccumulator = {};
         this._messageHandler = this._handleMessages.bind(this);
         this._tabUpdateHandler = this._handleTabUpdate.bind(this);
+        this._storageChangeHandler = this._handleStorageChange.bind(this);
 
         // --- ONE-TIME SETUP LOGIC ---
         this._queryElements();
         this._bindEvents();
         this.store.subscribe(this.render.bind(this));
         chrome.runtime.onMessage.addListener(this._messageHandler);
-
-        // Listen for tab updates to handle navigation
         chrome.tabs.onUpdated.addListener(this._tabUpdateHandler);
+        chrome.storage.onChanged.addListener(this._storageChangeHandler);
 
         window.addEventListener('unload', () => {
             chrome.runtime.onMessage.removeListener(this._messageHandler);
             chrome.tabs.onUpdated.removeListener(this._tabUpdateHandler);
+            chrome.storage.onChanged.removeListener(this._storageChangeHandler);
         });
     }
 
@@ -82,7 +83,6 @@ class PopupApp {
 
     _handleTabUpdate(tabId, changeInfo) {
         const state = this.store.getState();
-        // If the active tab has finished loading a new URL, trigger a rescan.
         if (state.tab && tabId === state.tab.id && changeInfo.status === 'complete') {
             StorageManager.log('Popup', 'Active tab updated, triggering rescan.');
             this.start(true);
@@ -92,6 +92,24 @@ class PopupApp {
     _handleMessages(request) {
         if (request.action === 'geminiStreamUpdate') {
             this._handleStreamUpdate(request);
+        }
+    }
+
+    _handleStorageChange(changes) {
+        const state = this.store.getState();
+        let configChanged = false;
+        const relevantKeys = ['autoHighlight', 'preSubmissionCheck', 'geminiApiKey', 'selectedModel', 'temperature', 'promptProfiles', 'activeProfile'];
+
+        for (const key in changes) {
+            if (relevantKeys.includes(key)) {
+                state.config[key] = changes[key].newValue;
+                configChanged = true;
+            }
+        }
+
+        if (configChanged) {
+            this.store.setState({ config: { ...state.config } });
+            StorageManager.log('Popup', 'Configuration updated in real-time due to storage change.');
         }
     }
 
@@ -109,7 +127,6 @@ class PopupApp {
                 return;
             }
         } catch (e) {
-            // This error is expected if the script isn't injected yet.
             StorageManager.log('Injection', 'Content script not found, injecting now...');
             try {
                 await chrome.scripting.insertCSS({ target: { tabId }, files: ['assets/highlighter.css', 'assets/dialog.css', 'assets/toolbar.css'] });
@@ -121,12 +138,10 @@ class PopupApp {
                         'js/vendor/dompurify.min.js', 
                         'js/vendor/marked.min.js', 
                         'js/vendor/mark.min.js',
-                        'js/vendor/Readability.js', // Ensure library is injected before our script
+                        'js/vendor/Readability.js',
                         'js/content.js'
                     ] 
                 });
-                // Give a brief moment for the script to initialize after injection
-                await new Promise(resolve => setTimeout(resolve, 100));
             } catch (injectionError) {
                 StorageManager.log('Injection', 'Critical injection failure:', injectionError);
                 throw new Error('Script injection failed. This page may not be supported.');
@@ -266,18 +281,16 @@ class PopupApp {
             this.elements.contentDisplayWrapper.classList.add('hidden');
         }
 
-        // Declarative rendering for the answer panel
         if (state.answerHTML) {
             this.elements.answerContainer.classList.remove('hidden');
             this._renderAnswerContent(state.answerHTML, true, state.totalTokenCount, state.thoughtProcess);
-        } else if (state.cleanedContent) { // Show loader only after cleaning is done
+        } else if (state.cleanedContent) {
             this.elements.answerContainer.classList.remove('hidden');
             this._renderLoadingState(this.elements.answerDisplay);
         } else {
             this.elements.answerContainer.classList.add('hidden');
         }
         
-        // Declarative rendering for the explanation panel
         if (state.explanationHTML) {
             this.elements.explanationContainer.classList.remove('hidden');
             this._renderExplanationContent(state.explanationHTML);
@@ -389,7 +402,6 @@ class PopupApp {
     
     _getAnswer() {
         const state = this.store.getState();
-        // Logic is now simplified: just make the API call. The render() function handles the UI.
         if (state.isImageMode) {
             this._callGeminiStream('answer', '', state.base64ImageData);
             return;
@@ -462,7 +474,7 @@ class PopupApp {
         if (payload.chunk) {
             if (!this.streamAccumulator[purpose]) {
                 this.streamAccumulator[purpose] = '';
-                if (streamTarget) streamTarget.innerHTML = ''; // Clear loader on first chunk
+                if (streamTarget) streamTarget.innerHTML = '';
             }
             this.streamAccumulator[purpose] += payload.chunk;
             if (streamTarget) {
@@ -491,7 +503,6 @@ class PopupApp {
     _handleCleaningResult(fullText) {
         this.store.setState({ cleanedContent: fullText, view: 'quiz' });
         this._saveCurrentViewState();
-        // The render() function will now show the loader. We just need to trigger the API call.
         this._getAnswer();
     }
 
@@ -539,8 +550,10 @@ class PopupApp {
         if (state.config.autoHighlight && !state.isImageMode) {
             this._sendMessageToContentScript({
                 action: 'highlight-answer',
-                text: answersToHighlight,
-                preSubmissionCheck: state.config.preSubmissionCheck ?? true
+                payload: {
+                    text: answersToHighlight,
+                    preSubmissionCheck: state.config.preSubmissionCheck ?? true
+                }
             })
             .catch(err => StorageManager.log('Popup', 'Could not highlight answer on page:', err.message));
         }
@@ -591,16 +604,14 @@ class PopupApp {
         if (parts.length > 1) {
             const optionLines = parts[1].trim().split('\n');
             const formattedOptions = optionLines.map(line => {
-                // Robustly find the text after the hyphen
                 const textMatch = line.match(/^\s*-\s*(.*)/);
-                if (!textMatch) return ''; // Skip empty or malformed lines
+                if (!textMatch) return '';
                 
                 const optionText = textMatch[1].trim();
-                // Check if the option looks like code and wrap it in backticks
                 if (optionText.includes('<') && optionText.includes('>')) {
                     return `- \`${optionText}\``;
                 }
-                return `- ${optionText}`; // Return as plain text if not code
+                return `- ${optionText}`;
             }).filter(Boolean).join('\n');
             options = '\n### Options\n' + formattedOptions;
         }

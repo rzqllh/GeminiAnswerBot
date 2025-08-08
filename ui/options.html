@@ -1,8 +1,7 @@
-<!-- // === Hafizh Rizqullah | GeminiAnswerBot ===
-// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
-// 📄 ui/options.html
-// 🕓 Created: 2024-05-22 19:15:00
-// 🧠 Modular | DRY | SOLID | Apple HIG Compliant -->
+<!-- === Hafizh Signature Code ===
+Author: Hafizh Rizqullah — GeminiAnswerBot
+File: ui/options.html
+Created: 2025-08-08 16:42:03 -->
 
 <!DOCTYPE html>
 <html>
@@ -45,8 +44,10 @@
     <main class="settings-content">
       <!-- General Settings Pane -->
       <div id="general" class="content-pane">
-        <h1>General Settings</h1>
-        <p class="section-description">Configure your API key, select the AI model, and adjust core extension behaviors.</p>
+        <div class="pane-header-main">
+          <h1>General Settings</h1>
+          <p class="section-description">Configure your API key, select the AI model, and adjust core extension behaviors.</p>
+        </div>
         
         <div id="syncWarning" class="settings-card hidden" style="border-color: var(--accent-yellow); background-color: rgba(255, 204, 0, 0.1);">
             <div class="card-content" style="padding: 16px 20px;">
@@ -61,13 +62,9 @@
         </div>
 
         <div class="settings-card">
-          <div class="card-header"><h2>API Configuration</h2></div>
           <div class="card-content">
             <div class="form-row">
-              <div class="form-row-label">
-                <label for="apiKey">Google Gemini API Key</label>
-                <p class="form-hint">Your key is stored locally and never shared.</p>
-              </div>
+              <label for="apiKey" class="form-row-label-static">Google Gemini API Key</label>
               <div class="form-row-control">
                 <div class="input-wrapper">
                   <input type="password" id="apiKey" placeholder="Enter your API key">
@@ -79,10 +76,7 @@
               </div>
             </div>
             <div class="form-row">
-              <div class="form-row-label">
-                <label for="modelSelect">AI Model</label>
-                <p class="form-hint">Select the Gemini model for processing requests.</p>
-              </div>
+              <label for="modelSelect" class="form-row-label-static">AI Model</label>
               <div class="form-row-control">
                 <select id="modelSelect">
                   <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (Recommended)</option>
@@ -91,26 +85,28 @@
                 </select>
               </div>
             </div>
-            <div class="form-row">
-                <div class="form-row-label">
-                    <label for="temperatureSlider">Global Temperature</label>
-                    <p class="form-hint">Controls randomness. Lower is more deterministic, higher is more creative.</p>
-                </div>
-                <div class="form-row-control">
-                    <div class="slider-container">
-                        <span id="temperatureValue" class="slider-value-display">0.4</span>
-                        <input type="range" id="temperatureSlider" min="0" max="1" step="0.1" value="0.4">
+          </div>
+        </div>
+        <p class="settings-group-description">Controls randomness. Lower is more deterministic, higher is more creative.</p>
+        <div class="settings-card">
+            <div class="card-content">
+                <div class="form-row">
+                    <label for="temperatureSlider" class="form-row-label-static">Global Temperature</label>
+                    <div class="form-row-control">
+                        <div class="slider-container">
+                            <span id="temperatureValue" class="slider-value-display">0.4</span>
+                            <input type="range" id="temperatureSlider" min="0" max="1" step="0.1" value="0.4">
+                        </div>
                     </div>
                 </div>
             </div>
-          </div>
         </div>
 
+        <p class="settings-group-description">Customize the core functionality of the extension during quiz analysis.</p>
         <div class="settings-card">
-          <div class="card-header"><h2>Behavior</h2></div>
           <div class="card-content">
             <div class="form-row">
-              <div class="form-row-label">
+              <div class="form-row-label-stacked">
                 <label for="autoHighlightToggle">Auto-Highlight Answer</label>
                 <p class="form-hint">Automatically highlight the AI's answer on the page.</p>
               </div>
@@ -122,7 +118,7 @@
               </div>
             </div>
             <div class="form-row">
-              <div class="form-row-label">
+              <div class="form-row-label-stacked">
                 <label for="preSubmissionCheckToggle">Pre-Submission Check</label>
                 <p class="form-hint">Warn if your selected answer differs from the AI's.</p>
               </div>
@@ -144,24 +140,22 @@
 
       <!-- Prompts Settings Pane -->
       <div id="prompts" class="content-pane">
-        <h1>Prompt Engineering</h1>
-        <p class="section-description">Customize the system prompts used by the AI to tailor its behavior and responses.</p>
+        <div class="pane-header-main">
+          <h1>Prompt Engineering</h1>
+          <p class="section-description">Customize the system prompts used by the AI to tailor its behavior and responses.</p>
+        </div>
         
         <div class="settings-card">
-          <div class="card-header"><h2>Profile Management</h2></div>
           <div class="card-content">
             <div class="form-row">
-              <div class="form-row-label">
-                <label for="profileSelect">Active Prompt Profile</label>
-                <p class="form-hint">Select a profile to edit its prompts below.</p>
-              </div>
+              <label for="profileSelect" class="form-row-label-static">Active Prompt Profile</label>
               <div class="form-row-control">
                 <div class="profile-manager">
                   <select id="profileSelect"></select>
                   <div class="profile-actions">
-                    <button id="newProfileBtn" class="button button-secondary" title="New Profile">+</button>
-                    <button id="renameProfileBtn" class="button button-secondary" title="Rename Profile">✏️</button>
-                    <button id="deleteProfileBtn" class="button button-secondary" title="Delete Profile">🗑️</button>
+                    <button id="newProfileBtn" class="button button-icon" title="New Profile">+</button>
+                    <button id="renameProfileBtn" class="button button-icon" title="Rename Profile">✏️</button>
+                    <button id="deleteProfileBtn" class="button button-icon" title="Delete Profile">🗑️</button>
                   </div>
                 </div>
               </div>
@@ -265,15 +259,13 @@
 
       <!-- History Pane -->
       <div id="history" class="content-pane">
-        <div class="pane-header">
-          <div>
-            <h1>Interaction History</h1>
-            <p class="section-description">Review your past 100 interactions with the extension.</p>
-          </div>
-          <div class="pane-header-actions">
-            <button id="exportHistoryButton" class="button button-secondary">Export History</button>
-            <button id="clearHistoryButton" class="button button-danger">Clear History</button>
-          </div>
+        <div class="pane-header-main">
+          <h1>Interaction History</h1>
+          <p class="section-description">Review your past 100 interactions with the extension.</p>
+        </div>
+        <div class="pane-header-actions">
+          <button id="exportHistoryButton" class="button button-secondary">Export History</button>
+          <button id="clearHistoryButton" class="button button-danger">Clear History</button>
         </div>
         <div id="history-list-container">
           <!-- History items will be loaded here by history.js -->
@@ -282,13 +274,15 @@
 
       <!-- Data Management Pane -->
       <div id="data" class="content-pane">
-        <h1>Data Management</h1>
-        <p class="section-description">Manage extension data stored on your local machine.</p>
+        <div class="pane-header-main">
+          <h1>Data Management</h1>
+          <p class="section-description">Manage extension data stored on your local machine.</p>
+        </div>
+        <p class="settings-group-description">For troubleshooting and development purposes.</p>
         <div class="settings-card">
-            <div class="card-header"><h2>Developer</h2></div>
             <div class="card-content">
                 <div class="form-row">
-                    <div class="form-row-label">
+                    <div class="form-row-label-stacked">
                         <label for="debugModeToggle">Debug Mode</label>
                         <p class="form-hint">Enable detailed logging to the console for troubleshooting.</p>
                     </div>
@@ -301,13 +295,13 @@
                 </div>
             </div>
         </div>
+        <p class="settings-group-description">These actions are permanent and cannot be undone.</p>
         <div class="settings-card">
-          <div class="card-header"><h2>Danger Zone</h2></div>
           <div class="card-content">
             <div class="form-row">
-              <div class="form-row-label">
+              <div class="form-row-label-stacked">
                 <label>Reset All Settings</label>
-                <p class="form-hint">This will permanently delete your API key, custom prompts, and all history. This action cannot be undone.</p>
+                <p class="form-hint">This will permanently delete your API key, custom prompts, and all history.</p>
               </div>
               <div class="form-row-control">
                 <button id="resetSettingsButton" class="button button-danger">Reset to Factory Defaults</button>
@@ -332,7 +326,6 @@
 
   <div id="notification-container"></div>
   
-  <!-- SCRIPT LOADING ORDER IS CRITICAL -->
   <script src="../js/vendor/dompurify.min.js"></script>
   <script src="../js/utils/helpers.js"></script>
   <script src="../js/utils/errorHandler.js"></script>
@@ -340,13 +333,11 @@
   <script src="../js/vendor/marked.min.js"></script>
   <script src="../js/prompts.js"></script>
   
-  <!-- MODULAR OPTIONS SCRIPTS -->
   <script src="../js/options/ui.js"></script>
   <script src="../js/options/nav.js"></script>
   <script src="../js/options/history.js"></script>
   <script src="../js/options/settings.js"></script>
 
-  <!-- MAIN ORCHESTRATOR SCRIPT (must be last) -->
   <script src="../js/options.js"></script>
 </body>
 </html>

@@ -16,7 +16,6 @@ const SettingsModule = (() => {
     const value = parseFloat(slider.value);
     tooltip.textContent = value.toFixed(1);
     
-    // Position the tooltip above the thumb
     const min = parseFloat(slider.min);
     const max = parseFloat(slider.max);
     const percent = (value - min) / (max - min);
@@ -42,8 +41,6 @@ const SettingsModule = (() => {
     slider.addEventListener('mouseenter', showTooltip);
     slider.addEventListener('mouseleave', hideTooltip);
     
-    // Initial positioning
-    // Use a timeout to ensure the element is rendered and has a width
     setTimeout(() => updateSliderTooltip(slider), 50);
   }
 
@@ -66,11 +63,11 @@ const SettingsModule = (() => {
   async function saveGeneralSettings() {
     const newGlobalTemp = parseFloat(ELS.temperatureSlider.value);
     const settingsToSave = {
-      'geminiApiKey': ELS.apiKeyInput.value.trim(),
-      'selectedModel': ELS.modelSelect.value,
-      'autoHighlight': ELS.autoHighlightToggle.checked,
-      'preSubmissionCheck': ELS.preSubmissionCheckToggle.checked,
-      'temperature': newGlobalTemp
+      geminiApiKey: ELS.apiKeyInput.value.trim(),
+      selectedModel: ELS.modelSelect.value,
+      autoHighlight: ELS.autoHighlightToggle.checked,
+      preSubmissionCheck: ELS.preSubmissionCheckToggle.checked,
+      temperature: newGlobalTemp
     };
     try {
       await StorageManager.set(settingsToSave);

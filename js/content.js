@@ -3,13 +3,9 @@
 // File: js/content.js
 // Created: 2025-08-08 16:42:03
 
-// Load guard to prevent re-declaration errors on repeated injections
 if (typeof window.geminiAnswerBotContentLoaded === 'undefined') {
   window.geminiAnswerBotContentLoaded = true;
 
-  /**
-   * Mengenkapsulasi semua interaksi dengan pustaka Mark.js untuk menyorot teks.
-   */
   class MarkerModule {
     constructor() {
       this.markerInstance = null;
@@ -57,9 +53,6 @@ if (typeof window.geminiAnswerBotContentLoaded === 'undefined') {
     }
   }
 
-  /**
-   * Mengelola semua logika terkait ekstraksi konten kuis dan pemeriksaan pra-pengiriman.
-   */
   class QuizModule {
     constructor() {
       this.correctAiAnswer = null;
@@ -653,6 +646,5 @@ if (typeof window.geminiAnswerBotContentLoaded === 'undefined') {
     }
   }
 
-  // The only code that runs globally is the instantiation.
   new ContentController();
 }
