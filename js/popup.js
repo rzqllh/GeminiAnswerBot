@@ -240,14 +240,23 @@ class PopupApp {
             this.elements.contentDisplayWrapper.classList.add('hidden');
         }
 
-        this.elements.answerContainer.classList.toggle('hidden', !state.answerHTML && !this.streamAccumulator.answer);
+        // Declarative rendering for the answer panel
         if (state.answerHTML) {
+            this.elements.answerContainer.classList.remove('hidden');
             this._renderAnswerContent(state.answerHTML, true, state.totalTokenCount, state.thoughtProcess);
+        } else if (state.cleanedContent) { // Show loader only after cleaning is done
+            this.elements.answerContainer.classList.remove('hidden');
+            this._renderLoadingState(this.elements.answerDisplay);
+        } else {
+            this.elements.answerContainer.classList.add('hidden');
         }
         
-        this.elements.explanationContainer.classList.toggle('hidden', !state.explanationHTML && !this.streamAccumulator.explanation);
+        // Declarative rendering for the explanation panel
         if (state.explanationHTML) {
+            this.elements.explanationContainer.classList.remove('hidden');
             this._renderExplanationContent(state.explanationHTML);
+        } else {
+            this.elements.explanationContainer.classList.add('hidden');
         }
     }
 
@@ -354,30 +363,24 @@ class PopupApp {
     
     _getAnswer() {
         const state = this.store.getState();
-        // Make container visible BEFORE rendering the loading indicator
-        this.elements.answerContainer.classList.remove('hidden');
-        this._renderLoadingState(this.elements.answerDisplay);
-
-        // Defer the API call to allow the browser to render the loader first.
-        setTimeout(() => {
-            if (state.isImageMode) {
-                this._callGeminiStream('answer', '', state.base64ImageData);
-                return;
-            }
-            if (!state.cleanedContent) return;
-            
-            const fingerprint = this._createQuizFingerprint(state.cleanedContent);
-            const cacheKey = fingerprint ? this._simpleHash(fingerprint) : null;
-            this.store.setState({ cacheKey });
-            
-            if (cacheKey) {
-                StorageManager.local.get(cacheKey).then(cachedResult => {
-                    if (cachedResult[cacheKey]?.answerHTML) {
-                        this._handleAnswerResult(cachedResult[cacheKey].answerHTML, true, cachedResult[cacheKey].totalTokenCount, cachedResult[cacheKey].thoughtProcess);
-                    } else { this._continueGetAnswer(); }
-                });
-            } else { this._continueGetAnswer(); }
-        }, 0);
+        // Logic is now simplified: just make the API call. The render() function handles the UI.
+        if (state.isImageMode) {
+            this._callGeminiStream('answer', '', state.base64ImageData);
+            return;
+        }
+        if (!state.cleanedContent) return;
+        
+        const fingerprint = this._createQuizFingerprint(state.cleanedContent);
+        const cacheKey = fingerprint ? this._simpleHash(fingerprint) : null;
+        this.store.setState({ cacheKey });
+        
+        if (cacheKey) {
+            StorageManager.local.get(cacheKey).then(cachedResult => {
+                if (cachedResult[cacheKey]?.answerHTML) {
+                    this._handleAnswerResult(cachedResult[cacheKey].answerHTML, true, cachedResult[cacheKey].totalTokenCount, cachedResult[cacheKey].thoughtProcess);
+                } else { this._continueGetAnswer(); }
+            });
+        } else { this._continueGetAnswer(); }
     }
     
     _continueGetAnswer() {
@@ -390,11 +393,10 @@ class PopupApp {
         if (!state.cleanedContent) return;
         this.elements.explanationButton.disabled = true;
         this.elements.retryExplanation.disabled = true;
-        // Make container visible BEFORE rendering the loading indicator
+        
         this.elements.explanationContainer.classList.remove('hidden');
         this._renderLoadingState(this.elements.explanationDisplay);
 
-        // Defer the API call to allow the browser to render the loader first.
         setTimeout(() => {
             const contentForExplanation = `${state.cleanedContent}\n\nCorrect Answer: ${state.incorrectAnswer}`;
             this._callGeminiStream('explanation', contentForExplanation);
@@ -461,8 +463,8 @@ class PopupApp {
     _handleCleaningResult(fullText) {
         this.store.setState({ cleanedContent: fullText, view: 'quiz' });
         this._saveCurrentViewState();
-        // Defer the _getAnswer call to allow the main quiz view to render first.
-        setTimeout(() => this._getAnswer(), 0);
+        // The render() function will now show the loader. We just need to trigger the API call.
+        this._getAnswer();
     }
 
     _renderAnswerContent(fullText, fromCache, totalTokenCount, thoughtProcess) {
