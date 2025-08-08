@@ -1,8 +1,7 @@
-// === Hafizh Rizqullah | GeminiAnswerBot ===
-// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
-// 📄 js/content.js
-// 🕓 Created: 2024-05-22 14:00:00
-// 🧠 Modular | DRY | SOLID | Apple HIG Compliant
+// === Hafizh Signature Code ===
+// Author: Hafizh Rizqullah — GeminiAnswerBot
+// File: js/content.js
+// Created: 2025-08-08 16:42:03
 
 /**
  * Mengenkapsulasi semua interaksi dengan pustaka Mark.js untuk menyorot teks.
@@ -432,11 +431,10 @@ class ContentController {
           break;
         case "highlight-answer":
           this.marker.highlight(request.text, () => {
-              StorageManager.local.get('preSubmissionCheck', (settings) => {
-                  if (settings.preSubmissionCheck ?? true) {
-                      this.quiz.activatePreSubmissionCheck(request.text[0]);
-                  }
-              });
+              // Use the setting passed directly in the message
+              if (request.preSubmissionCheck) {
+                  this.quiz.activatePreSubmissionCheck(request.text[0]);
+              }
           });
           sendResponse({ success: true });
           break;

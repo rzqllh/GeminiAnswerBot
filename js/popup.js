@@ -494,8 +494,12 @@ class PopupApp {
 
         const answersToHighlight = incorrectAnswer.split(',').map(s => s.trim());
         if (state.config.autoHighlight && !state.isImageMode) {
-            this._sendMessageToContentScript({ action: 'highlight-answer', text: answersToHighlight })
-                .catch(err => StorageManager.log('Popup', 'Could not highlight answer on page:', err.message));
+            this._sendMessageToContentScript({
+                action: 'highlight-answer',
+                text: answersToHighlight,
+                preSubmissionCheck: state.config.preSubmissionCheck ?? true
+            })
+            .catch(err => StorageManager.log('Popup', 'Could not highlight answer on page:', err.message));
         }
     }
 
