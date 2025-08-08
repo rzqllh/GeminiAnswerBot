@@ -370,7 +370,6 @@ class PageModule {
             console.error("Readability.js failed, using raw text fallback:", e);
         }
 
-        // Original raw text fallback if Readability fails
         const clone = document.body.cloneNode(true);
         clone.querySelectorAll('script, style, noscript, iframe').forEach(el => el.remove());
         let content = clone.innerText.trim();
@@ -384,8 +383,9 @@ class PageModule {
 }
 
 class ToolbarModule {
-  constructor() {
+  constructor(dialogModule) {
     this.toolbarElement = null;
+    this.dialogModule = dialogModule; // Store reference to the dialog module
     this.create();
     this.bindEvents();
   }
@@ -411,14 +411,15 @@ class ToolbarModule {
       button.innerHTML = item.svg;
       button.addEventListener('click', (e) => {
         e.stopPropagation();
+        this.hide();
         const selectedText = window.getSelection().toString();
         if (selectedText.trim()) {
+          this.dialogModule.show(item.title); // Show dialog immediately
           chrome.runtime.sendMessage({
             action: 'triggerContextMenuAction',
             payload: { action: item.action, selectionText: selectedText }
           });
         }
-        this.hide();
       });
       this.toolbarElement.appendChild(button);
     });
@@ -427,6 +428,7 @@ class ToolbarModule {
   
   bindEvents() {
     document.addEventListener('mouseup', () => setTimeout(() => {
+      if (this.dialogModule.isVisible()) return; // Don't show toolbar if dialog is open
       const selectionText = window.getSelection().toString().trim();
       if (selectionText.length > 5) { this.show(); } else { this.hide(); }
     }, 10));
@@ -463,12 +465,111 @@ class ToolbarModule {
   }
 }
 
+/**
+ * NEW: Manages the floating result dialog injected into the page.
+ */
+class DialogModule {
+    constructor() {
+        this.overlay = null;
+        this.contentArea = null;
+        this.titleArea = null;
+        this.streamAccumulator = '';
+    }
+
+    _ensureStylesheet() {
+        if (!document.getElementById('gemini-answer-bot-result-dialog-css')) {
+            const link = document.createElement('link');
+            link.id = 'gemini-answer-bot-result-dialog-css';
+            link.rel = 'stylesheet';
+            link.type = 'text/css';
+            link.href = chrome.runtime.getURL('assets/resultDialog.css');
+            document.head.appendChild(link);
+        }
+    }
+
+    create() {
+        if (document.getElementById('gemini-answer-bot-result-dialog-overlay')) return;
+        this._ensureStylesheet();
+        
+        this.overlay = document.createElement('div');
+        this.overlay.id = 'gemini-answer-bot-result-dialog-overlay';
+        
+        this.overlay.innerHTML = `
+            <div id="gemini-answer-bot-result-dialog-box" role="dialog" aria-modal="true">
+                <div class="gab-result-dialog-header">
+                    <h2 class="gab-result-dialog-title">Result</h2>
+                    <button class="gab-result-dialog-close-btn" aria-label="Close">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+                <div class="gab-result-dialog-content">
+                    <div class="gab-result-dialog-loader">
+                        <div class="gab-result-dialog-spinner"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(this.overlay);
+
+        this.contentArea = this.overlay.querySelector('.gab-result-dialog-content');
+        this.titleArea = this.overlay.querySelector('.gab-result-dialog-title');
+        
+        this.overlay.querySelector('.gab-result-dialog-close-btn').addEventListener('click', () => this.hide());
+        this.overlay.addEventListener('click', (e) => {
+            if (e.target === this.overlay) {
+                this.hide();
+            }
+        });
+    }
+
+    show(title = 'Result') {
+        if (!this.overlay) this.create();
+        this.titleArea.textContent = _escapeHtml(title);
+        this.streamAccumulator = '';
+        this.contentArea.innerHTML = `
+            <div class="gab-result-dialog-loader">
+                <div class="gab-result-dialog-spinner"></div>
+            </div>
+        `;
+        
+        this.overlay.classList.add('visible');
+    }
+
+    hide() {
+        if (!this.overlay) return;
+        this.overlay.classList.remove('visible');
+    }
+
+    update(chunk) {
+        if(!this.contentArea) return;
+        // On first chunk, clear the loader
+        if(this.streamAccumulator === '') {
+            this.contentArea.innerHTML = '';
+        }
+        this.streamAccumulator += chunk;
+        this.contentArea.innerHTML = DOMPurify.sanitize(marked.parse(this.streamAccumulator));
+    }
+
+    handleError(error) {
+        if(!this.contentArea) return;
+        this.titleArea.textContent = 'Error';
+        this.contentArea.innerHTML = `<p><strong>${_escapeHtml(error.title)}</strong></p><p>${_escapeHtml(error.message)}</p>`;
+    }
+
+    isVisible() {
+        return this.overlay && this.overlay.classList.contains('visible');
+    }
+}
+
+
 class ContentController {
   constructor() {
     this.marker = new MarkerModule();
     this.quiz = new QuizModule();
     this.page = new PageModule();
-    this.toolbar = new ToolbarModule();
+    this.dialog = new DialogModule();
+    this.toolbar = new ToolbarModule(this.dialog); // Pass dialog manager to toolbar
     this.listenForMessages();
   }
   
@@ -495,6 +596,18 @@ class ContentController {
             sendResponse({ content });
           }, 150);
           return true;
+        
+        // NEW: Handle stream updates from background script
+        case "geminiStreamUpdate":
+          const { payload } = request;
+          if (!payload.success) {
+              this.dialog.handleError(payload.error);
+              return;
+          }
+          if (payload.chunk) {
+              this.dialog.update(payload.chunk);
+          }
+          break;
 
         case "get_full_page_content":
           const fullContent = this.page.extractFullContent();
@@ -502,7 +615,6 @@ class ContentController {
           break;
         case "highlight-answer":
           this.marker.highlight(request.text, () => {
-              // Use the setting passed directly in the message
               if (request.preSubmissionCheck) {
                   this.quiz.activatePreSubmissionCheck(request.text[0]);
               }

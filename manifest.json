@@ -2,7 +2,7 @@
 {
   "manifest_version": 3,
   "name": "GeminiAnswerBot",
-  "version": "3.2.2",
+  "version": "3.3.0",
   "description": "A smart Chrome extension powered by the Google Gemini API.",
   "permissions": [
     "activeTab",
@@ -33,6 +33,7 @@
         "assets/highlighter.css",
         "assets/dialog.css",
         "assets/toolbar.css",
+        "assets/resultDialog.css",
         "js/googleScraper.js",
         "js/vendor/Readability.js"
       ],

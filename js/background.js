@@ -10,9 +10,6 @@ try {
   console.error('Failed to import scripts in background worker:', e);
 }
 
-// REMOVED: Global variables `contextDataForPopup` and `verificationContext`.
-// State is now managed in `chrome.storage.session` for reliability.
-
 async function fetchImageAsBase64(url) {
   try {
     const response = await fetch(url, { mode: 'cors' });
@@ -32,6 +29,7 @@ async function fetchImageAsBase64(url) {
   }
 }
 
+// This function is now ONLY for the native context menu clicks.
 async function handleContextAction(info, tab) {
   if (!tab || !tab.id) {
     console.error("Context action triggered without a valid tab.");
@@ -58,14 +56,13 @@ async function handleContextAction(info, tab) {
     }
   }
   
-  // Use session storage for robust state passing
   await StorageManager.session.set({ [`contextData_${tab.id}`]: actionData });
 
   try {
+    // This is valid here because it's a direct result of a native menu click.
     await chrome.action.openPopup();
   } catch (e) {
     console.error("Failed to open popup programmatically:", e);
-    // Clean up if popup fails to open
     await StorageManager.session.remove(`contextData_${tab.id}`);
   }
 }
@@ -135,17 +132,28 @@ chrome.runtime.onStartup.addListener(updateContextMenus);
 async function performApiCall(payload) {
     const { apiKey, model, systemPrompt, userContent, base64ImageData, purpose, tabId } = payload;
     
+    // MODIFIED: Stream callback now sends directly to the originating tab if tabId is present.
     const streamCallback = (streamData) => {
-      chrome.runtime.sendMessage({
+      const message = {
         action: 'geminiStreamUpdate',
         payload: { ...streamData, originalUserContent: userContent },
         purpose: purpose
-      }).catch(err => {
-        // This can happen if the popup closes mid-stream. It's not a critical error.
-        if (!err.message.includes('Receiving end does not exist')) {
-            console.warn('Error sending stream update:', err);
-        }
-      });
+      };
+
+      if (tabId) {
+        chrome.tabs.sendMessage(tabId, message).catch(err => {
+          if (!err.message.includes('Receiving end does not exist')) {
+            console.warn(`Error sending stream to tab ${tabId}:`, err);
+          }
+        });
+      } else {
+        // Fallback for requests from the popup itself
+        chrome.runtime.sendMessage(message).catch(err => {
+          if (!err.message.includes('Receiving end does not exist')) {
+            console.warn('Error sending stream update to runtime:', err);
+          }
+        });
+      }
     };
 
     try {
@@ -252,13 +260,15 @@ function extractQuestionForSearch(cleanedContent) {
     return match ? match[1].trim() : cleanedContent;
 }
 
+// Native context menu clicks call this.
 chrome.contextMenus.onClicked.addListener(handleContextAction);
   
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const tabId = sender.tab?.id;
     switch(request.action) {
         case 'callGeminiStream':
-            performApiCall({ ...request.payload, tabId });
+            // This path is used by the popup. No tabId is needed as results are broadcast.
+            performApiCall({ ...request.payload, tabId: null });
             break;
         case 'testApiConnection':
             handleTestConnection(request.payload, sendResponse);
@@ -266,9 +276,35 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         case 'updateContextMenus':
             updateContextMenus();
             break;
+        
+        // MODIFIED: This is now the entry point for in-page toolbar actions.
         case 'triggerContextMenuAction':
-            handleContextAction({ menuItemId: request.payload.action, selectionText: request.payload.selectionText }, sender.tab);
+            (async () => {
+                const { action, selectionText } = request.payload;
+                const { tab } = sender;
+                const { geminiApiKey, selectedModel, promptProfiles, activeProfile } = await StorageManager.get(['geminiApiKey', 'selectedModel', 'promptProfiles', 'activeProfile']);
+                const currentPrompts = (promptProfiles?.[activeProfile]) || DEFAULT_PROMPTS;
+                
+                let systemPrompt = currentPrompts[action] || DEFAULT_PROMPTS[action];
+                let userContent = selectionText;
+
+                if (action.startsWith('rephrase-')) {
+                    const language = action.split('-')[1];
+                    systemPrompt = currentPrompts.rephrase || DEFAULT_PROMPTS.rephrase;
+                    userContent = `Target Language: ${language}\n\nText to rephrase:\n${selectionText}`;
+                }
+        
+                performApiCall({
+                    apiKey: geminiApiKey,
+                    model: selectedModel,
+                    systemPrompt,
+                    userContent,
+                    purpose: action,
+                    tabId: tab.id, // Critical: Pass tabId to target the response
+                });
+            })();
             break;
+
         case 'popupReady':
             if (tabId) {
                 (async () => {
@@ -276,7 +312,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     const data = await StorageManager.session.get(key);
                     if (data[key]) {
                         sendResponse(data[key]);
-                        await StorageManager.session.remove(key); // Clean up
+                        await StorageManager.session.remove(key);
                     } else {
                         sendResponse(null);
                     }
@@ -331,7 +367,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     model: selectedModel,
                     systemPrompt: DEFAULT_PROMPTS.verification,
                     userContent: verificationContent,
-                    purpose: 'verification'
+                    purpose: 'verification',
+                    tabId: null // Result goes to the popup, not the scraper tab
                 });
 
                 await StorageManager.session.remove(key);
