@@ -33,7 +33,8 @@
         "assets/highlighter.css",
         "assets/dialog.css",
         "assets/toolbar.css",
-        "js/googleScraper.js"
+        "js/googleScraper.js",
+        "js/vendor/Readability.js"
       ],
       "matches": [
         "<all_urls>"
