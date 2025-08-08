@@ -631,4 +631,77 @@ class PopupApp {
     
     _clearPersistedState() { 
         const { tab } = this.store.getState();
-        return tab ? StorageManager.local.remove(tab.id.toString(
+        return tab ? StorageManager.local.remove(tab.id.toString()) : Promise.resolve(null); 
+    }
+    
+    _saveCurrentViewState() { 
+        const state = this.store.getState();
+        if (!state.tab) return; 
+        const key = state.tab.id.toString(); 
+        const stateToSave = { ...state };
+        delete stateToSave.tab;
+        delete stateToSave.config;
+        StorageManager.local.set({ [key]: stateToSave }); 
+    }
+
+    async _saveToHistory(stateData, actionType) { 
+        const state = this.store.getState();
+        if (!state.tab) return; 
+        const { history = [] } = await StorageManager.local.get('history'); 
+        const newEntry = { ...stateData, id: Date.now(), url: state.tab.url, title: state.tab.title, timestamp: new Date().toISOString(), actionType }; 
+        history.unshift(newEntry); 
+        if (history.length > 100) history.pop(); 
+        await StorageManager.local.set({ history }); 
+    }
+
+    _sendMessageToContentScript(message, timeout = 5000) { 
+        const { tab } = this.store.getState();
+        return new Promise((resolve, reject) => { 
+            if (!tab || tab.id === undefined) return reject(new Error("Invalid tab ID.")); 
+            const timer = setTimeout(() => reject(new Error('Content script timeout.')), timeout); 
+            chrome.tabs.sendMessage(tab.id, message, (response) => { 
+                clearTimeout(timer); 
+                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message)); 
+                else resolve(response); 
+            }); 
+        }); 
+    }
+
+    _createQuizFingerprint(cleanedContent) { 
+        if (!cleanedContent) return null; 
+        const lines = cleanedContent.split('\n').map(l => l.trim()).filter(l => l); 
+        return lines.length < 2 ? null : lines.map(l => l.toLowerCase().replace(/\s+/g, ' ').trim()).join('\n'); 
+    }
+    
+    _simpleHash(str) { 
+        let hash = 0; 
+        for (let i = 0; i < str.length; i++) { 
+            hash = ((hash << 5) - hash) + str.charCodeAt(i); 
+            hash |= 0; 
+        } 
+        return 'cache_' + new Uint32Array([hash])[0].toString(16); 
+    }
+
+    _handleVerification() {
+        const state = this.store.getState();
+        this.elements.verifyButton.disabled = true;
+        this.elements.verifyButton.innerHTML = `<div class="spinner"></div> Verifying...`;
+        this.streamAccumulator.answer = '';
+        this.streamAccumulator.verification = '';
+        this.elements.answerDisplay.innerHTML = '';
+        this._renderSkeletonState(this.elements.answerDisplay, true, 'answer');
+
+        chrome.runtime.sendMessage({
+            action: 'verifyAnswerWithSearch',
+            payload: {
+                cleanedContent: state.cleanedContent,
+                initialAnswer: state.incorrectAnswer
+            }
+        });
+    }
+}
+
+const app = new PopupApp();
+document.addEventListener('DOMContentLoaded', () => {
+    app.start();
+});
