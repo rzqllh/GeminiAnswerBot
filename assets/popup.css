@@ -1,7 +1,7 @@
 /* === Hafizh Signature Code ===
 Author: Hafizh Rizqullah — GeminiAnswerBot
 File: assets/popup.css
-Created: 2025-eight-08 16:42:03 */
+Created: 2025-08-08 16:42:03 */
 
 /* == BASE COLORS & VARIABLES (Light Mode First) ================= */
 :root {
@@ -273,7 +273,7 @@ body {
 
 /* NEW LOADER */
 .loader {
-  width: 60px; /* Adjusted size for popup */
+  width: 50px; /* Adjusted size for popup */
   aspect-ratio: 1;
   border: 8px solid var(--loader-primary); /* Adjusted border */
   box-sizing: border-box;
@@ -284,10 +284,10 @@ body {
     radial-gradient(farthest-side,var(--loader-secondary) 98%,#0000) right,
     radial-gradient(farthest-side,var(--loader-secondary) 98%,#0000) bottom,
     var(--loader-primary);
-  background-size: 16px 16px; /* Adjusted size */
+  background-size: 12px 12px; /* Adjusted size */
   background-repeat: no-repeat;
-  filter: blur(3px) contrast(10); /* Adjusted blur */
-  animation: l19 2s infinite;
+  filter: blur(2px) contrast(10); /* Adjusted blur */
+  animation: l19 1.5s infinite;
   margin-bottom: 16px;
 }
 @keyframes l19 {

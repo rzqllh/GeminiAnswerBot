@@ -28,6 +28,7 @@ class PopupApp {
         this.elements = {};
         this.streamAccumulator = {};
         this._messageHandler = this._handleMessages.bind(this);
+        this._tabUpdateHandler = this._handleTabUpdate.bind(this);
 
         // --- ONE-TIME SETUP LOGIC ---
         this._queryElements();
@@ -35,8 +36,12 @@ class PopupApp {
         this.store.subscribe(this.render.bind(this));
         chrome.runtime.onMessage.addListener(this._messageHandler);
 
+        // Listen for tab updates to handle navigation
+        chrome.tabs.onUpdated.addListener(this._tabUpdateHandler);
+
         window.addEventListener('unload', () => {
             chrome.runtime.onMessage.removeListener(this._messageHandler);
+            chrome.tabs.onUpdated.removeListener(this._tabUpdateHandler);
         });
     }
 
@@ -73,6 +78,15 @@ class PopupApp {
         this.elements.copyGeneralTask.addEventListener('click', e => this._copyToClipboard(e.currentTarget));
         this.elements.showReasoningButton.addEventListener('click', () => this._toggleReasoningDisplay());
         this.elements.verifyButton.addEventListener('click', () => this._handleVerification());
+    }
+
+    _handleTabUpdate(tabId, changeInfo) {
+        const state = this.store.getState();
+        // If the active tab has finished loading a new URL, trigger a rescan.
+        if (state.tab && tabId === state.tab.id && changeInfo.status === 'complete') {
+            StorageManager.log('Popup', 'Active tab updated, triggering rescan.');
+            this.start(true);
+        }
     }
 
     _handleMessages(request) {
