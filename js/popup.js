@@ -563,16 +563,17 @@ class PopupApp {
         if (parts.length > 1) {
             const optionLines = parts[1].trim().split('\n');
             const formattedOptions = optionLines.map(line => {
-                const trimmedLine = line.trim();
-                if (trimmedLine.startsWith('-')) {
-                    const optionText = trimmedLine.substring(1).trim();
-                    // Check if the option looks like code and wrap it in backticks
-                    if (optionText.includes('<') && optionText.includes('>')) {
-                        return `- \`${optionText}\``;
-                    }
+                // Robustly find the text after the hyphen
+                const textMatch = line.match(/^\s*-\s*(.*)/);
+                if (!textMatch) return ''; // Skip empty or malformed lines
+                
+                const optionText = textMatch[1].trim();
+                // Check if the option looks like code and wrap it in backticks
+                if (optionText.includes('<') && optionText.includes('>')) {
+                    return `- \`${optionText}\``;
                 }
-                return line; // Return original line if it's not a code option
-            }).join('\n');
+                return `- ${optionText}`; // Return as plain text if not code
+            }).filter(Boolean).join('\n');
             options = '\n### Options\n' + formattedOptions;
         }
 
