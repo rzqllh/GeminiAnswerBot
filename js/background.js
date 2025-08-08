@@ -29,10 +29,35 @@ async function fetchImageAsBase64(url) {
   }
 }
 
-// MODIFIED: This function now triggers the in-page dialog via messaging.
+// MODIFIED: This function now ensures scripts are injected before messaging.
 async function handleContextAction(info, tab) {
   if (!tab || !tab.id) {
     console.error("Context action triggered without a valid tab.");
+    return;
+  }
+
+  // Ensure content scripts are injected before proceeding.
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: [
+        'js/utils/helpers.js',
+        'js/utils/errorHandler.js',
+        'js/vendor/dompurify.min.js',
+        'js/vendor/marked.min.js',
+        'js/vendor/mark.min.js',
+        'js/vendor/Readability.js',
+        'js/content.js'
+      ]
+    });
+    // Also inject necessary CSS
+    await chrome.scripting.insertCSS({
+      target: { tabId: tab.id },
+      files: ['assets/highlighter.css', 'assets/dialog.css', 'assets/toolbar.css', 'assets/resultDialog.css']
+    });
+  } catch (err) {
+    console.error(`Failed to inject content script for context menu action: ${err.message}`);
+    // Do not proceed if injection fails (e.g., on a protected page).
     return;
   }
   
@@ -59,7 +84,7 @@ async function handleContextAction(info, tab) {
     return;
   }
 
-  // For text selections, message the content script to show the dialog.
+  // For text selections, message the now-guaranteed content script.
   if (info.selectionText) {
     chrome.tabs.sendMessage(tab.id, {
       action: 'showDialogForContextMenu',
@@ -67,7 +92,7 @@ async function handleContextAction(info, tab) {
         action: info.menuItemId,
         selectionText: info.selectionText
       }
-    }).catch(err => console.error("Could not send message to content script:", err.message));
+    }).catch(err => console.error("Message sending failed even after injection:", err.message));
   }
 }
 
