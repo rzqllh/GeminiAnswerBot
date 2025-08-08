@@ -90,29 +90,60 @@ class QuizModule {
   }
 
   _findQuizBlocks() {
-      const blocks = new Set();
-      const inputs = document.querySelectorAll('input[type="radio"], input[type="checkbox"]');
-      const questionSelectors = 'p, h1, h2, h3, h4, div[class*="question"], span';
+    const inputGroups = {};
+    // Group inputs by their 'name' attribute, which is standard for radio button groups.
+    document.querySelectorAll('input[type="radio"]').forEach(input => {
+        if (!this._isVisible(input) || !input.name) return;
+        if (!inputGroups[input.name]) {
+            inputGroups[input.name] = [];
+        }
+        inputGroups[input.name].push(input);
+    });
 
-      inputs.forEach(input => {
-          if (!this._isVisible(input)) return;
-          
-          let container = input.closest('form, fieldset, div.w3-panel, div[class*="quiz-item"]');
-          if (!container || container.tagName === 'BODY' || container.tagName === 'MAIN') {
-              container = input.parentElement?.closest('div');
-          }
+    const containers = new Set();
+    for (const name in inputGroups) {
+        const group = inputGroups[name];
+        if (group.length < 2) continue; // A quiz needs at least 2 options.
 
-          if (container && this._isVisible(container) && container.offsetHeight > 50) {
-              const hasQuestionText = container.querySelector(questionSelectors);
-              const hasMultipleInputs = container.querySelectorAll('input[type="radio"], input[type="checkbox"]').length > 1;
+        let commonAncestor = group[0].parentElement;
+        for (let i = 1; i < group.length; i++) {
+            while (commonAncestor && !commonAncestor.contains(group[i])) {
+                commonAncestor = commonAncestor.parentElement;
+            }
+        }
+        
+        // Refine the ancestor to be a meaningful block, not the whole body.
+        while (commonAncestor && commonAncestor.parentElement && commonAncestor.parentElement.tagName !== 'BODY' && commonAncestor.parentElement.tagName !== 'HTML') {
+            const parent = commonAncestor.parentElement;
+            const parentInputs = parent.querySelectorAll('input[type="radio"]').length;
+            if (parentInputs > group.length + 2) { // If parent contains many more inputs, stop.
+                break;
+            }
+            commonAncestor = parent;
+        }
 
-              if (hasQuestionText && hasMultipleInputs) {
-                  blocks.add(container);
-              }
-          }
-      });
+        if (commonAncestor && commonAncestor.tagName !== 'BODY' && commonAncestor.tagName !== 'HTML') {
+            containers.add(commonAncestor);
+        }
+    }
+    
+    // Fallback for checkboxes or inputs without a name attribute
+    if (containers.size === 0) {
+        const inputs = document.querySelectorAll('input[type="radio"], input[type="checkbox"]');
+        if (inputs.length > 1 && inputs.length < 20) { // Heuristic for a single quiz on a page
+            let commonAncestor = inputs[0].parentElement;
+            for (let i = 1; i < inputs.length; i++) {
+                 while (commonAncestor && !commonAncestor.contains(inputs[i])) {
+                    commonAncestor = commonAncestor.parentElement;
+                }
+            }
+            if (commonAncestor && commonAncestor.tagName !== 'BODY') {
+                containers.add(commonAncestor);
+            }
+        }
+    }
 
-      return Array.from(blocks);
+    return Array.from(containers);
   }
 
   extractContent() {
@@ -126,19 +157,23 @@ class QuizModule {
     if (!block) return null;
 
     let questionText = '';
-    const questionCandidates = block.querySelectorAll('p, h1, h2, h3, h4, div[class*="question"], span');
+    // Prioritize elements that are not direct parents of options.
+    const questionCandidates = block.querySelectorAll('p, h1, h2, h3, h4, div, span');
     let bestCandidate = null;
 
     questionCandidates.forEach(el => {
-      if (el.closest('label')) return;
-      
-      const clone = el.cloneNode(true);
-      clone.querySelectorAll('button, input, a, select, form, ul, ol, label').forEach(child => child.remove());
-      const text = clone.textContent.trim().replace(/\s+/g, ' ');
+        // Skip if the element is or contains a label/input, or is an option itself.
+        if (el.querySelector('input, label') || el.closest('label')) return;
 
-      if (text.length > 10 && (!bestCandidate || text.length > bestCandidate.length)) {
-          bestCandidate = text;
-      }
+        const clone = el.cloneNode(true);
+        // More aggressive cleaning of potential option/control elements
+        clone.querySelectorAll('button, input, a, select, form, ul, ol, label, div[class*="option"], div[class*="answer"]').forEach(child => child.remove());
+        const text = clone.textContent.trim().replace(/\s+/g, ' ');
+
+        // A good question is usually a single, reasonably long sentence.
+        if (text.length > 15 && text.length < 200 && (!bestCandidate || text.length > bestCandidate.length)) {
+            bestCandidate = text;
+        }
     });
     questionText = bestCandidate || '';
     
@@ -150,11 +185,17 @@ class QuizModule {
       if (input.type === 'checkbox') hasCheckboxes = true;
       
       let optionText = '';
-      const label = input.closest('label') || document.querySelector(`label[for="${input.id}"]`);
+      // Find label more robustly
+      let label = input.closest('label');
+      if (!label && input.id) {
+          label = document.querySelector(`label[for="${input.id}"]`);
+      }
+
       if (label) {
         optionText = label.textContent.trim();
       }
 
+      // Fallback if no label is found
       if (!optionText) {
         const parent = input.parentElement;
         if (parent) {
