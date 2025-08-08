@@ -95,19 +95,9 @@ class PopupApp {
         }
     }
 
-    _renderSkeletonState(container, show, type = 'answer') {
+    _renderLoadingState(container) {
         if (!container) return;
-        if (show) {
-            let skeletonHtml = '';
-            if (type === 'answer') {
-                skeletonHtml = `<div class="skeleton-loader"><div class="skeleton skeleton-text" style="width: 80%;"></div><div class="skeleton skeleton-text" style="width: 60%; margin-top: 20px;"></div><div class="skeleton skeleton-text" style="width: 90%;"></div></div>`;
-            } else {
-                skeletonHtml = `<div class="skeleton-loader"><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width: 90%;"></div><div class="skeleton skeleton-text" style="width: 70%;"></div></div>`;
-            }
-            container.innerHTML = skeletonHtml;
-        } else {
-            container.innerHTML = '';
-        }
+        container.innerHTML = `<div class="panel-loader"><div class="panel-spinner"></div></div>`;
     }
     
     async _ensureContentScripts(tabId) {
@@ -229,7 +219,7 @@ class PopupApp {
             this.elements.generalTaskDisplay.innerHTML = DOMPurify.sanitize(marked.parse(state.generalTaskResult));
             this.elements.copyGeneralTask.dataset.copyText = state.generalTaskResult;
         } else {
-            this._renderSkeletonState(this.elements.generalTaskDisplay, true, 'explanation');
+            this._renderLoadingState(this.elements.generalTaskDisplay);
         }
     }
 
@@ -364,11 +354,11 @@ class PopupApp {
     
     _getAnswer() {
         const state = this.store.getState();
-        // Make container visible BEFORE rendering skeleton
+        // Make container visible BEFORE rendering the loading indicator
         this.elements.answerContainer.classList.remove('hidden');
-        this._renderSkeletonState(this.elements.answerDisplay, true, 'answer');
+        this._renderLoadingState(this.elements.answerDisplay);
 
-        // Defer the API call to allow the browser to render the skeleton first.
+        // Defer the API call to allow the browser to render the loader first.
         setTimeout(() => {
             if (state.isImageMode) {
                 this._callGeminiStream('answer', '', state.base64ImageData);
@@ -400,11 +390,11 @@ class PopupApp {
         if (!state.cleanedContent) return;
         this.elements.explanationButton.disabled = true;
         this.elements.retryExplanation.disabled = true;
-        // Make container visible BEFORE rendering skeleton
+        // Make container visible BEFORE rendering the loading indicator
         this.elements.explanationContainer.classList.remove('hidden');
-        this._renderSkeletonState(this.elements.explanationDisplay, true, 'explanation');
+        this._renderLoadingState(this.elements.explanationDisplay);
 
-        // Defer the API call to allow the browser to render the skeleton first.
+        // Defer the API call to allow the browser to render the loader first.
         setTimeout(() => {
             const contentForExplanation = `${state.cleanedContent}\n\nCorrect Answer: ${state.incorrectAnswer}`;
             this._callGeminiStream('explanation', contentForExplanation);
@@ -434,7 +424,7 @@ class PopupApp {
         if (payload.chunk) {
             if (!this.streamAccumulator[purpose]) {
                 this.streamAccumulator[purpose] = '';
-                if (targetElement) targetElement.innerHTML = ''; // Clear skeleton on first chunk
+                if (targetElement) targetElement.innerHTML = ''; // Clear loader on first chunk
             }
             this.streamAccumulator[purpose] += payload.chunk;
             if (targetElement) {
@@ -477,7 +467,6 @@ class PopupApp {
 
     _renderAnswerContent(fullText, fromCache, totalTokenCount, thoughtProcess) {
         const state = this.store.getState();
-        this._renderSkeletonState(this.elements.answerDisplay, false);
         
         const thoughtMatch = fullText.match(/\[THOUGHT\]([\s\S]*)\[ENDTHOUGHT\]/);
         const currentThoughtProcess = thoughtProcess || (thoughtMatch ? thoughtMatch[1].trim() : null);
@@ -584,7 +573,7 @@ class PopupApp {
                 const correctionContent = `The original quiz content was:\n${state.cleanedContent}\n\nMy previous incorrect answer was: \`${state.incorrectAnswer}\`\n\nThe user has indicated the correct answer is: \`${optionText}\``; 
                 this.elements.correctionPanel.classList.add('hidden'); 
                 this.elements.explanationContainer.classList.remove('hidden'); 
-                this._renderSkeletonState(this.elements.explanationDisplay, true, 'explanation');
+                this._renderLoadingState(this.elements.explanationDisplay);
                 this._callGeminiStream('correction', correctionContent); 
             }); 
             this.elements.correctionOptions.appendChild(button); 
@@ -689,7 +678,7 @@ class PopupApp {
         this.streamAccumulator.answer = '';
         this.streamAccumulator.verification = '';
         this.elements.answerDisplay.innerHTML = '';
-        this._renderSkeletonState(this.elements.answerDisplay, true, 'answer');
+        this._renderLoadingState(this.elements.answerDisplay);
 
         chrome.runtime.sendMessage({
             action: 'verifyAnswerWithSearch',

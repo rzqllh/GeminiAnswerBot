@@ -266,28 +266,21 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.skeleton-loader { display: flex; flex-direction: column; gap: 10px; }
-.skeleton {
-  background-color: var(--skeleton-bg);
-  border-radius: 5px;
-  position: relative;
-  overflow: hidden;
+/* New spinner for use inside panels */
+.panel-loader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  min-height: 80px;
 }
-.skeleton.skeleton-text { height: 1em; }
-.skeleton.skeleton-title { width: 40%; height: 1.2em; margin-bottom: 12px; }
-.skeleton::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -150%;
-  height: 100%;
-  width: 150%;
-  background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%);
-  animation: shimmer 1.5s infinite;
-}
-@keyframes shimmer {
-  0% { left: -150%; }
-  100% { left: 150%; }
+.panel-spinner {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--action-button-bg);
+  animation: spin 1s linear infinite;
 }
 
 .info-panel, .error-panel {

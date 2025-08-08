@@ -1,8 +1,7 @@
-// === Hafizh Rizqullah | GeminiAnswerBot ===
-// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
-// 📄 js/prompts.js
-// 🕓 Created: 2024-05-22 16:00:00
-// 🧠 Modular | DRY | SOLID | Apple HIG Compliant
+// === Hafizh Signature Code ===
+// Author: Hafizh Rizqullah — GeminiAnswerBot
+// File: js/prompts.js
+// Created: 2025-08-08 16:42:03
 
 const DEFAULT_PROMPTS = {
   'cleaning': `You are an extremely precise text cleaner and quiz extractor. Your ONLY objective is to extract the **single quiz question** and its **associated answer options** from the provided text.
@@ -11,13 +10,14 @@ CRITICAL RULES FOR EXTRACTION:
 1.  **Single Question Only:** Locate and extract the main quiz question. IGNORE any question numbers, category labels (e.g., "Category: Verbal"), or other metadata.
 2.  **All Relevant Options:** Extract *all* answer choices tied directly to that question.
 3.  **Strict Formatting:** You MUST format the options as a Markdown list using hyphens (-). Each option MUST be on a new line.
-4.  **Preserve Exact Original Text:** Do not modify spelling, symbols, spacing, punctuation, or case of the actual question and options. Wrap any code or technical terms in backticks (\`).
-5.  **Direct Output:**
+4.  **Preserve Exact Original Text:** Do not modify spelling, symbols, spacing, punctuation, or case of the actual question and options.
+5.  **CRITICAL CODE HANDLING:** If an option contains HTML tags (e.g., text with '<' and '>'), you MUST treat the entire option as a code literal and wrap it in backticks (\`). For example, if the option is '<p>Hello</p>', the output must be \`- \`<p>Hello</p>\`\`.
+6.  **Direct Output:**
     - Return ONLY the cleaned, extracted content in Markdown.
     - NO prefaces, no commentary, no summaries.
     - NO formatting explanations.
     - NO translations.
-6.  **CRITICAL LANGUAGE RULE:**
+7.  **CRITICAL LANGUAGE RULE:**
     - Detect the language of the input text.
     - Output MUST be in the **exact same language**. Never translate or switch languages.
 `,
@@ -25,7 +25,18 @@ CRITICAL RULES FOR EXTRACTION:
 
 CRITICAL FORMATTING RULES:
 1.  **Strict Line Breaks:** Each field (Answer, Confidence, Reason) MUST be on a new, separate line. DO NOT combine them.
-2.  **Code Formatting**: In your 'Answer' and 'Reason', you MUST wrap any code, keywords, operators, or technical terms (like 'key', '&&', 'map()') in backticks (\`).
+2.  **CRITICAL CODE HANDLING:** In your 'Answer' and 'Reason', you MUST wrap any code, keywords, operators, or technical terms in backticks (\`). If the chosen answer option itself is HTML code (containing '<' and '>'), you MUST return the entire option exactly as provided, wrapped in backticks.
+
+**EXAMPLE SCENARIO:**
+*INPUT QUESTION:* "Choose the correct HTML element to define important text"
+*INPUT OPTIONS:*
+- \`<i>\`
+- \`<important>\`
+- \`<strong>\`
+*CORRECT OUTPUT:*
+Answer: \`<strong>\`
+Confidence: High
+Reason: The \`<strong>\` tag is semantically used to indicate that its content has strong importance.
 
 Respond in the exact format below, without any extra words or explanations.
 FORMAT:
