@@ -156,15 +156,18 @@ class QuizModule {
   _extractDataFromBlock(block) {
     if (!block) return null;
 
+    // --- STEP 1: Reliably extract all options first ---
     const options = [];
     const seenOptions = new Set();
     let hasCheckboxes = false;
     const inputs = block.querySelectorAll('input[type="radio"], input[type="checkbox"]');
     
     inputs.forEach(input => {
+      if (!this._isVisible(input)) return;
       if (input.type === 'checkbox') hasCheckboxes = true;
       
       let optionText = '';
+      // Find label more robustly
       let label = input.closest('label');
       if (!label && input.id) {
           label = document.querySelector(`label[for="${input.id}"]`);
@@ -174,13 +177,11 @@ class QuizModule {
         optionText = label.textContent.trim();
       }
 
-      if (!optionText) {
-        const parent = input.parentElement;
-        if (parent) {
-          const clone = parent.cloneNode(true);
-          clone.querySelector('input')?.remove();
-          optionText = clone.textContent.trim();
-        }
+      // Fallback for structures without labels (e.g., <div><input>Text</div>)
+      if (!optionText && input.parentElement) {
+        const parentClone = input.parentElement.cloneNode(true);
+        parentClone.querySelector('input')?.remove();
+        optionText = parentClone.textContent.trim();
       }
       
       if (optionText && !seenOptions.has(optionText)) {
@@ -189,33 +190,36 @@ class QuizModule {
       }
     });
 
-    if (options.length < 2) return null; // Not a valid quiz without options.
+    if (options.length < 2) return null; // Not a valid quiz without at least two options.
 
-    // **NEW Proximity-Based Question Finding Logic**
+    // --- STEP 2: Safely find the question text ---
     let questionText = '';
     const firstInput = inputs[0];
     if (firstInput) {
         const allElements = Array.from(block.getElementsByTagName('*'));
-        const firstInputIndex = allElements.indexOf(firstInput.parentElement.closest('div, p, li') || firstInput);
+        const firstOptionContainer = firstInput.closest('div, p, li, label');
+        const firstInputIndex = firstOptionContainer ? allElements.indexOf(firstOptionContainer) : -1;
 
         let bestCandidate = null;
         // Search backwards from the first option for the nearest preceding text.
-        for (let i = firstInputIndex - 1; i >= 0; i--) {
-            const el = allElements[i];
-            if (el.querySelector('input, label, button')) continue; // Skip elements that contain other options/controls.
+        if (firstInputIndex !== -1) {
+            for (let i = firstInputIndex - 1; i >= 0; i--) {
+                const el = allElements[i];
+                // Skip elements that are parents of the options or contain other controls.
+                if (el.contains(firstInput) || el.querySelector('input, label, button')) continue;
 
-            const clone = el.cloneNode(true);
-            clone.querySelectorAll('script, style, svg, button, input, a, select, form, ul, ol, label').forEach(child => child.remove());
-            const text = clone.textContent.trim().replace(/\s+/g, ' ');
+                const text = el.textContent.trim().replace(/\s+/g, ' ');
 
-            if (text.length > 15 && text.length < 300) {
-                bestCandidate = text;
-                break; // Found the closest valid candidate, stop searching.
+                if (text.length > 15 && text.length < 300) {
+                    bestCandidate = text;
+                    break; // Found the closest valid candidate, stop searching.
+                }
             }
         }
         questionText = bestCandidate || '';
     }
 
+    // --- STEP 3: Assemble the final output ---
     if (questionText && options.length > 1) {
       let content = `Question: ${questionText}\n\nOptions:\n${options.map(opt => `- ${opt}`).join('\n')}`;
       if (hasCheckboxes) {
@@ -350,12 +354,29 @@ class PageModule {
     }
 
     fallbackContent() {
+        try {
+            const documentClone = document.cloneNode(true);
+            const article = new Readability(documentClone).parse();
+            if (article && article.textContent) {
+                console.log("Readability.js fallback successful.");
+                let content = article.textContent.trim();
+                if (content.length > this.MAX_CONTENT_LENGTH) {
+                    console.warn(`Readability content truncated from ${content.length} to ${this.MAX_CONTENT_LENGTH} characters.`);
+                    content = content.substring(0, this.MAX_CONTENT_LENGTH);
+                }
+                return content;
+            }
+        } catch (e) {
+            console.error("Readability.js failed, using raw text fallback:", e);
+        }
+
+        // Original raw text fallback if Readability fails
         const clone = document.body.cloneNode(true);
         clone.querySelectorAll('script, style, noscript, iframe').forEach(el => el.remove());
         let content = clone.innerText.trim();
 
         if (content.length > this.MAX_CONTENT_LENGTH) {
-            console.warn(`Fallback content truncated from ${content.length} to ${this.MAX_CONTENT_LENGTH} characters.`);
+            console.warn(`Raw text fallback content truncated from ${content.length} to ${this.MAX_CONTENT_LENGTH} characters.`);
             content = content.substring(0, this.MAX_CONTENT_LENGTH);
         }
         return content;
@@ -464,7 +485,7 @@ class ContentController {
             }
 
             if (!content) {
-                console.log("No specific quiz block found. Falling back to full page content for analysis.");
+                console.log("No specific quiz block found. Falling back to Readability.js for analysis.");
                 content = this.page.fallbackContent();
             }
             sendResponse({ content });
