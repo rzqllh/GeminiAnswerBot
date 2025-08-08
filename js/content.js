@@ -466,7 +466,7 @@ class ToolbarModule {
 }
 
 /**
- * NEW: Manages the floating result dialog injected into the page.
+ * Manages the floating result dialog injected into the page.
  */
 class DialogModule {
     constructor() {
@@ -474,6 +474,8 @@ class DialogModule {
         this.contentArea = null;
         this.titleArea = null;
         this.streamAccumulator = '';
+        // NEW: Pre-bind the event handler for correct `this` context
+        this.boundEscapeHandler = this._handleEscapeKey.bind(this);
     }
 
     _ensureStylesheet() {
@@ -488,7 +490,7 @@ class DialogModule {
     }
 
     create() {
-        if (document.getElementById('gemini-answer-bot-result-dialog-overlay')) return;
+        if (this.overlay) return; // MODIFIED: Prevent re-creation if it already exists
         this._ensureStylesheet();
         
         this.overlay = document.createElement('div');
@@ -524,7 +526,7 @@ class DialogModule {
     }
 
     show(title = 'Result') {
-        if (!this.overlay) this.create();
+        this.create(); // It's safe to call this every time now.
         this.titleArea.textContent = _escapeHtml(title);
         this.streamAccumulator = '';
         this.contentArea.innerHTML = `
@@ -533,17 +535,41 @@ class DialogModule {
             </div>
         `;
         
-        this.overlay.classList.add('visible');
+        // Use setTimeout to ensure the element is in the DOM before adding the class
+        setTimeout(() => this.overlay.classList.add('visible'), 10);
+        // NEW: Add Escape key listener
+        document.addEventListener('keydown', this.boundEscapeHandler);
     }
 
+    // MODIFIED: Complete rewrite of hide() for robust removal
     hide() {
         if (!this.overlay) return;
+        
+        // NEW: Remove Escape key listener to prevent memory leaks
+        document.removeEventListener('keydown', this.boundEscapeHandler);
+
         this.overlay.classList.remove('visible');
+        
+        // Listen for the transition to end, then remove the element from the DOM
+        this.overlay.addEventListener('transitionend', () => {
+            if (this.overlay) {
+                this.overlay.remove();
+                this.overlay = null; // Reset state
+                this.contentArea = null;
+                this.titleArea = null;
+            }
+        }, { once: true }); // Listener will auto-remove itself after firing once
+    }
+
+    // NEW: Handler for the Escape key
+    _handleEscapeKey(event) {
+        if (event.key === 'Escape') {
+            this.hide();
+        }
     }
 
     update(chunk) {
         if(!this.contentArea) return;
-        // On first chunk, clear the loader
         if(this.streamAccumulator === '') {
             this.contentArea.innerHTML = '';
         }
@@ -562,14 +588,13 @@ class DialogModule {
     }
 }
 
-
 class ContentController {
   constructor() {
     this.marker = new MarkerModule();
     this.quiz = new QuizModule();
     this.page = new PageModule();
     this.dialog = new DialogModule();
-    this.toolbar = new ToolbarModule(this.dialog); // Pass dialog manager to toolbar
+    this.toolbar = new ToolbarModule(this.dialog);
     this.listenForMessages();
   }
   
@@ -597,7 +622,6 @@ class ContentController {
           }, 150);
           return true;
         
-        // NEW: Handle stream updates from background script
         case "geminiStreamUpdate":
           const { payload } = request;
           if (!payload.success) {
@@ -631,7 +655,6 @@ class ContentController {
   }
 }
 
-// This check prevents re-declaration errors.
 if (typeof window.geminiAnswerBotContentLoaded === 'undefined') {
   window.geminiAnswerBotContentLoaded = true;
   new ContentController();
