@@ -14,6 +14,7 @@ class PopupApp {
                 totalTokenCount: 0, cacheKey: null, incorrectAnswer: null,
                 isImageMode: false, imageUrl: null, base64ImageData: null,
                 action: null, generalTaskResult: null,
+                imageAnalysisStep: 'idle', // NEW: Tracks image processing stage
             },
             _listeners: [],
             getState() { return this._state; },
@@ -217,6 +218,7 @@ class PopupApp {
             cleanedContent: null,
             answerHTML: null,
             explanationHTML: null,
+            imageAnalysisStep: 'idle',
             view: 'quiz' // All actions now start in quiz/general view
         });
 
@@ -297,21 +299,28 @@ class PopupApp {
         this.elements.imagePreviewContainer.classList.toggle('hidden', !state.isImageMode);
         if (state.isImageMode) {
             this.elements.imagePreview.src = state.imageUrl;
-            this.elements.imageStatusText.textContent = state.cleanedContent ? 'Text Extracted' : 'Extracting text from image...';
+            const statusMap = {
+                ocr: 'Extracting text from image...',
+                cleaning: 'Formatting extracted text...',
+                answering: 'Finding the answer...',
+                done: 'Analysis complete.'
+            };
+            this.elements.imageStatusText.textContent = statusMap[state.imageAnalysisStep] || 'Starting analysis...';
         }
 
-        // Content Display Logic (for both OCR text and regular quiz text)
-        const contentToDisplay = state.cleanedContent || (state.isImageMode ? '' : state.originalUserContent);
-        this.elements.contentDisplayWrapper.classList.toggle('hidden', !contentToDisplay);
+        // Content Display Logic (for OCR text and regular quiz text)
+        const contentToDisplay = state.cleanedContent || state.originalUserContent;
+        this.elements.contentDisplayWrapper.classList.toggle('hidden', !contentToDisplay || (state.isImageMode && !state.cleanedContent));
         if (contentToDisplay) {
             this.elements.contentDisplay.innerHTML = this._formatQuestionContent(contentToDisplay);
         }
 
         // Answer Panel Logic
-        this.elements.answerContainer.classList.toggle('hidden', !state.answerHTML && !state.cleanedContent);
+        const showAnswerPanel = state.answerHTML || (state.cleanedContent && (!state.isImageMode || state.imageAnalysisStep === 'answering' || state.imageAnalysisStep === 'done'));
+        this.elements.answerContainer.classList.toggle('hidden', !showAnswerPanel);
         if (state.answerHTML) {
             this._renderAnswerContent(state.answerHTML, false, state.totalTokenCount, state.thoughtProcess);
-        } else if (state.cleanedContent) {
+        } else if (showAnswerPanel) {
             this._renderLoadingState(this.elements.answerDisplay);
         }
         
@@ -494,6 +503,7 @@ class PopupApp {
             'correction': this.elements.explanationDisplay,
             'verification': this.elements.answerDisplay,
             'image-quiz': this.elements.contentDisplay, // OCR result goes here
+            'cleaning': this.elements.contentDisplay, // Cleaning result also goes here
         };
         return targetMap[purpose] || this.elements.generalTaskDisplay;
     }
@@ -520,14 +530,17 @@ class PopupApp {
         if (!state.isImageMode || !state.base64ImageData) return;
         
         // Step 1: Show preview and start OCR call
-        this.render(); // Render initial image preview
+        this.store.setState({ imageAnalysisStep: 'ocr' });
         this._callGeminiStream('image-quiz', '', state.base64ImageData);
     }
 
-    _handleOcrResult(ocrText) {
-        // Step 2: OCR is complete. Update state and UI, then call for the answer.
-        this.store.setState({ cleanedContent: ocrText });
-        this._getAnswer(); // This will use the new cleanedContent
+    _handleOcrResult(rawOcrText) {
+        // Step 2: OCR is complete. Update state and UI, then call for cleaning.
+        this.store.setState({ 
+            imageAnalysisStep: 'cleaning',
+            originalUserContent: rawOcrText // Store raw text for display
+        });
+        this._callGeminiStream('cleaning', rawOcrText);
     }
 
     _handleGeneralTaskResult(fullText) {
@@ -536,14 +549,22 @@ class PopupApp {
         this._saveToHistory({ originalUserContent: this.store.getState().originalUserContent, generalTaskResult: fullText }, action);
     }
     
-    _handleCleaningResult(fullText) {
-        this.store.setState({ cleanedContent: fullText });
+    _handleCleaningResult(cleanedText) {
+        // This is Step 3 for images, and Step 1 for text
+        const state = this.store.getState();
+        if (state.isImageMode) {
+            this.store.setState({ imageAnalysisStep: 'answering' });
+        }
+        this.store.setState({ cleanedContent: cleanedText });
         this._saveCurrentViewState();
         this._getAnswer();
     }
 
     _renderAnswerContent(fullText, fromCache, totalTokenCount, thoughtProcess) {
         const state = this.store.getState();
+        if (state.isImageMode) {
+            this.store.setState({ imageAnalysisStep: 'done' });
+        }
         
         const thoughtMatch = fullText.match(/\[THOUGHT\]([\s\S]*)\[ENDTHOUGHT\]/);
         const currentThoughtProcess = thoughtProcess || (thoughtMatch ? thoughtMatch[1].trim() : null);
