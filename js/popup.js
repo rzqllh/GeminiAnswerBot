@@ -170,19 +170,25 @@ class PopupApp {
 
             if (contextData && contextData.source === 'contextMenu' && !isRescan) {
                 await this._clearPersistedState();
-                const isGeneralTask = ['summarize', 'explanation', 'translate', 'rephrase'].some(t => contextData.action.startsWith(t));
+                const isImageTask = contextData.action.startsWith('image-');
                 
                 this.store.setState({
                     action: contextData.action,
                     url: tab.url,
                     originalUserContent: contextData.selectionText || contextData.srcUrl,
-                    isImageMode: contextData.action.startsWith('image-'),
+                    isImageMode: isImageTask,
                     imageUrl: contextData.srcUrl,
                     base64ImageData: contextData.base64ImageData,
-                    view: isGeneralTask ? 'general' : 'quiz'
+                    view: 'quiz' // All actions now start in quiz/general view
                 });
 
-                this._callGeminiStream(contextData.action, this.store.getState().originalUserContent, this.store.getState().base64ImageData);
+                if (isImageTask) {
+                    this._startImageWorkflow();
+                } else {
+                    // Handle text-based context menu actions
+                    this.store.setState({ view: 'general' });
+                    this._callGeminiStream(contextData.action, this.store.getState().originalUserContent);
+                }
             } else {
                 const persistedState = await this._getPersistedState();
                 if (persistedState && persistedState.url === tab.url && !isRescan) {
@@ -195,7 +201,7 @@ class PopupApp {
                         this.store.setState({ view: 'info', error: { title: 'No Quiz Found', message: 'We couldn\'t detect a quiz on this page. Try using the "Analyze Full Page" button or highlight text to start.' } });
                         return;
                     }
-                    this.store.setState({ url: tab.url, originalUserContent: response.content });
+                    this.store.setState({ url: tab.url, originalUserContent: response.content, view: 'quiz' });
                     this._callGeminiStream('cleaning', response.content);
                 }
             }
@@ -266,36 +272,35 @@ class PopupApp {
 
     _renderQuizState() {
         const state = this.store.getState();
-        const titleText = this._getActionTitle(state.action) || 'Answer';
+        const titleText = this._getActionTitle(state.action) || 'Analysis';
         this.elements.answerCardTitle.textContent = titleText;
+        
+        // Image Preview Logic
         this.elements.imagePreviewContainer.classList.toggle('hidden', !state.isImageMode);
-        this.elements.contentDisplayWrapper.classList.toggle('hidden', state.isImageMode);
-
-        if (state.isImageMode) this.elements.imagePreview.src = state.imageUrl;
-
-        const contentToDisplay = state.cleanedContent || state.originalUserContent;
-        if (contentToDisplay && !state.isImageMode) {
-            this.elements.contentDisplay.innerHTML = this._formatQuestionContent(contentToDisplay);
-            this.elements.contentDisplayWrapper.classList.remove('hidden');
-        } else if (!state.isImageMode) {
-            this.elements.contentDisplayWrapper.classList.add('hidden');
+        if (state.isImageMode) {
+            this.elements.imagePreview.src = state.imageUrl;
+            this.elements.imageStatusText.textContent = state.cleanedContent ? 'Text Extracted' : 'Extracting text from image...';
         }
 
+        // Content Display Logic (for both OCR text and regular quiz text)
+        const contentToDisplay = state.cleanedContent || (state.isImageMode ? '' : state.originalUserContent);
+        this.elements.contentDisplayWrapper.classList.toggle('hidden', !contentToDisplay);
+        if (contentToDisplay) {
+            this.elements.contentDisplay.innerHTML = this._formatQuestionContent(contentToDisplay);
+        }
+
+        // Answer Panel Logic
+        this.elements.answerContainer.classList.toggle('hidden', !state.answerHTML && !state.cleanedContent);
         if (state.answerHTML) {
-            this.elements.answerContainer.classList.remove('hidden');
-            this._renderAnswerContent(state.answerHTML, true, state.totalTokenCount, state.thoughtProcess);
+            this._renderAnswerContent(state.answerHTML, false, state.totalTokenCount, state.thoughtProcess);
         } else if (state.cleanedContent) {
-            this.elements.answerContainer.classList.remove('hidden');
             this._renderLoadingState(this.elements.answerDisplay);
-        } else {
-            this.elements.answerContainer.classList.add('hidden');
         }
         
+        // Explanation Panel Logic
+        this.elements.explanationContainer.classList.toggle('hidden', !state.explanationHTML);
         if (state.explanationHTML) {
-            this.elements.explanationContainer.classList.remove('hidden');
             this._renderExplanationContent(state.explanationHTML);
-        } else {
-            this.elements.explanationContainer.classList.add('hidden');
         }
     }
 
@@ -402,10 +407,6 @@ class PopupApp {
     
     _getAnswer() {
         const state = this.store.getState();
-        if (state.isImageMode) {
-            this._callGeminiStream('answer', '', state.base64ImageData);
-            return;
-        }
         if (!state.cleanedContent) return;
         
         const fingerprint = this._createQuizFingerprint(state.cleanedContent);
@@ -448,28 +449,7 @@ class PopupApp {
             return;
         }
         
-        const targetElementMap = {
-            'answer': this.elements.answerDisplay,
-            'quiz_explanation': this.elements.explanationDisplay,
-            'correction': this.elements.explanationDisplay,
-            'verification': this.elements.answerDisplay,
-            'general': this.elements.generalTaskDisplay,
-        };
-
-        const quizHandlers = {
-            'cleaning': text => this._handleCleaningResult(text),
-            'answer': text => this._handleAnswerResult(text, false, payload.totalTokenCount),
-            'quiz_explanation': text => this._handleExplanationResult(text, false),
-            'correction': text => this._handleCorrectionResult(text),
-            'verification': text => this._handleAnswerResult(text, false, payload.totalTokenCount, this.store.getState().thoughtProcess),
-        };
-
-        let streamTarget = null;
-        if(quizHandlers[purpose]) {
-            streamTarget = targetElementMap[purpose] || targetElementMap['answer'];
-        } else {
-            streamTarget = targetElementMap['general'];
-        }
+        const streamTarget = this._getStreamTarget(purpose);
 
         if (payload.chunk) {
             if (!this.streamAccumulator[purpose]) {
@@ -485,13 +465,51 @@ class PopupApp {
         if (payload.done) {
             const fullText = payload.fullText || this.streamAccumulator[purpose] || '';
             delete this.streamAccumulator[purpose];
-
-            if (quizHandlers[purpose]) {
-                quizHandlers[purpose](fullText);
-            } else {
-                this._handleGeneralTaskResult(fullText);
-            }
+            this._handleStreamCompletion(purpose, fullText, payload);
         }
+    }
+
+    _getStreamTarget(purpose) {
+        const targetMap = {
+            'answer': this.elements.answerDisplay,
+            'quiz_explanation': this.elements.explanationDisplay,
+            'correction': this.elements.explanationDisplay,
+            'verification': this.elements.answerDisplay,
+            'image-quiz': this.elements.contentDisplay, // OCR result goes here
+        };
+        return targetMap[purpose] || this.elements.generalTaskDisplay;
+    }
+
+    _handleStreamCompletion(purpose, fullText, payload) {
+        const completionHandlers = {
+            'cleaning': () => this._handleCleaningResult(fullText),
+            'answer': () => this._handleAnswerResult(fullText, false, payload.totalTokenCount),
+            'quiz_explanation': () => this._handleExplanationResult(fullText, false),
+            'correction': () => this._handleCorrectionResult(fullText),
+            'verification': () => this._handleAnswerResult(fullText, false, payload.totalTokenCount, this.store.getState().thoughtProcess),
+            'image-quiz': () => this._handleOcrResult(fullText),
+        };
+
+        if (completionHandlers[purpose]) {
+            completionHandlers[purpose]();
+        } else {
+            this._handleGeneralTaskResult(fullText);
+        }
+    }
+
+    _startImageWorkflow() {
+        const state = this.store.getState();
+        if (!state.isImageMode || !state.base64ImageData) return;
+        
+        // Step 1: Show preview and start OCR call
+        this.render(); // Render initial image preview
+        this._callGeminiStream('image-quiz', '', state.base64ImageData);
+    }
+
+    _handleOcrResult(ocrText) {
+        // Step 2: OCR is complete. Update state and UI, then call for the answer.
+        this.store.setState({ cleanedContent: ocrText });
+        this._getAnswer(); // This will use the new cleanedContent
     }
 
     _handleGeneralTaskResult(fullText) {
@@ -501,7 +519,7 @@ class PopupApp {
     }
     
     _handleCleaningResult(fullText) {
-        this.store.setState({ cleanedContent: fullText, view: 'quiz' });
+        this.store.setState({ cleanedContent: fullText });
         this._saveCurrentViewState();
         this._getAnswer();
     }

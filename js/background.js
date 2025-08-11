@@ -36,7 +36,31 @@ async function handleContextAction(info, tab) {
     return;
   }
 
-  // Ensure content scripts are injected before proceeding.
+  // For images, we fetch the data and delegate the entire workflow to the popup.
+  if (info.mediaType === 'image' && info.srcUrl) {
+    const base64Data = await fetchImageAsBase64(info.srcUrl);
+    if (base64Data) {
+      const actionData = {
+        action: info.menuItemId, // e.g., 'image-quiz'
+        source: 'contextMenu',
+        srcUrl: info.srcUrl,
+        base64ImageData: base64Data,
+      };
+      await StorageManager.session.set({ [`contextData_${tab.id}`]: actionData });
+      try {
+        await chrome.action.openPopup();
+      } catch (e) {
+        console.error("Failed to open popup for image action:", e);
+        // Clean up session storage if popup fails to open
+        await StorageManager.session.remove(`contextData_${tab.id}`);
+      }
+    } else {
+      console.error("Could not fetch and convert image. Aborting image action.");
+    }
+    return;
+  }
+
+  // Ensure content scripts are injected before proceeding with text actions.
   try {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -61,29 +85,6 @@ async function handleContextAction(info, tab) {
     return;
   }
   
-  // For images, we still need the popup as the dialog is text-only for now.
-  if (info.mediaType === 'image' && info.srcUrl) {
-    const actionData = {
-      action: info.menuItemId,
-      source: 'contextMenu',
-      srcUrl: info.srcUrl,
-    };
-    const base64Data = await fetchImageAsBase64(info.srcUrl);
-    if (base64Data) {
-      actionData.base64ImageData = base64Data;
-      await StorageManager.session.set({ [`contextData_${tab.id}`]: actionData });
-      try {
-        await chrome.action.openPopup();
-      } catch (e) {
-        console.error("Failed to open popup for image action:", e);
-        await StorageManager.session.remove(`contextData_${tab.id}`);
-      }
-    } else {
-      console.error("Could not fetch and convert image. Aborting image action.");
-    }
-    return;
-  }
-
   // For text selections, message the now-guaranteed content script.
   if (info.selectionText) {
     chrome.tabs.sendMessage(tab.id, {

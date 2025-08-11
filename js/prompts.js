@@ -162,25 +162,20 @@ INSTRUCTIONS:
 - Do NOT translate the text unless instructed. Only rephrase.
 - Keep formatting clean and minimal. Output only the rephrased content under each heading.`,
 
-  'image-quiz': `You are a highly accurate Optical Character Recognition (OCR) and quiz extraction engine. Given an image of a multiple-choice question, your tasks are:
+  'image-quiz': `You are a highly accurate Optical Character Recognition (OCR) and text extraction engine. Your ONLY task is to look at the provided image and transcribe the quiz question and its options into the following clean format.
 
-1. Extract and transcribe the full main question as it appears in the image.
-2. Extract and transcribe **all** answer options, preserving their exact order.
-3. Output the transcribed content in **clean Markdown format** as shown below:
+**CRITICAL RULES:**
+1.  **Transcribe Only:** Do NOT answer the question. Do NOT add any commentary, greetings, or metadata.
+2.  **Strict Formatting:** Use the exact "Question:" and "Options:" format below. Each option must start with "- ".
+3.  **Preserve Language:** Transcribe the text in the **exact same language** as it appears in the image.
 
-**Example Output:**
-Question: What is the capital of France?
+**EXAMPLE OUTPUT FORMAT:**
+Question: [Transcribed question text here]
 
 Options:
-- London
-- Berlin
-- Paris
-- Madrid
-
-**STRICT RULES:**
-- Do NOT include any additional commentary, greetings, or metadata.
-- Output ONLY the clean transcribed quiz in Markdown.
-- Always use the **same language** as shown in the image.`,
+- [Transcribed option 1]
+- [Transcribed option 2]
+- [Transcribed option 3]`,
 
   'image-analyze': `You are an advanced image analysis model. Given any image, provide a detailed breakdown including:
 
