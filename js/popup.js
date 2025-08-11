@@ -166,48 +166,66 @@ class PopupApp {
             
             await this._ensureContentScripts(tab.id);
 
+            // **REFACTORED LOGIC START**
+            // Priority 1: Check for a new action from the context menu.
             const contextData = await chrome.runtime.sendMessage({ action: 'popupReady' });
-
             if (contextData && contextData.source === 'contextMenu' && !isRescan) {
-                await this._clearPersistedState();
-                const isImageTask = contextData.action.startsWith('image-');
-                
-                this.store.setState({
-                    action: contextData.action,
-                    url: tab.url,
-                    originalUserContent: contextData.selectionText || contextData.srcUrl,
-                    isImageMode: isImageTask,
-                    imageUrl: contextData.srcUrl,
-                    base64ImageData: contextData.base64ImageData,
-                    view: 'quiz' // All actions now start in quiz/general view
-                });
-
-                if (isImageTask) {
-                    this._startImageWorkflow();
-                } else {
-                    // Handle text-based context menu actions
-                    this.store.setState({ view: 'general' });
-                    this._callGeminiStream(contextData.action, this.store.getState().originalUserContent);
-                }
-            } else {
-                const persistedState = await this._getPersistedState();
-                if (persistedState && persistedState.url === tab.url && !isRescan) {
-                    this.store.setState(persistedState);
-                } else {
-                    await this._clearPersistedState();
-                    this.store.setState({ view: 'loading' });
-                    const response = await this._sendMessageToContentScript({ action: "get_quiz_content" });
-                    if (!response || !response.content?.trim()) {
-                        this.store.setState({ view: 'info', error: { title: 'No Quiz Found', message: 'We couldn\'t detect a quiz on this page. Try using the "Analyze Full Page" button or highlight text to start.' } });
-                        return;
-                    }
-                    this.store.setState({ url: tab.url, originalUserContent: response.content, view: 'quiz' });
-                    this._callGeminiStream('cleaning', response.content);
-                }
+                StorageManager.log('Popup', 'New context menu action detected. Clearing old state.');
+                await this._clearPersistedState(); // CRITICAL: Clear old state first.
+                this._initializeFromContext(contextData);
+                return;
             }
+
+            // Priority 2: Check for a persisted state for the current tab.
+            const persistedState = await this._getPersistedState();
+            if (persistedState && persistedState.url === tab.url && !isRescan) {
+                StorageManager.log('Popup', 'Resuming previous session from persisted state.');
+                this.store.setState(persistedState);
+                return;
+            }
+
+            // Priority 3: Default to a fresh analysis of the page.
+            StorageManager.log('Popup', 'No context or persisted state found. Starting fresh analysis.');
+            await this._clearPersistedState();
+            this.store.setState({ view: 'loading' });
+            const response = await this._sendMessageToContentScript({ action: "get_quiz_content" });
+            if (!response || !response.content?.trim()) {
+                this.store.setState({ view: 'info', error: { title: 'No Quiz Found', message: 'We couldn\'t detect a quiz on this page. Try using the "Analyze Full Page" button or highlight text to start.' } });
+                return;
+            }
+            this.store.setState({ url: tab.url, originalUserContent: response.content, view: 'quiz' });
+            this._callGeminiStream('cleaning', response.content);
+            // **REFACTORED LOGIC END**
+
         } catch (error) {
             console.error("Initialization failed:", error);
             this.store.setState({ view: 'error', error: ErrorHandler.format(error, 'init') });
+        }
+    }
+
+    _initializeFromContext(contextData) {
+        const isImageTask = contextData.action.startsWith('image-');
+        
+        this.store.setState({
+            action: contextData.action,
+            url: this.store.getState().tab.url,
+            originalUserContent: contextData.selectionText || contextData.srcUrl,
+            isImageMode: isImageTask,
+            imageUrl: contextData.srcUrl,
+            base64ImageData: contextData.base64ImageData,
+            // Reset other relevant state fields to ensure a clean slate
+            cleanedContent: null,
+            answerHTML: null,
+            explanationHTML: null,
+            view: 'quiz' // All actions now start in quiz/general view
+        });
+
+        if (isImageTask) {
+            this._startImageWorkflow();
+        } else {
+            // Handle text-based context menu actions
+            this.store.setState({ view: 'general' });
+            this._callGeminiStream(contextData.action, this.store.getState().originalUserContent);
         }
     }
     
