@@ -360,14 +360,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     const listener = (updatedTabId, changeInfo) => {
                         if (updatedTabId === tab.id && changeInfo.status === 'complete') {
                             chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['js/googleScraper.js'] })
-                                .catch(err => console.error("Failed to inject scraper script:", err));
+                                .catch(err => {
+                                    console.error("Failed to inject scraper script:", err);
+                                    // If injection fails, clean up and notify the UI
+                                    chrome.tabs.remove(tab.id);
+                                    StorageManager.session.remove(`verification_${tab.id}`);
+                                    const formattedError = ErrorHandler.format({ message: "Verification failed: Could not inject scraper." }, 'verification');
+                                    chrome.runtime.sendMessage({ action: 'geminiStreamUpdate', payload: { success: false, error: formattedError }, purpose: 'verification' });
+                                });
                             chrome.tabs.onUpdated.removeListener(listener);
                         }
                     };
                     chrome.tabs.onUpdated.addListener(listener);
                 } catch (error) {
                     const formattedError = ErrorHandler.format(error, 'verification');
-                    chrome.runtime.sendMessage({ action: 'geminiStreamUpdate', payload: { success: false, error: formattedError }, purpose: 'answer' });
+                    chrome.runtime.sendMessage({ action: 'geminiStreamUpdate', payload: { success: false, error: formattedError }, purpose: 'verification' });
                 }
             })();
             break;
@@ -408,7 +415,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 await StorageManager.session.remove(key);
                 chrome.tabs.remove(sender.tab.id);
                 const formattedError = ErrorHandler.format({ message: "Could not scrape Google Search results." }, 'verification');
-                chrome.runtime.sendMessage({ action: 'geminiStreamUpdate', payload: { success: false, error: formattedError }, purpose: 'answer' });
+                chrome.runtime.sendMessage({ action: 'geminiStreamUpdate', payload: { success: false, error: formattedError }, purpose: 'verification' });
             })();
             break;
     }
