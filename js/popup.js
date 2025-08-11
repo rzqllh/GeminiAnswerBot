@@ -14,7 +14,7 @@ class PopupApp {
                 totalTokenCount: 0, cacheKey: null, incorrectAnswer: null,
                 isImageMode: false, imageUrl: null, base64ImageData: null,
                 action: null, generalTaskResult: null,
-                imageAnalysisStep: 'idle', // NEW: Tracks image processing stage
+                imageAnalysisStep: 'idle',
             },
             _listeners: [],
             getState() { return this._state; },
@@ -150,6 +150,28 @@ class PopupApp {
         }
     }
 
+    /**
+     * Resets all session-specific state properties to their default values.
+     * This ensures a clean slate before starting a new analysis.
+     */
+    _resetState() {
+        this.store.setState({
+            view: 'loading',
+            error: null,
+            cleanedContent: null,
+            originalUserContent: null,
+            answerHTML: null,
+            explanationHTML: null,
+            thoughtProcess: null,
+            isImageMode: false,
+            imageUrl: null,
+            base64ImageData: null,
+            action: null,
+            generalTaskResult: null,
+            imageAnalysisStep: 'idle',
+        });
+    }
+
     async start(isRescan = false) {
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -167,12 +189,12 @@ class PopupApp {
             
             await this._ensureContentScripts(tab.id);
 
-            // **REFACTORED LOGIC START**
             // Priority 1: Check for a new action from the context menu.
             const contextData = await chrome.runtime.sendMessage({ action: 'popupReady' });
             if (contextData && contextData.source === 'contextMenu' && !isRescan) {
-                StorageManager.log('Popup', 'New context menu action detected. Clearing old state.');
-                await this._clearPersistedState(); // CRITICAL: Clear old state first.
+                StorageManager.log('Popup', 'New context menu action detected. Forcibly clearing all states.');
+                await this._clearPersistedState(); // Clear storage
+                this._resetState();                 // Clear memory state
                 this._initializeFromContext(contextData);
                 return;
             }
@@ -196,7 +218,6 @@ class PopupApp {
             }
             this.store.setState({ url: tab.url, originalUserContent: response.content, view: 'quiz' });
             this._callGeminiStream('cleaning', response.content);
-            // **REFACTORED LOGIC END**
 
         } catch (error) {
             console.error("Initialization failed:", error);
@@ -214,18 +235,12 @@ class PopupApp {
             isImageMode: isImageTask,
             imageUrl: contextData.srcUrl,
             base64ImageData: contextData.base64ImageData,
-            // Reset other relevant state fields to ensure a clean slate
-            cleanedContent: null,
-            answerHTML: null,
-            explanationHTML: null,
-            imageAnalysisStep: 'idle',
-            view: 'quiz' // All actions now start in quiz/general view
+            view: 'quiz'
         });
 
         if (isImageTask) {
             this._startImageWorkflow();
         } else {
-            // Handle text-based context menu actions
             this.store.setState({ view: 'general' });
             this._callGeminiStream(contextData.action, this.store.getState().originalUserContent);
         }
