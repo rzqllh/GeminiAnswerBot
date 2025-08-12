@@ -3,6 +3,7 @@
 // File: js/options/settings.js
 // Created: 2025-08-08 16:42:03
 
+// **FIX**: The module pattern is kept, but the initialization logic is now self-contained.
 const SettingsModule = (() => {
   let ELS = {};
   let PROMPT_TEXTAREAS = {};
@@ -343,11 +344,14 @@ const SettingsModule = (() => {
     });
   }
   
+  // This is the public method that will be called from options.js
   async function initialize(elements, prompts, temps, rephraseInput) {
     ELS = elements;
     PROMPT_TEXTAREAS = prompts;
     PROMPT_TEMP_SLIDERS = temps;
     REPHRASE_LANGUAGES_INPUT = rephraseInput;
+    
+    // The async operations are now correctly awaited here.
     await loadGeneralSettings();
     await initializePromptManager();
     bindEventListeners();

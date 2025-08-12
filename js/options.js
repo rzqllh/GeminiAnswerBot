@@ -3,7 +3,7 @@
 // File: js/options.js
 // Created: 2025-08-08 16:42:03
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     // Peta Elemen DOM (Single Source of Truth)
     const ELS = {
         // Navigasi & Konten
@@ -62,5 +62,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inisialisasi semua modul
     NavModule.initialize(ELS);
     HistoryModule.initialize(ELS);
-    SettingsModule.initialize(ELS, PROMPT_TEXTAREAS, PROMPT_TEMP_SLIDERS, REPHRASE_LANGUAGES_INPUT);
+    // **FIX**: Await the asynchronous initialization of the SettingsModule
+    try {
+        await SettingsModule.initialize(ELS, PROMPT_TEXTAREAS, PROMPT_TEMP_SLIDERS, REPHRASE_LANGUAGES_INPUT);
+    } catch (error) {
+        console.error("Failed to initialize settings:", error);
+        UIModule.showToast('Initialization Error', 'Could not load settings. Check the console for details.', 'error');
+    }
 });
