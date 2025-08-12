@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Inisialisasi semua modul
     NavModule.initialize(ELS);
     HistoryModule.initialize(ELS);
+    
     // **FIX**: Await the asynchronous initialization of the SettingsModule
     try {
         await SettingsModule.initialize(ELS, PROMPT_TEXTAREAS, PROMPT_TEMP_SLIDERS, REPHRASE_LANGUAGES_INPUT);

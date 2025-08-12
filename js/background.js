@@ -40,31 +40,38 @@ async function runMigration(reason) {
   if (reason !== 'update' && reason !== 'install') return;
 
   try {
-    const oldData = await StorageManager.get('promptProfiles');
-    if (oldData && oldData.promptProfiles) {
-      console.log('GeminiAnswerBot: Old promptProfiles structure found. Starting migration...');
-      
-      const profiles = oldData.promptProfiles;
-      const profileNames = Object.keys(profiles);
-      const newStorageItems = {
-        profileList: profileNames,
-      };
-
-      for (const name of profileNames) {
-        const profileKey = `profile_${name}`;
-        newStorageItems[profileKey] = profiles[name];
+    // Use the raw storage API here since we are dealing with potentially problematic keys
+    chrome.storage.sync.get('promptProfiles', async (data) => {
+      if (chrome.runtime.lastError) {
+        console.error("Migration check failed:", chrome.runtime.lastError.message);
+        return;
       }
 
-      await StorageManager.set(newStorageItems);
-      await StorageManager.remove('promptProfiles');
+      if (data && data.promptProfiles) {
+        console.log('GeminiAnswerBot: Old promptProfiles structure found. Starting migration...');
+        
+        const profiles = data.promptProfiles;
+        const profileNames = Object.keys(profiles);
+        const newStorageItems = {
+          profileList: profileNames,
+        };
 
-      console.log('GeminiAnswerBot: Migration completed successfully.');
-      // **FIX**: Use chrome.notifications instead of UIModule
-      showNotification('migration-success', 'GeminiAnswerBot Updated', 'Your prompt profiles have been successfully updated to a new, more stable format.');
-    }
+        for (const name of profileNames) {
+          const profileKey = `profile_${name}`;
+          newStorageItems[profileKey] = profiles[name];
+        }
+
+        // Use StorageManager for the new, safe keys
+        await StorageManager.set(newStorageItems);
+        // Use raw API to remove the old, problematic key
+        chrome.storage.sync.remove('promptProfiles');
+
+        console.log('GeminiAnswerBot: Migration completed successfully.');
+        showNotification('migration-success', 'GeminiAnswerBot Updated', 'Your prompt profiles have been successfully updated to a new, more stable format.');
+      }
+    });
   } catch (error) {
     console.error('GeminiAnswerBot: Migration failed.', error);
-    // **FIX**: Use chrome.notifications for error feedback
     showNotification('migration-error', 'GeminiAnswerBot Update Error', 'Failed to update settings. Please reset the extension from the options page if issues persist.');
   }
 }
