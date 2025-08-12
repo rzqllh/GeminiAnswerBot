@@ -348,6 +348,7 @@ const SettingsModule = (() => {
     PROMPT_TEXTAREAS = prompts;
     PROMPT_TEMP_SLIDERS = temps;
     REPHRASE_LANGUAGES_INPUT = rephraseInput;
+    
     await loadGeneralSettings();
     await initializePromptManager();
     bindEventListeners();

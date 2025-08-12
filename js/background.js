@@ -10,6 +10,73 @@ try {
   console.error('Failed to import scripts in background worker:', e);
 }
 
+let pendingContextData = {};
+
+/**
+ * Creates a native Chrome notification to inform the user.
+ * @param {string} id - A unique ID for the notification.
+ * @param {string} title - The title of the notification.
+ * @param {string} message - The main message content.
+ * @param {string} type - The type of notification ('basic', 'list', etc.).
+ */
+function showNotification(id, title, message, type = 'basic') {
+  if (chrome.notifications) {
+    chrome.notifications.create(id, {
+      type: type,
+      iconUrl: '../assets/icon.png',
+      title: title,
+      message: message,
+      priority: 1
+    });
+  }
+}
+
+/**
+ * Migrates the old, monolithic promptProfiles object to the new, individualized key structure.
+ * This runs once upon extension update to fix the storage quota issue for existing users.
+ * @param {string} reason - The reason for the onInstalled event.
+ */
+async function runMigration(reason) {
+  if (reason !== 'update' && reason !== 'install') return;
+
+  try {
+    // Use the raw storage API here since we are dealing with potentially problematic keys
+    chrome.storage.sync.get('promptProfiles', async (data) => {
+      if (chrome.runtime.lastError) {
+        console.error("Migration check failed:", chrome.runtime.lastError.message);
+        return;
+      }
+
+      if (data && data.promptProfiles) {
+        console.log('GeminiAnswerBot: Old promptProfiles structure found. Starting migration...');
+        
+        const profiles = data.promptProfiles;
+        const profileNames = Object.keys(profiles);
+        const newStorageItems = {
+          profileList: profileNames,
+        };
+
+        for (const name of profileNames) {
+          const profileKey = `profile_${name}`;
+          newStorageItems[profileKey] = profiles[name];
+        }
+
+        // Use StorageManager for the new, safe keys
+        await StorageManager.set(newStorageItems);
+        // Use raw API to remove the old, problematic key
+        chrome.storage.sync.remove('promptProfiles');
+
+        console.log('GeminiAnswerBot: Migration completed successfully.');
+        showNotification('migration-success', 'GeminiAnswerBot Updated', 'Your prompt profiles have been successfully updated to a new, more stable format.');
+      }
+    });
+  } catch (error) {
+    console.error('GeminiAnswerBot: Migration failed.', error);
+    showNotification('migration-error', 'GeminiAnswerBot Update Error', 'Failed to update settings. Please reset the extension from the options page if issues persist.');
+  }
+}
+
+
 async function fetchImageAsBase64(url) {
   try {
     const response = await fetch(url, { mode: 'cors' });
@@ -29,30 +96,26 @@ async function fetchImageAsBase64(url) {
   }
 }
 
-// MODIFIED: This function now ensures scripts are injected before messaging.
 async function handleContextAction(info, tab) {
   if (!tab || !tab.id) {
     console.error("Context action triggered without a valid tab.");
     return;
   }
 
-  // For images, we fetch the data and delegate the entire workflow to the popup.
   if (info.mediaType === 'image' && info.srcUrl) {
     const base64Data = await fetchImageAsBase64(info.srcUrl);
     if (base64Data) {
-      const actionData = {
-        action: info.menuItemId, // e.g., 'image-quiz'
+      pendingContextData[tab.id] = {
+        action: info.menuItemId,
         source: 'contextMenu',
         srcUrl: info.srcUrl,
         base64ImageData: base64Data,
       };
-      await StorageManager.session.set({ [`contextData_${tab.id}`]: actionData });
       try {
         await chrome.action.openPopup();
       } catch (e) {
         console.error("Failed to open popup for image action:", e);
-        // Clean up session storage if popup fails to open
-        await StorageManager.session.remove(`contextData_${tab.id}`);
+        delete pendingContextData[tab.id];
       }
     } else {
       console.error("Could not fetch and convert image. Aborting image action.");
@@ -60,32 +123,23 @@ async function handleContextAction(info, tab) {
     return;
   }
 
-  // Ensure content scripts are injected before proceeding with text actions.
   try {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       files: [
-        'js/utils/helpers.js',
-        'js/utils/errorHandler.js',
-        'js/vendor/dompurify.min.js',
-        'js/vendor/marked.min.js',
-        'js/vendor/mark.min.js',
-        'js/vendor/Readability.js',
-        'js/content.js'
+        'js/utils/helpers.js', 'js/utils/errorHandler.js', 'js/vendor/dompurify.min.js',
+        'js/vendor/marked.min.js', 'js/vendor/mark.min.js', 'js/vendor/Readability.js', 'js/content.js'
       ]
     });
-    // Also inject necessary CSS
     await chrome.scripting.insertCSS({
       target: { tabId: tab.id },
       files: ['assets/highlighter.css', 'assets/dialog.css', 'assets/toolbar.css', 'assets/resultDialog.css']
     });
   } catch (err) {
     console.error(`Failed to inject content script for context menu action: ${err.message}`);
-    // Do not proceed if injection fails (e.g., on a protected page).
     return;
   }
   
-  // For text selections, message the now-guaranteed content script.
   if (info.selectionText) {
     chrome.tabs.sendMessage(tab.id, {
       action: 'showDialogForContextMenu',
@@ -98,65 +152,76 @@ async function handleContextAction(info, tab) {
 }
 
 async function updateContextMenus() {
-  await chrome.contextMenus.removeAll();
+  try {
+    await chrome.contextMenus.removeAll();
   
-  chrome.contextMenus.create({
-    id: "gemini-text-parent",
-    title: "GeminiAnswerBot Actions",
-    contexts: ["selection"]
-  });
-
-  const standardActions = [
-    { id: 'summarize', title: 'Summarize Selection' },
-    { id: 'explanation', title: 'Explain Selection' },
-    { id: 'translate', title: 'Translate Selection' }
-  ];
-  standardActions.forEach(action => {
     chrome.contextMenus.create({
-      id: action.id, parentId: "gemini-text-parent",
-      title: action.title, contexts: ["selection"]
+      id: "gemini-text-parent",
+      title: "GeminiAnswerBot Actions",
+      contexts: ["selection"]
     });
-  });
 
-  const { promptProfiles, activeProfile } = await StorageManager.get(['promptProfiles', 'activeProfile']);
-  const defaultLanguages = 'English, Indonesian';
-  const currentProfile = promptProfiles?.[activeProfile] || promptProfiles?.['Default'] || {};
-  const rephraseLanguages = currentProfile.rephraseLanguages || defaultLanguages;
-  
-  const languages = rephraseLanguages.split(',').map(lang => lang.trim()).filter(lang => lang);
-  if (languages.length > 0) {
-    chrome.contextMenus.create({
-      id: "rephrase-parent", parentId: "gemini-text-parent",
-      title: "Rephrase Selection into...", contexts: ["selection"]
-    });
-    languages.forEach(lang => {
+    const standardActions = [
+      { id: 'summarize', title: 'Summarize Selection' },
+      { id: 'explanation', title: 'Explain Selection' },
+      { id: 'translate', title: 'Translate Selection' }
+    ];
+    standardActions.forEach(action => {
       chrome.contextMenus.create({
-        id: `rephrase-${lang}`, parentId: "rephrase-parent",
-        title: lang, contexts: ["selection"]
+        id: action.id, parentId: "gemini-text-parent",
+        title: action.title, contexts: ["selection"]
       });
     });
+
+    const { activeProfile = 'Default' } = await StorageManager.get('activeProfile');
+    const profileKey = `profile_${activeProfile}`;
+    const result = await StorageManager.get(profileKey);
+    const currentProfile = result[profileKey] || {};
+    
+    const defaultLanguages = 'English, Indonesian';
+    const rephraseLanguages = currentProfile.rephraseLanguages || defaultLanguages;
+    
+    const languages = rephraseLanguages.split(',').map(lang => lang.trim()).filter(lang => lang);
+    if (languages.length > 0) {
+      chrome.contextMenus.create({
+        id: "rephrase-parent", parentId: "gemini-text-parent",
+        title: "Rephrase Selection into...", contexts: ["selection"]
+      });
+      languages.forEach(lang => {
+        chrome.contextMenus.create({
+          id: `rephrase-${lang}`, parentId: "rephrase-parent",
+          title: lang, contexts: ["selection"]
+        });
+      });
+    }
+
+    chrome.contextMenus.create({
+      id: "gemini-image-parent",
+      title: "Gemini Image Actions",
+      contexts: ["image"]
+    });
+    
+    const imageActions = [
+        { id: 'image-quiz', title: 'Answer Quiz from Image' },
+        { id: 'image-analyze', title: 'Describe this Image' },
+        { id: 'image-translate', title: 'Translate Text in Image' }
+    ];
+    imageActions.forEach(action => {
+        chrome.contextMenus.create({
+            id: action.id, parentId: "gemini-image-parent",
+            title: action.title, contexts: ["image"]
+        });
+    });
+  } catch (error) {
+    console.error("Failed to update context menus, possibly due to storage issues:", error);
   }
-
-  chrome.contextMenus.create({
-    id: "gemini-image-parent",
-    title: "Gemini Image Actions",
-    contexts: ["image"]
-  });
-  
-  const imageActions = [
-      { id: 'image-quiz', title: 'Answer Quiz from Image' },
-      { id: 'image-analyze', title: 'Describe this Image' },
-      { id: 'image-translate', title: 'Translate Text in Image' }
-  ];
-  imageActions.forEach(action => {
-      chrome.contextMenus.create({
-          id: action.id, parentId: "gemini-image-parent",
-          title: action.title, contexts: ["image"]
-      });
-  });
 }
 
-chrome.runtime.onInstalled.addListener(updateContextMenus);
+chrome.runtime.onInstalled.addListener((details) => {
+  runMigration(details.reason);
+  updateContextMenus();
+});
+
 chrome.runtime.onStartup.addListener(updateContextMenus);
 
 async function performApiCall(payload) {
@@ -185,9 +250,12 @@ async function performApiCall(payload) {
     };
 
     try {
-      const settings = await StorageManager.get(['promptProfiles', 'activeProfile', 'temperature']);
+      const settings = await StorageManager.get(['activeProfile', 'temperature']);
       const activeProfileName = settings.activeProfile || 'Default';
-      const activeProfile = settings.promptProfiles?.[activeProfileName] || {};
+      const profileKey = `profile_${activeProfileName}`;
+      const profileResult = await StorageManager.get(profileKey);
+      const activeProfile = profileResult[profileKey] || {};
+
       const globalTemp = settings.temperature ?? 0.4;
       const purposeBase = purpose.split('-')[0];
       const tempKey = `${purposeBase}_temp`;
@@ -307,8 +375,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             (async () => {
                 const { action, selectionText } = request.payload;
                 const { tab } = sender;
-                const { geminiApiKey, selectedModel, promptProfiles, activeProfile } = await StorageManager.get(['geminiApiKey', 'selectedModel', 'promptProfiles', 'activeProfile']);
-                const currentPrompts = (promptProfiles?.[activeProfile]) || DEFAULT_PROMPTS;
+                const { geminiApiKey, selectedModel, activeProfile } = await StorageManager.get(['geminiApiKey', 'selectedModel', 'activeProfile']);
+                const profileKey = `profile_${activeProfile || 'Default'}`;
+                const profileResult = await StorageManager.get(profileKey);
+                const currentPrompts = profileResult[profileKey] || DEFAULT_PROMPTS;
                 
                 let systemPrompt = currentPrompts[action] || DEFAULT_PROMPTS[action];
                 let userContent = selectionText;
@@ -331,22 +401,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             break;
 
         case 'popupReady':
-            if (tabId) {
-                (async () => {
-                    const key = `contextData_${tabId}`;
-                    const data = await StorageManager.session.get(key);
-                    if (data[key]) {
-                        sendResponse(data[key]);
-                        await StorageManager.session.remove(key);
-                    } else {
-                        sendResponse(null);
-                    }
-                })();
+            if (tabId && pendingContextData[tabId]) {
+                const data = pendingContextData[tabId];
+                delete pendingContextData[tabId];
+                sendResponse(data);
             } else {
                 sendResponse(null);
             }
             return true;
-        
+
         case 'verifyAnswerWithSearch':
             (async () => {
                 const { cleanedContent, initialAnswer } = request.payload;
@@ -362,7 +425,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                             chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['js/googleScraper.js'] })
                                 .catch(err => {
                                     console.error("Failed to inject scraper script:", err);
-                                    // If injection fails, clean up and notify the UI
                                     chrome.tabs.remove(tab.id);
                                     StorageManager.session.remove(`verification_${tab.id}`);
                                     const formattedError = ErrorHandler.format({ message: "Verification failed: Could not inject scraper." }, 'verification');
