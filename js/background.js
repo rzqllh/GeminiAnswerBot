@@ -13,6 +13,25 @@ try {
 let pendingContextData = {};
 
 /**
+ * Creates a native Chrome notification to inform the user.
+ * @param {string} id - A unique ID for the notification.
+ * @param {string} title - The title of the notification.
+ * @param {string} message - The main message content.
+ * @param {string} type - The type of notification ('basic', 'list', etc.).
+ */
+function showNotification(id, title, message, type = 'basic') {
+  if (chrome.notifications) {
+    chrome.notifications.create(id, {
+      type: type,
+      iconUrl: '../assets/icon.png',
+      title: title,
+      message: message,
+      priority: 1
+    });
+  }
+}
+
+/**
  * Migrates the old, monolithic promptProfiles object to the new, individualized key structure.
  * This runs once upon extension update to fix the storage quota issue for existing users.
  * @param {string} reason - The reason for the onInstalled event.
@@ -22,32 +41,31 @@ async function runMigration(reason) {
 
   try {
     const oldData = await StorageManager.get('promptProfiles');
-    // Check if the old, problematic key exists
     if (oldData && oldData.promptProfiles) {
       console.log('GeminiAnswerBot: Old promptProfiles structure found. Starting migration...');
       
       const profiles = oldData.promptProfiles;
       const profileNames = Object.keys(profiles);
       const newStorageItems = {
-        profileList: profileNames, // Create the new profile list
+        profileList: profileNames,
       };
 
-      // Create a new item for each profile
       for (const name of profileNames) {
         const profileKey = `profile_${name}`;
         newStorageItems[profileKey] = profiles[name];
       }
 
-      // Save the new, separated items
       await StorageManager.set(newStorageItems);
-      // IMPORTANT: Remove the old, large item
       await StorageManager.remove('promptProfiles');
 
-      console.log('GeminiAnswerBot: Migration completed successfully. Old promptProfiles key removed.');
-      UIModule.showToast('Migration Complete', 'Your prompt profiles have been updated to a new format.', 'success');
+      console.log('GeminiAnswerBot: Migration completed successfully.');
+      // **FIX**: Use chrome.notifications instead of UIModule
+      showNotification('migration-success', 'GeminiAnswerBot Updated', 'Your prompt profiles have been successfully updated to a new, more stable format.');
     }
   } catch (error) {
-    console.error('GeminiAnswerBot: Migration failed. This can happen if storage is in a bad state. It is recommended to reset settings if issues persist.', error);
+    console.error('GeminiAnswerBot: Migration failed.', error);
+    // **FIX**: Use chrome.notifications for error feedback
+    showNotification('migration-error', 'GeminiAnswerBot Update Error', 'Failed to update settings. Please reset the extension from the options page if issues persist.');
   }
 }
 
@@ -148,7 +166,6 @@ async function updateContextMenus() {
       });
     });
 
-    // **FIX**: Wrap storage access in try/catch to prevent startup crash
     const { activeProfile = 'Default' } = await StorageManager.get('activeProfile');
     const profileKey = `profile_${activeProfile}`;
     const result = await StorageManager.get(profileKey);
