@@ -1,7 +1,7 @@
 // === Hafizh Signature Code ===
-// Author: Hafizh Rizqullah — GeminiAnswerBot
+// Author: Hafizh Rizqullah — GeminiAnswerBot Specialist
 // File: js/options/settings.js
-// Created: 2025-08-08 16:42:03
+// Created: 2025-08-27 12:05:00
 
 const SettingsModule = (() => {
   let ELS = {};
@@ -10,6 +10,7 @@ const SettingsModule = (() => {
   let REPHRASE_LANGUAGES_INPUT = null;
   let globalTemperature = 0.4;
 
+  // **REFACTOR**: Define a prefix for profile keys to keep them organized.
   const PROFILE_KEY_PREFIX = 'profile_';
 
   function updateSliderTooltip(slider) {
@@ -100,22 +101,27 @@ const SettingsModule = (() => {
     updateProfileButtonStates();
   }
 
+  // **REFACTOR**: Load individual prompt keys instead of one large object.
   async function loadPromptsForActiveProfile() {
     const { activeProfile = 'Default' } = await StorageManager.get('activeProfile');
-    const profileKey = `${PROFILE_KEY_PREFIX}${activeProfile}`;
-    const result = await StorageManager.get(profileKey);
-    const activeProfileData = result[profileKey] || {};
+    
+    const keysToFetch = Object.keys(DEFAULT_PROMPTS).map(key => `${PROFILE_KEY_PREFIX}${activeProfile}_${key}`);
+    keysToFetch.push(`${PROFILE_KEY_PREFIX}${activeProfile}_rephraseLanguages`);
+    
+    const profileData = await StorageManager.get(keysToFetch);
 
     for (const key in PROMPT_TEXTAREAS) {
+      const storageKey = `${PROFILE_KEY_PREFIX}${activeProfile}_${key}`;
       if (PROMPT_TEXTAREAS[key]) {
-        PROMPT_TEXTAREAS[key].value = activeProfileData[key] || DEFAULT_PROMPTS[key] || '';
+        PROMPT_TEXTAREAS[key].value = profileData[storageKey] || DEFAULT_PROMPTS[key] || '';
         PROMPT_TEXTAREAS[key].placeholder = DEFAULT_PROMPTS[key] || '';
       }
     }
     for (const key in PROMPT_TEMP_SLIDERS) {
       const slider = PROMPT_TEMP_SLIDERS[key];
+      const storageKey = `${PROFILE_KEY_PREFIX}${activeProfile}_${key}_temp`;
       if (slider) {
-        const tempValue = activeProfileData[`${key}_temp`] !== undefined ? activeProfileData[`${key}_temp`] : globalTemperature;
+        const tempValue = profileData[storageKey] !== undefined ? profileData[storageKey] : globalTemperature;
         slider.value = tempValue;
         updateSliderTooltip(slider);
         const controlGroup = slider.closest('.temperature-control-group');
@@ -124,47 +130,54 @@ const SettingsModule = (() => {
       }
     }
     if (REPHRASE_LANGUAGES_INPUT) {
-      REPHRASE_LANGUAGES_INPUT.value = activeProfileData.rephraseLanguages || 'English, Indonesian';
+      const storageKey = `${PROFILE_KEY_PREFIX}${activeProfile}_rephraseLanguages`;
+      REPHRASE_LANGUAGES_INPUT.value = profileData[storageKey] || 'English, Indonesian';
     }
   }
 
+  // **REFACTOR**: Initialize default profile with individual keys.
   async function initializePromptManager() {
     let { profileList } = await StorageManager.get('profileList');
     if (!profileList || profileList.length === 0) {
-      const defaultProfile = { ...DEFAULT_PROMPTS, rephraseLanguages: 'English, Indonesian' };
-      await StorageManager.set({
+      const defaultProfileSettings = {
         profileList: ['Default'],
         activeProfile: 'Default',
-        [`${PROFILE_KEY_PREFIX}Default`]: defaultProfile
-      });
+        [`${PROFILE_KEY_PREFIX}Default_rephraseLanguages`]: 'English, Indonesian'
+      };
+      for(const key in DEFAULT_PROMPTS) {
+        defaultProfileSettings[`${PROFILE_KEY_PREFIX}Default_${key}`] = DEFAULT_PROMPTS[key];
+      }
+      await StorageManager.set(defaultProfileSettings);
     }
     await populateProfileSelector();
     await loadPromptsForActiveProfile();
   }
 
+  // **REFACTOR**: Save prompts as individual keys.
   async function savePrompts() {
     const { activeProfile } = await StorageManager.get('activeProfile');
-    const profileKey = `${PROFILE_KEY_PREFIX}${activeProfile}`;
-    const result = await StorageManager.get(profileKey);
-    const currentProfileData = result[profileKey] || {};
+    const settingsToSave = {};
 
     for (const key in PROMPT_TEXTAREAS) {
+        const storageKey = `${PROFILE_KEY_PREFIX}${activeProfile}_${key}`;
         if (PROMPT_TEXTAREAS[key]) {
-            currentProfileData[key] = PROMPT_TEXTAREAS[key].value.trim() || DEFAULT_PROMPTS[key];
+            settingsToSave[storageKey] = PROMPT_TEXTAREAS[key].value.trim() || DEFAULT_PROMPTS[key];
         }
     }
     for (const key in PROMPT_TEMP_SLIDERS) {
+        const storageKey = `${PROFILE_KEY_PREFIX}${activeProfile}_${key}_temp`;
         const sliderValue = parseFloat(PROMPT_TEMP_SLIDERS[key].value);
         if (Math.abs(sliderValue - globalTemperature) > 0.01) {
-            currentProfileData[`${key}_temp`] = sliderValue;
+            settingsToSave[storageKey] = sliderValue;
         } else {
-            delete currentProfileData[`${key}_temp`];
+            // If it matches global, we can remove the override to save space
+            await StorageManager.remove(storageKey);
         }
     }
-    currentProfileData.rephraseLanguages = REPHRASE_LANGUAGES_INPUT.value.trim();
+    settingsToSave[`${PROFILE_KEY_PREFIX}${activeProfile}_rephraseLanguages`] = REPHRASE_LANGUAGES_INPUT.value.trim();
     
     try {
-      await StorageManager.set({ [profileKey]: currentProfileData });
+      await StorageManager.set(settingsToSave);
       chrome.runtime.sendMessage({ action: 'updateContextMenus' });
       UIModule.showToast('Success', `Prompts for "${activeProfile}" have been saved.`, 'success');
       await loadPromptsForActiveProfile();
@@ -207,6 +220,86 @@ const SettingsModule = (() => {
         await StorageManager.local.clear();
         UIModule.showToast('Success', 'All settings have been reset.', 'success');
         setTimeout(() => window.location.reload(), 1000);
+    }
+  }
+
+  // **REFACTOR**: All profile management functions now handle multiple keys.
+  async function handleNewProfile() {
+    const newName = prompt("Enter a name for the new profile:", "My New Profile");
+    if (!newName || newName.trim() === '') return;
+    let { profileList, activeProfile } = await StorageManager.get(['profileList', 'activeProfile']);
+    if (profileList.includes(newName)) { UIModule.showToast('Error', 'A profile with that name already exists.', 'error'); return; }
+    
+    const keysToClone = Object.keys(DEFAULT_PROMPTS).map(k => `${PROFILE_KEY_PREFIX}${activeProfile}_${k}`);
+    keysToClone.push(`${PROFILE_KEY_PREFIX}${activeProfile}_rephraseLanguages`);
+    
+    const currentProfileData = await StorageManager.get(keysToClone);
+    const newProfileData = {};
+    for(const oldKey in currentProfileData) {
+        const newKey = oldKey.replace(`${PROFILE_KEY_PREFIX}${activeProfile}_`, `${PROFILE_KEY_PREFIX}${newName}_`);
+        newProfileData[newKey] = currentProfileData[oldKey];
+    }
+    
+    profileList.push(newName);
+    await StorageManager.set({
+        ...newProfileData,
+        profileList: profileList,
+        activeProfile: newName,
+    });
+    await initializePromptManager();
+    UIModule.showToast('Success', `Profile "${newName}" created.`, 'success');
+  }
+
+  async function handleRenameProfile() {
+    let { profileList, activeProfile } = await StorageManager.get(['profileList', 'activeProfile']);
+    const newName = prompt(`Enter a new name for the "${activeProfile}" profile:`, activeProfile);
+    if (!newName || newName.trim() === '' || newName === activeProfile) return;
+    if (profileList.includes(newName)) {
+        UIModule.showToast('Error', 'A profile with that name already exists.', 'error');
+        return;
+    }
+    
+    const keysToMove = Object.keys(DEFAULT_PROMPTS).map(k => `${PROFILE_KEY_PREFIX}${activeProfile}_${k}`);
+    keysToMove.push(`${PROFILE_KEY_PREFIX}${activeProfile}_rephraseLanguages`);
+    
+    const profileData = await StorageManager.get(keysToMove);
+    const newSettings = {};
+    for(const oldKey in profileData) {
+        const newKey = oldKey.replace(`${PROFILE_KEY_PREFIX}${activeProfile}_`, `${PROFILE_KEY_PREFIX}${newName}_`);
+        newSettings[newKey] = profileData[oldKey];
+    }
+
+    const newProfileList = profileList.map(p => p === activeProfile ? newName : p);
+    newSettings.profileList = newProfileList;
+    newSettings.activeProfile = newName;
+
+    await StorageManager.set(newSettings);
+    await StorageManager.remove(keysToMove);
+
+    await initializePromptManager();
+    UIModule.showToast('Success', `Profile renamed to "${newName}".`, 'success');
+  }
+
+  async function handleDeleteProfile() {
+    let { profileList, activeProfile } = await StorageManager.get(['profileList', 'activeProfile']);
+    const confirmed = await UIModule.showConfirm({
+        title: `Delete Profile`,
+        message: `Are you sure you want to delete the "${activeProfile}" profile? This cannot be undone.`,
+        okLabel: 'Delete',
+        okClass: 'button-danger'
+    });
+    if (confirmed) {
+        const keysToRemove = Object.keys(DEFAULT_PROMPTS).map(k => `${PROFILE_KEY_PREFIX}${activeProfile}_${k}`);
+        keysToRemove.push(`${PROFILE_KEY_PREFIX}${activeProfile}_rephraseLanguages`);
+        
+        const newProfileList = profileList.filter(p => p !== activeProfile);
+        await StorageManager.set({
+            profileList: newProfileList,
+            activeProfile: 'Default'
+        });
+        await StorageManager.remove(keysToRemove);
+        await initializePromptManager();
+        UIModule.showToast('Success', `Profile "${activeProfile}" has been deleted.`, 'success');
     }
   }
 
@@ -266,72 +359,9 @@ const SettingsModule = (() => {
         updateProfileButtonStates();
         UIModule.showToast('Profile Changed', `Active profile is now "${newActiveProfile}".`, 'info');
     });
-    ELS.newProfileBtn.addEventListener('click', async () => {
-        const newName = prompt("Enter a name for the new profile:", "My New Profile");
-        if (!newName || newName.trim() === '') return;
-        let { profileList } = await StorageManager.get('profileList');
-        if (profileList.includes(newName)) { UIModule.showToast('Error', 'A profile with that name already exists.', 'error'); return; }
-        
-        const { activeProfile } = await StorageManager.get('activeProfile');
-        const activeProfileKey = `${PROFILE_KEY_PREFIX}${activeProfile}`;
-        const result = await StorageManager.get(activeProfileKey);
-        const newProfileData = { ...result[activeProfileKey] };
-        
-        profileList.push(newName);
-        await StorageManager.set({
-            profileList: profileList,
-            activeProfile: newName,
-            [`${PROFILE_KEY_PREFIX}${newName}`]: newProfileData
-        });
-        await initializePromptManager();
-        UIModule.showToast('Success', `Profile "${newName}" created.`, 'success');
-    });
-    ELS.renameProfileBtn.addEventListener('click', async () => {
-        let { profileList, activeProfile } = await StorageManager.get(['profileList', 'activeProfile']);
-        const newName = prompt(`Enter a new name for the "${activeProfile}" profile:`, activeProfile);
-        if (!newName || newName.trim() === '' || newName === activeProfile) return;
-        if (profileList.includes(newName)) {
-            UIModule.showToast('Error', 'A profile with that name already exists.', 'error');
-            return;
-        }
-        
-        const oldKey = `${PROFILE_KEY_PREFIX}${activeProfile}`;
-        const newKey = `${PROFILE_KEY_PREFIX}${newName}`;
-        const result = await StorageManager.get(oldKey);
-        const profileData = result[oldKey];
-
-        const newProfileList = profileList.map(p => p === activeProfile ? newName : p);
-
-        await StorageManager.set({
-            profileList: newProfileList,
-            activeProfile: newName,
-            [newKey]: profileData
-        });
-        await StorageManager.remove(oldKey);
-
-        await initializePromptManager();
-        UIModule.showToast('Success', `Profile renamed to "${newName}".`, 'success');
-    });
-    ELS.deleteProfileBtn.addEventListener('click', async () => {
-        let { profileList, activeProfile } = await StorageManager.get(['profileList', 'activeProfile']);
-        const confirmed = await UIModule.showConfirm({
-            title: `Delete Profile`,
-            message: `Are you sure you want to delete the "${activeProfile}" profile? This cannot be undone.`,
-            okLabel: 'Delete',
-            okClass: 'button-danger'
-        });
-        if (confirmed) {
-            const keyToRemove = `${PROFILE_KEY_PREFIX}${activeProfile}`;
-            const newProfileList = profileList.filter(p => p !== activeProfile);
-            await StorageManager.set({
-                profileList: newProfileList,
-                activeProfile: 'Default'
-            });
-            await StorageManager.remove(keyToRemove);
-            await initializePromptManager();
-            UIModule.showToast('Success', `Profile "${activeProfile}" has been deleted.`, 'success');
-        }
-    });
+    ELS.newProfileBtn.addEventListener('click', handleNewProfile);
+    ELS.renameProfileBtn.addEventListener('click', handleRenameProfile);
+    ELS.deleteProfileBtn.addEventListener('click', handleDeleteProfile);
     ELS.promptResetButtons.forEach(button => {
         button.addEventListener('click', (e) => {
             const key = e.currentTarget.dataset.promptKey;

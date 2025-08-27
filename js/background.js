@@ -31,16 +31,18 @@ function showNotification(id, title, message, type = 'basic') {
   }
 }
 
+// **FIX**: New migration function to handle storage refactor.
 /**
- * Migrates the old, monolithic promptProfiles object to the new, individualized key structure.
- * This runs once upon extension update to fix the storage quota issue for existing users.
- * @param {string} reason - The reason for the onInstalled event.
+ * Migrates old storage structures to new ones upon extension update.
+ * Specifically handles the transition from a single large `promptProfiles` object
+ * to individual keys for each prompt to avoid storage quota errors.
+ * @param {string} reason - The reason for the onInstalled event ('install', 'update').
  */
 async function runMigration(reason) {
   if (reason !== 'update' && reason !== 'install') return;
 
   try {
-    // Use the raw storage API here since we are dealing with potentially problematic keys
+    // Use the raw storage API to safely access potentially oversized items.
     chrome.storage.sync.get('promptProfiles', async (data) => {
       if (chrome.runtime.lastError) {
         console.error("Migration check failed:", chrome.runtime.lastError.message);
@@ -48,7 +50,7 @@ async function runMigration(reason) {
       }
 
       if (data && data.promptProfiles) {
-        console.log('GeminiAnswerBot: Old promptProfiles structure found. Starting migration...');
+        console.log('GeminiAnswerBot: Old `promptProfiles` structure found. Starting migration...');
         
         const profiles = data.promptProfiles;
         const profileNames = Object.keys(profiles);
@@ -57,13 +59,16 @@ async function runMigration(reason) {
         };
 
         for (const name of profileNames) {
-          const profileKey = `profile_${name}`;
-          newStorageItems[profileKey] = profiles[name];
+          const profile = profiles[name];
+          for (const key in profile) {
+            const newStorageKey = `profile_${name}_${key}`;
+            newStorageItems[newStorageKey] = profile[key];
+          }
         }
 
-        // Use StorageManager for the new, safe keys
+        // Use StorageManager for the new, safe keys.
         await StorageManager.set(newStorageItems);
-        // Use raw API to remove the old, problematic key
+        // Use raw API to remove the old, problematic key.
         chrome.storage.sync.remove('promptProfiles');
 
         console.log('GeminiAnswerBot: Migration completed successfully.');
@@ -151,6 +156,7 @@ async function handleContextAction(info, tab) {
   }
 }
 
+// **REFACTOR**: Updated to use the new individual key storage model.
 async function updateContextMenus() {
   try {
     await chrome.contextMenus.removeAll();
@@ -174,12 +180,11 @@ async function updateContextMenus() {
     });
 
     const { activeProfile = 'Default' } = await StorageManager.get('activeProfile');
-    const profileKey = `profile_${activeProfile}`;
-    const result = await StorageManager.get(profileKey);
-    const currentProfile = result[profileKey] || {};
+    const rephraseLangKey = `profile_${activeProfile}_rephraseLanguages`;
+    const result = await StorageManager.get(rephraseLangKey);
     
     const defaultLanguages = 'English, Indonesian';
-    const rephraseLanguages = currentProfile.rephraseLanguages || defaultLanguages;
+    const rephraseLanguages = result[rephraseLangKey] || defaultLanguages;
     
     const languages = rephraseLanguages.split(',').map(lang => lang.trim()).filter(lang => lang);
     if (languages.length > 0) {
@@ -227,6 +232,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 chrome.runtime.onStartup.addListener(updateContextMenus);
 
+// **REFACTOR**: Updated to use the new individual key storage model.
 async function performApiCall(payload) {
     const { apiKey, model, systemPrompt, userContent, base64ImageData, purpose, tabId } = payload;
     
@@ -255,14 +261,12 @@ async function performApiCall(payload) {
     try {
       const settings = await StorageManager.get(['activeProfile', 'temperature']);
       const activeProfileName = settings.activeProfile || 'Default';
-      const profileKey = `profile_${activeProfileName}`;
-      const profileResult = await StorageManager.get(profileKey);
-      const activeProfile = profileResult[profileKey] || {};
-
+      
       const globalTemp = settings.temperature ?? 0.4;
       const purposeBase = purpose.split('-')[0];
-      const tempKey = `${purposeBase}_temp`;
-      const finalTemperature = activeProfile[tempKey] ?? globalTemp;
+      const tempKey = `profile_${activeProfileName}_${purposeBase}_temp`;
+      const tempResult = await StorageManager.get(tempKey);
+      const finalTemperature = tempResult[tempKey] ?? globalTemp;
 
       const generationConfig = { temperature: finalTemperature };
       const endpoint = 'streamGenerateContent';
@@ -374,21 +378,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             updateContextMenus();
             break;
         
+        // **REFACTOR**: Updated to use the new individual key storage model.
         case 'triggerContextMenuAction':
             (async () => {
                 const { action, selectionText } = request.payload;
                 const { tab } = sender;
                 const { geminiApiKey, selectedModel, activeProfile } = await StorageManager.get(['geminiApiKey', 'selectedModel', 'activeProfile']);
-                const profileKey = `profile_${activeProfile || 'Default'}`;
-                const profileResult = await StorageManager.get(profileKey);
-                const currentPrompts = profileResult[profileKey] || DEFAULT_PROMPTS;
                 
-                let systemPrompt = currentPrompts[action] || DEFAULT_PROMPTS[action];
+                const profileName = activeProfile || 'Default';
+                const baseAction = action.startsWith('rephrase-') ? 'rephrase' : action;
+                const promptKey = `profile_${profileName}_${baseAction}`;
+                
+                const result = await StorageManager.get(promptKey);
+                let systemPrompt = result[promptKey] || DEFAULT_PROMPTS[baseAction];
                 let userContent = selectionText;
 
                 if (action.startsWith('rephrase-')) {
                     const language = action.split('-')[1];
-                    systemPrompt = currentPrompts.rephrase || DEFAULT_PROMPTS.rephrase;
                     userContent = `Target Language: ${language}\n\nText to rephrase:\n${selectionText}`;
                 }
         

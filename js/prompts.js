@@ -1,7 +1,14 @@
 // === Hafizh Signature Code ===
-// Author: Hafizh Rizqullah — GeminiAnswerBot
+// Author: Hafizh Rizqullah — GeminiAnswerBot Specialist
 // File: js/prompts.js
-// Created: 2025-08-08 16:42:03
+// Created: 2025-08-27 12:05:00
+
+// DEVELOPER NOTE:
+// This object defines the default prompts. The actual prompts used by the
+// extension are stored in chrome.storage under individual keys to avoid
+// storage quota limits. The naming convention for these keys is:
+// `profile_{ProfileName}_{promptKey}`
+// For example: 'profile_Default_answer' or 'profile_Work_summarize'
 
 const DEFAULT_PROMPTS = {
   'cleaning': `You are an extremely precise text cleaner and quiz extractor. Your ONLY objective is to extract the **single quiz question** and its **associated answer options** from the provided text.
