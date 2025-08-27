@@ -1,7 +1,7 @@
 // === Hafizh Signature Code ===
-// Author: Hafizh Rizqullah — GeminiAnswerBot
+// Author: Hafizh Rizqullah — GeminiAnswerBot Specialist
 // File: js/content.js
-// Created: 2025-08-08 16:42:03
+// Created: 2025-08-27 12:05:00
 
 if (typeof window.geminiAnswerBotContentLoaded === 'undefined') {
   window.geminiAnswerBotContentLoaded = true;
