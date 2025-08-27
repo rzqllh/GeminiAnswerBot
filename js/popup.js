@@ -1,7 +1,7 @@
 // === Hafizh Signature Code ===
-// Author: Hafizh Rizqullah — GeminiAnswerBot
+// Author: Hafizh Rizqullah — GeminiAnswerBot Specialist
 // File: js/popup.js
-// Created: 2025-08-08 16:42:03
+// Created: 2025-08-27 12:05:00
 
 class PopupApp {
     constructor() {
@@ -58,7 +58,8 @@ class PopupApp {
             'imagePreviewContainer', 'imagePreview', 'imageStatusText', 'answerCardTitle',
             'generalTaskContainer', 'generalTaskTitle', 'generalTaskDisplay', 'copyGeneralTask',
             'showReasoningButton', 'reasoningDisplay',
-            'verificationContainer', 'verifyButton'
+            'verificationContainer', 'verifyButton',
+            'onboardingContainer', 'onboardingGoToSettings'
         ];
         ids.forEach(id => {
             const key = id.replace(/-([a-z])/g, g => g[1].toUpperCase());
@@ -68,6 +69,7 @@ class PopupApp {
 
     _bindEvents() {
         this.elements.settingsButton.addEventListener('click', () => chrome.runtime.openOptionsPage());
+        this.elements.onboardingGoToSettings.addEventListener('click', () => chrome.runtime.openOptionsPage());
         this.elements.analyzePageButton.addEventListener('click', () => this._handlePageAnalysis());
         this.elements.rescanButton.addEventListener('click', () => this.start(true));
         this.elements.explanationButton.addEventListener('click', () => this._getExplanation());
@@ -111,6 +113,10 @@ class PopupApp {
         if (configChanged) {
             this.store.setState({ config: { ...state.config } });
             StorageManager.log('Popup', 'Configuration updated in real-time due to storage change.');
+            // If an API key was just added, restart the app flow
+            if (changes.geminiApiKey && changes.geminiApiKey.newValue && !changes.geminiApiKey.oldValue) {
+                this.start(true);
+            }
         }
     }
 
@@ -185,7 +191,11 @@ class PopupApp {
                 return;
             }
 
-            if (!config.geminiApiKey) throw { type: 'INVALID_API_KEY' };
+            // **ONBOARDING CHECK**: If no API key, show the welcome screen.
+            if (!config.geminiApiKey) {
+                this.store.setState({ view: 'onboarding' });
+                return;
+            }
             
             await this._ensureContentScripts(tab.id);
 
@@ -251,11 +261,15 @@ class PopupApp {
         this.elements.messageArea.classList.add('hidden');
         this.elements.quizModeContainer.classList.add('hidden');
         this.elements.generalTaskContainer.classList.add('hidden');
+        this.elements.onboardingContainer.classList.add('hidden');
         
         switch (state.view) {
             case 'loading': 
                 this.elements.messageArea.classList.remove('hidden'); 
                 this.elements.messageArea.innerHTML = `<div class="loading-state full-page"><div class="spinner"></div><p>Scanning for quiz...</p></div>`; 
+                break;
+            case 'onboarding':
+                this.elements.onboardingContainer.classList.remove('hidden');
                 break;
             case 'info': 
                 this.elements.messageArea.classList.remove('hidden');

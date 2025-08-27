@@ -1,7 +1,7 @@
 // === Hafizh Signature Code ===
-// Author: Hafizh Rizqullah — GeminiAnswerBot
+// Author: Hafizh Rizqullah — GeminiAnswerBot Specialist
 // File: js/background.js
-// Created: 2025-08-08 16:42:03
+// Created: 2025-08-27 12:05:00
 
 // CRITICAL: Scripts must be imported at the top level of the service worker.
 try {
@@ -218,6 +218,9 @@ async function updateContextMenus() {
 }
 
 chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === 'install') {
+    chrome.runtime.openOptionsPage();
+  }
   runMigration(details.reason);
   updateContextMenus();
 });

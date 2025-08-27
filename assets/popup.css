@@ -1,7 +1,7 @@
 /* === Hafizh Signature Code ===
-Author: Hafizh Rizqullah — GeminiAnswerBot
+Author: Hafizh Rizqullah — GeminiAnswerBot Specialist
 File: assets/popup.css
-Created: 2025-08-08 16:42:03 */
+Created: 2025-08-27 12:05:00 */
 
 /* == BASE COLORS & VARIABLES (Light Mode First) ================= */
 :root {
@@ -291,6 +291,33 @@ body {
 .error-panel { background-color: var(--error-bg); border: 1px solid var(--error-border); color: var(--error-text); }
 .info-panel-header, .error-panel-header { font-size: 16px; font-weight: 600; }
 .info-panel-body p, .error-panel-body p { margin: 0; line-height: 1.5; }
+
+/* == ONBOARDING VIEW =========================================== */
+.onboarding-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px 24px !important;
+}
+.onboarding-icon {
+  color: var(--action-button-bg);
+  margin-bottom: 16px;
+}
+.onboarding-content h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+.onboarding-content p {
+  color: var(--secondary-text);
+  max-width: 300px;
+  margin: 0 0 24px 0;
+}
+.onboarding-content .action-button {
+  width: 100%;
+  max-width: 250px;
+}
 
 /* == UTILITY =================================================== */
 .icon-button {
