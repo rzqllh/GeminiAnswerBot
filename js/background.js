@@ -31,18 +31,10 @@ function showNotification(id, title, message, type = 'basic') {
   }
 }
 
-// **FIX**: New migration function to handle storage refactor.
-/**
- * Migrates old storage structures to new ones upon extension update.
- * Specifically handles the transition from a single large `promptProfiles` object
- * to individual keys for each prompt to avoid storage quota errors.
- * @param {string} reason - The reason for the onInstalled event ('install', 'update').
- */
 async function runMigration(reason) {
   if (reason !== 'update' && reason !== 'install') return;
 
   try {
-    // Use the raw storage API to safely access potentially oversized items.
     chrome.storage.sync.get('promptProfiles', async (data) => {
       if (chrome.runtime.lastError) {
         console.error("Migration check failed:", chrome.runtime.lastError.message);
@@ -66,9 +58,7 @@ async function runMigration(reason) {
           }
         }
 
-        // Use StorageManager for the new, safe keys.
         await StorageManager.set(newStorageItems);
-        // Use raw API to remove the old, problematic key.
         chrome.storage.sync.remove('promptProfiles');
 
         console.log('GeminiAnswerBot: Migration completed successfully.');
@@ -156,7 +146,7 @@ async function handleContextAction(info, tab) {
   }
 }
 
-// **REFACTOR**: Updated to use the new individual key storage model.
+// **REFACTOR**: Context menus are now fully dynamic based on stored profile settings.
 async function updateContextMenus() {
   try {
     await chrome.contextMenus.removeAll();
@@ -167,6 +157,13 @@ async function updateContextMenus() {
       contexts: ["selection"]
     });
 
+    const { activeProfile = 'Default' } = await StorageManager.get('activeProfile');
+    const profileName = activeProfile;
+    
+    const rephraseLangKey = `profile_${profileName}_rephraseLanguages`;
+    const customActionsKey = `profile_${profileName}_customActions`;
+    const result = await StorageManager.get([rephraseLangKey, customActionsKey]);
+    
     const standardActions = [
       { id: 'summarize', title: 'Summarize Selection' },
       { id: 'explanation', title: 'Explain Selection' },
@@ -179,13 +176,8 @@ async function updateContextMenus() {
       });
     });
 
-    const { activeProfile = 'Default' } = await StorageManager.get('activeProfile');
-    const rephraseLangKey = `profile_${activeProfile}_rephraseLanguages`;
-    const result = await StorageManager.get(rephraseLangKey);
-    
     const defaultLanguages = 'English, Indonesian';
     const rephraseLanguages = result[rephraseLangKey] || defaultLanguages;
-    
     const languages = rephraseLanguages.split(',').map(lang => lang.trim()).filter(lang => lang);
     if (languages.length > 0) {
       chrome.contextMenus.create({
@@ -196,6 +188,24 @@ async function updateContextMenus() {
         chrome.contextMenus.create({
           id: `rephrase-${lang}`, parentId: "rephrase-parent",
           title: lang, contexts: ["selection"]
+        });
+      });
+    }
+
+    const customActions = result[customActionsKey] || [];
+    if (customActions.length > 0) {
+      chrome.contextMenus.create({
+        id: "custom-actions-separator",
+        type: "separator",
+        parentId: "gemini-text-parent",
+        contexts: ["selection"]
+      });
+      customActions.forEach(action => {
+        chrome.contextMenus.create({
+          id: action.id,
+          parentId: "gemini-text-parent",
+          title: action.name,
+          contexts: ["selection"]
         });
       });
     }
@@ -232,7 +242,6 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 chrome.runtime.onStartup.addListener(updateContextMenus);
 
-// **REFACTOR**: Updated to use the new individual key storage model.
 async function performApiCall(payload) {
     const { apiKey, model, systemPrompt, userContent, base64ImageData, purpose, tabId } = payload;
     
@@ -378,7 +387,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             updateContextMenus();
             break;
         
-        // **REFACTOR**: Updated to use the new individual key storage model.
+        // **REFACTOR**: Logic to handle standard, rephrase, and custom actions.
         case 'triggerContextMenuAction':
             (async () => {
                 const { action, selectionText } = request.payload;
@@ -386,16 +395,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const { geminiApiKey, selectedModel, activeProfile } = await StorageManager.get(['geminiApiKey', 'selectedModel', 'activeProfile']);
                 
                 const profileName = activeProfile || 'Default';
-                const baseAction = action.startsWith('rephrase-') ? 'rephrase' : action;
-                const promptKey = `profile_${profileName}_${baseAction}`;
-                
-                const result = await StorageManager.get(promptKey);
-                let systemPrompt = result[promptKey] || DEFAULT_PROMPTS[baseAction];
+                let systemPrompt = '';
                 let userContent = selectionText;
+                let purpose = action;
 
                 if (action.startsWith('rephrase-')) {
                     const language = action.split('-')[1];
+                    const promptKey = `profile_${profileName}_rephrase`;
+                    const result = await StorageManager.get(promptKey);
+                    systemPrompt = result[promptKey] || DEFAULT_PROMPTS.rephrase;
                     userContent = `Target Language: ${language}\n\nText to rephrase:\n${selectionText}`;
+                } else if (DEFAULT_PROMPTS[action]) { // Standard actions
+                    const promptKey = `profile_${profileName}_${action}`;
+                    const result = await StorageManager.get(promptKey);
+                    systemPrompt = result[promptKey] || DEFAULT_PROMPTS[action];
+                } else if (action.startsWith('custom_')) { // Custom actions
+                    const customActionsKey = `profile_${profileName}_customActions`;
+                    const result = await StorageManager.get(customActionsKey);
+                    const customActions = result[customActionsKey] || [];
+                    const customAction = customActions.find(a => a.id === action);
+                    if (customAction) {
+                        systemPrompt = customAction.prompt;
+                        purpose = customAction.name; // Use the name for display purposes
+                    } else {
+                        console.error(`Custom action with ID ${action} not found.`);
+                        return;
+                    }
                 }
         
                 performApiCall({
@@ -403,7 +428,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     model: selectedModel,
                     systemPrompt,
                     userContent,
-                    purpose: action,
+                    purpose: purpose,
                     tabId: tab.id,
                 });
             })();

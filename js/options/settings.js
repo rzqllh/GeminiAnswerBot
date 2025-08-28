@@ -10,8 +10,21 @@ const SettingsModule = (() => {
   let REPHRASE_LANGUAGES_INPUT = null;
   let globalTemperature = 0.4;
 
-  // **REFACTOR**: Define a prefix for profile keys to keep them organized.
   const PROFILE_KEY_PREFIX = 'profile_';
+
+  // **NEW**: DOM elements for the custom action modal
+  const MODAL_ELS = {
+    modal: document.getElementById('customActionModal'),
+    title: document.getElementById('customActionModalTitle'),
+    form: document.getElementById('customActionForm'),
+    idInput: document.getElementById('customActionId'),
+    nameInput: document.getElementById('customActionName'),
+    promptInput: document.getElementById('customActionPrompt'),
+    saveButton: document.getElementById('customActionSave'),
+    cancelButton: document.getElementById('customActionCancel'),
+    addNewButton: document.getElementById('addNewActionButton'),
+    actionsList: document.getElementById('customActionsList'),
+  };
 
   function updateSliderTooltip(slider) {
     const tooltip = slider.parentElement.querySelector('.slider-value-display');
@@ -101,7 +114,6 @@ const SettingsModule = (() => {
     updateProfileButtonStates();
   }
 
-  // **REFACTOR**: Load individual prompt keys instead of one large object.
   async function loadPromptsForActiveProfile() {
     const { activeProfile = 'Default' } = await StorageManager.get('activeProfile');
     
@@ -133,9 +145,13 @@ const SettingsModule = (() => {
       const storageKey = `${PROFILE_KEY_PREFIX}${activeProfile}_rephraseLanguages`;
       REPHRASE_LANGUAGES_INPUT.value = profileData[storageKey] || 'English, Indonesian';
     }
+    
+    // **NEW**: Load and render custom actions
+    const customActionsKey = `${PROFILE_KEY_PREFIX}${activeProfile}_customActions`;
+    const customActions = profileData[customActionsKey] || [];
+    renderCustomActions(customActions);
   }
 
-  // **REFACTOR**: Initialize default profile with individual keys.
   async function initializePromptManager() {
     let { profileList } = await StorageManager.get('profileList');
     if (!profileList || profileList.length === 0) {
@@ -153,7 +169,6 @@ const SettingsModule = (() => {
     await loadPromptsForActiveProfile();
   }
 
-  // **REFACTOR**: Save prompts as individual keys.
   async function savePrompts() {
     const { activeProfile } = await StorageManager.get('activeProfile');
     const settingsToSave = {};
@@ -170,7 +185,6 @@ const SettingsModule = (() => {
         if (Math.abs(sliderValue - globalTemperature) > 0.01) {
             settingsToSave[storageKey] = sliderValue;
         } else {
-            // If it matches global, we can remove the override to save space
             await StorageManager.remove(storageKey);
         }
     }
@@ -183,6 +197,112 @@ const SettingsModule = (() => {
       await loadPromptsForActiveProfile();
     } catch (error) {
       UIModule.showToast('Error Saving Prompts', error.message, 'error');
+    }
+  }
+
+  // **NEW**: All functions related to custom action management
+  function renderCustomActions(actions) {
+    MODAL_ELS.actionsList.innerHTML = '';
+    if (!actions || actions.length === 0) {
+      MODAL_ELS.actionsList.innerHTML = '<p class="empty-actions-state">No custom actions created yet. Add one below!</p>';
+      return;
+    }
+
+    actions.forEach(action => {
+      const item = document.createElement('div');
+      item.className = 'custom-action-item';
+      item.innerHTML = `
+        <span class="custom-action-name">${_escapeHtml(action.name)}</span>
+        <div class="custom-action-buttons">
+          <button class="button button-secondary button-icon edit-action-btn" title="Edit Action">✏️</button>
+          <button class="button button-danger button-icon delete-action-btn" title="Delete Action">🗑️</button>
+        </div>
+      `;
+      item.querySelector('.edit-action-btn').addEventListener('click', () => openActionModal(action));
+      item.querySelector('.delete-action-btn').addEventListener('click', () => deleteCustomAction(action.id));
+      MODAL_ELS.actionsList.appendChild(item);
+    });
+  }
+
+  function openActionModal(action = null) {
+    MODAL_ELS.form.reset();
+    if (action) {
+      MODAL_ELS.title.textContent = 'Edit Action';
+      MODAL_ELS.idInput.value = action.id;
+      MODAL_ELS.nameInput.value = action.name;
+      MODAL_ELS.promptInput.value = action.prompt;
+    } else {
+      MODAL_ELS.title.textContent = 'Add New Action';
+      MODAL_ELS.idInput.value = `custom_${Date.now()}`;
+    }
+    MODAL_ELS.modal.classList.remove('hidden');
+    setTimeout(() => MODAL_ELS.modal.classList.add('show'), 10);
+  }
+
+  function closeActionModal() {
+    MODAL_ELS.modal.classList.remove('show');
+    MODAL_ELS.modal.addEventListener('transitionend', () => {
+      MODAL_ELS.modal.classList.add('hidden');
+    }, { once: true });
+  }
+
+  async function saveCustomAction(e) {
+    e.preventDefault();
+    const { activeProfile } = await StorageManager.get('activeProfile');
+    const customActionsKey = `${PROFILE_KEY_PREFIX}${activeProfile}_customActions`;
+    
+    const result = await StorageManager.get(customActionsKey);
+    let actions = result[customActionsKey] || [];
+
+    const action = {
+      id: MODAL_ELS.idInput.value,
+      name: MODAL_ELS.nameInput.value.trim(),
+      prompt: MODAL_ELS.promptInput.value.trim(),
+    };
+
+    const existingIndex = actions.findIndex(a => a.id === action.id);
+    if (existingIndex > -1) {
+      actions[existingIndex] = action;
+    } else {
+      actions.push(action);
+    }
+
+    try {
+      await StorageManager.set({ [customActionsKey]: actions });
+      UIModule.showToast('Success', `Action "${action.name}" saved.`, 'success');
+      chrome.runtime.sendMessage({ action: 'updateContextMenus' });
+      renderCustomActions(actions);
+      closeActionModal();
+    } catch (error) {
+      UIModule.showToast('Error', `Could not save action: ${error.message}`, 'error');
+    }
+  }
+
+  async function deleteCustomAction(actionId) {
+    const confirmed = await UIModule.showConfirm({
+      title: 'Delete Action',
+      message: 'Are you sure you want to delete this custom action? This cannot be undone.',
+      okLabel: 'Delete',
+      okClass: 'button-danger'
+    });
+
+    if (confirmed) {
+      const { activeProfile } = await StorageManager.get('activeProfile');
+      const customActionsKey = `${PROFILE_KEY_PREFIX}${activeProfile}_customActions`;
+      
+      const result = await StorageManager.get(customActionsKey);
+      let actions = result[customActionsKey] || [];
+      
+      const updatedActions = actions.filter(a => a.id !== actionId);
+
+      try {
+        await StorageManager.set({ [customActionsKey]: updatedActions });
+        UIModule.showToast('Success', 'Action deleted.', 'success');
+        chrome.runtime.sendMessage({ action: 'updateContextMenus' });
+        renderCustomActions(updatedActions);
+      } catch (error) {
+        UIModule.showToast('Error', `Could not delete action: ${error.message}`, 'error');
+      }
     }
   }
 
@@ -223,7 +343,6 @@ const SettingsModule = (() => {
     }
   }
 
-  // **REFACTOR**: All profile management functions now handle multiple keys.
   async function handleNewProfile() {
     const newName = prompt("Enter a name for the new profile:", "My New Profile");
     if (!newName || newName.trim() === '') return;
@@ -371,6 +490,14 @@ const SettingsModule = (() => {
             }
         });
     });
+
+    // **NEW**: Event listeners for the custom action modal
+    MODAL_ELS.addNewButton.addEventListener('click', () => openActionModal());
+    MODAL_ELS.cancelButton.addEventListener('click', closeActionModal);
+    MODAL_ELS.modal.addEventListener('click', (e) => {
+      if (e.target === MODAL_ELS.modal) closeActionModal();
+    });
+    MODAL_ELS.form.addEventListener('submit', saveCustomAction);
   }
   
   async function initialize(elements, prompts, temps, rephraseInput) {

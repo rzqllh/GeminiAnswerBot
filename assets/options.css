@@ -202,6 +202,9 @@ h1 {
 .card-header {
   padding: 16px 20px;
   border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 .card-header h2 {
   font-size: 18px;
@@ -229,17 +232,21 @@ h1 {
 .card-content .form-row:last-child {
   border-bottom: none;
 }
-.form-row-label {
+.form-row-label-static {
+  font-weight: 500;
+  font-size: 15px;
+}
+.form-row-label-stacked {
   flex: 1 1 50%;
   padding-right: 24px;
 }
-.form-row-label label {
+.form-row-label-stacked label {
   display: block;
   font-weight: 500;
   font-size: 15px;
   margin-bottom: 4px;
 }
-.form-row-label .form-hint {
+.form-row-label-stacked .form-hint {
   font-size: 13px;
   color: var(--secondary-text);
   line-height: 1.4;
@@ -654,11 +661,34 @@ input[type="range"]::-moz-range-thumb {
   color: #fff;
 }
 
-/* **NEW**: History loader for infinite scroll */
 .history-loader {
   display: flex;
   justify-content: center;
   padding: 20px;
+}
+
+/* **NEW**: Custom Actions Styles */
+.custom-action-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+#customActionsList .custom-action-item:last-child {
+  border-bottom: none;
+}
+.custom-action-name {
+  font-weight: 500;
+}
+.custom-action-buttons {
+  display: flex;
+  gap: 8px;
+}
+.empty-actions-state {
+  text-align: center;
+  padding: 24px;
+  color: var(--secondary-text);
 }
 
 /* Buttons */
@@ -670,6 +700,15 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.button-icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 18px;
 }
 .button-primary {
   background-color: var(--accent-blue);
@@ -767,7 +806,7 @@ input[type="range"]::-moz-range-thumb {
   color: var(--secondary-text);
 }
 
-#custom-confirm-overlay {
+.modal-overlay, #custom-confirm-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -783,18 +822,17 @@ input[type="range"]::-moz-range-thumb {
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
-#custom-confirm-overlay.show {
+.modal-overlay.show, #custom-confirm-overlay.show {
   opacity: 1;
 }
-#custom-confirm-overlay.show .custom-confirm-box {
+.modal-overlay.show .modal-box, #custom-confirm-overlay.show .custom-confirm-box {
   transform: scale(1);
   opacity: 1;
 }
-.custom-confirm-box {
-  width: 380px;
+.modal-box, .custom-confirm-box {
+  width: 480px;
   padding: 24px;
   border-radius: 14px;
-  text-align: center;
   background-color: var(--content-bg);
   border: 1px solid var(--border-color);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
@@ -802,11 +840,15 @@ input[type="range"]::-moz-range-thumb {
   opacity: 0;
   transition: all 0.2s ease-in-out;
 }
-.custom-confirm-box h2 {
+.modal-box h2, .custom-confirm-box h2 {
   font-size: 18px;
   font-weight: 600;
-  margin: 0 0 10px 0;
+  margin: 0 0 20px 0;
   color: var(--primary-text);
+}
+.custom-confirm-box {
+  width: 380px;
+  text-align: center;
 }
 .custom-confirm-box p {
   font-size: 14px;
@@ -821,4 +863,25 @@ input[type="range"]::-moz-range-thumb {
 }
 .custom-confirm-actions .button {
   flex-grow: 1;
+}
+
+/* **NEW**: Custom Action Modal Form */
+.modal-form-group {
+  margin-bottom: 20px;
+}
+.modal-form-group label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.modal-form-group .form-hint {
+  font-size: 13px;
+  color: var(--secondary-text);
+  margin-top: 8px;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
 }

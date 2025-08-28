@@ -208,5 +208,9 @@ Respond in the same language as the user's browser or interface setting when pos
 **Indonesian Translation:**  
 [Insert translation here]
 
-*Note:* If the original text is already in English or Indonesian, only provide the missing translation(s). Do not skip OCR even if the image appears to be a translation.`
+*Note:* If the original text is already in English or Indonesian, only provide the missing translation(s). Do not skip OCR even if the image appears to be a translation.`,
+  
+  // **NEW**: Default key for custom context menu actions.
+  // This will be stored as an array of objects: [{id, name, prompt}, ...]
+  customActions: []
 };
