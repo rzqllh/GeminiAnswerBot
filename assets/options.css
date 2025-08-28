@@ -654,6 +654,13 @@ input[type="range"]::-moz-range-thumb {
   color: #fff;
 }
 
+/* **NEW**: History loader for infinite scroll */
+.history-loader {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
 /* Buttons */
 .button {
   padding: 10px 18px;

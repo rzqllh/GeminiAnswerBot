@@ -6,6 +6,13 @@
 
 const HistoryModule = (() => {
   let ELS = {};
+  
+  // **REFACTOR**: State variables for infinite scrolling
+  let fullHistory = [];
+  let currentPage = 0;
+  let isLoading = false;
+  const ITEMS_PER_PAGE = 15;
+  const SCROLL_THRESHOLD = 100; // pixels from bottom to trigger load
 
   /**
    * Merender item riwayat ke dalam kartu yang terformat.
@@ -56,13 +63,61 @@ const HistoryModule = (() => {
   }
 
   /**
-   * Memuat dan menampilkan semua item riwayat dari storage.
+   * **NEW**: Appends a page of history items to the DOM.
+   */
+  function appendHistoryItems() {
+    if (isLoading) return;
+    isLoading = true;
+
+    const start = currentPage * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    const itemsToRender = fullHistory.slice(start, end);
+
+    // Remove previous loader if it exists
+    const existingLoader = ELS.historyListContainer.querySelector('.history-loader');
+    if (existingLoader) existingLoader.remove();
+
+    if (itemsToRender.length === 0) {
+      isLoading = false;
+      return; // No more items to load
+    }
+
+    const fragment = document.createDocumentFragment();
+    itemsToRender.forEach(item => {
+      try {
+        fragment.appendChild(renderHistoryItem(item));
+      } catch (e) {
+        console.error('Failed to render history item:', item, e);
+      }
+    });
+    ELS.historyListContainer.appendChild(fragment);
+    currentPage++;
+
+    // Add a new loader if there are more items
+    if (end < fullHistory.length) {
+      const loader = document.createElement('div');
+      loader.className = 'history-loader';
+      loader.innerHTML = '<div class="spinner"></div>';
+      ELS.historyListContainer.appendChild(loader);
+    }
+    
+    isLoading = false;
+  }
+
+  /**
+   * **REFACTOR**: Initializes history loading, fetching all data once.
    */
   async function loadHistory() {
     ELS.historyListContainer.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading history...</p></div>';
-    const { history = [] } = await StorageManager.local.get('history');
+    
+    const data = await StorageManager.local.get('history');
+    fullHistory = data.history || [];
+    currentPage = 0;
+    isLoading = false;
 
-    if (history.length === 0) {
+    ELS.historyListContainer.innerHTML = ''; // Clear container
+
+    if (fullHistory.length === 0) {
       ELS.historyListContainer.innerHTML = `
         <div class="empty-state">
             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
@@ -72,16 +127,7 @@ const HistoryModule = (() => {
       return;
     }
 
-    ELS.historyListContainer.innerHTML = '';
-    const fragment = document.createDocumentFragment();
-    history.forEach(item => {
-      try {
-        fragment.appendChild(renderHistoryItem(item));
-      } catch (e) {
-        console.error('Failed to render history item:', item, e);
-      }
-    });
-    ELS.historyListContainer.appendChild(fragment);
+    appendHistoryItems(); // Load the first page
   }
 
   async function clearHistory() {
@@ -94,7 +140,7 @@ const HistoryModule = (() => {
     if (confirmed) {
       await StorageManager.local.remove('history');
       UIModule.showToast('Success', 'All history has been cleared.', 'success');
-      loadHistory();
+      loadHistory(); // Reload to show the empty state
     }
   }
 
@@ -117,11 +163,32 @@ const HistoryModule = (() => {
     UIModule.showToast('Success', 'History has been exported!', 'success');
   }
 
+  /**
+   * **NEW**: Scroll handler for infinite loading.
+   * @param {Event} e - The scroll event.
+   */
+  function handleScroll(e) {
+    if (isLoading) return;
+    
+    const container = e.target;
+    const isAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - SCROLL_THRESHOLD;
+
+    if (isAtBottom && (currentPage * ITEMS_PER_PAGE < fullHistory.length)) {
+      appendHistoryItems();
+    }
+  }
+
   function initialize(elements) {
     ELS = elements;
     ELS.clearHistoryButton.addEventListener('click', clearHistory);
     ELS.exportHistoryButton.addEventListener('click', exportHistory);
     document.addEventListener('historyTabActivated', loadHistory);
+
+    // **NEW**: Attach scroll listener to the main content pane
+    const contentPane = document.querySelector('.settings-content');
+    if (contentPane) {
+      contentPane.addEventListener('scroll', handleScroll);
+    }
   }
 
   return {
