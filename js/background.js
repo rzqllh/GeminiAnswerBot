@@ -91,10 +91,23 @@ async function fetchImageAsBase64(url) {
   }
 }
 
+// **REFACTOR**: Added permission check for robust handling.
 async function handleContextAction(info, tab) {
   if (!tab || !tab.id) {
     console.error("Context action triggered without a valid tab.");
     return;
+  }
+
+  const hasAllUrls = await chrome.permissions.contains({ origins: ["<all_urls>"] });
+
+  // If we don't have broad permissions, we can only act on the current tab if it's active.
+  // This is a best-effort fallback.
+  if (!hasAllUrls) {
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!activeTab || activeTab.id !== tab.id) {
+      showNotification('permission-denied', 'Permission Required', 'Please enable "Full-Page Access" in the extension settings for context menus to work on all tabs.');
+      return;
+    }
   }
 
   if (info.mediaType === 'image' && info.srcUrl) {
@@ -132,6 +145,11 @@ async function handleContextAction(info, tab) {
     });
   } catch (err) {
     console.error(`Failed to inject content script for context menu action: ${err.message}`);
+    if (err.message.includes("Cannot access a chrome:// URL")) {
+        // Do nothing for special browser pages.
+    } else if (!hasAllUrls) {
+        showNotification('permission-denied-injection', 'Permission Required', 'To use this feature on this page, please enable "Full-Page Access" in settings or open the popup first.');
+    }
     return;
   }
   
@@ -146,7 +164,6 @@ async function handleContextAction(info, tab) {
   }
 }
 
-// **REFACTOR**: Context menus are now fully dynamic based on stored profile settings.
 async function updateContextMenus() {
   try {
     await chrome.contextMenus.removeAll();
@@ -241,6 +258,8 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 chrome.runtime.onStartup.addListener(updateContextMenus);
+chrome.permissions.onAdded.addListener(updateContextMenus);
+chrome.permissions.onRemoved.addListener(updateContextMenus);
 
 async function performApiCall(payload) {
     const { apiKey, model, systemPrompt, userContent, base64ImageData, purpose, tabId } = payload;
@@ -387,7 +406,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             updateContextMenus();
             break;
         
-        // **REFACTOR**: Logic to handle standard, rephrase, and custom actions.
         case 'triggerContextMenuAction':
             (async () => {
                 const { action, selectionText } = request.payload;

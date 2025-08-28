@@ -12,7 +12,6 @@ const SettingsModule = (() => {
 
   const PROFILE_KEY_PREFIX = 'profile_';
 
-  // **NEW**: DOM elements for the custom action modal
   const MODAL_ELS = {
     modal: document.getElementById('customActionModal'),
     title: document.getElementById('customActionModalTitle'),
@@ -25,6 +24,9 @@ const SettingsModule = (() => {
     addNewButton: document.getElementById('addNewActionButton'),
     actionsList: document.getElementById('customActionsList'),
   };
+
+  // **NEW**: Element for the permissions toggle
+  const fullAccessToggle = document.getElementById('fullAccessToggle');
 
   function updateSliderTooltip(slider) {
     const tooltip = slider.parentElement.querySelector('.slider-value-display');
@@ -146,7 +148,6 @@ const SettingsModule = (() => {
       REPHRASE_LANGUAGES_INPUT.value = profileData[storageKey] || 'English, Indonesian';
     }
     
-    // **NEW**: Load and render custom actions
     const customActionsKey = `${PROFILE_KEY_PREFIX}${activeProfile}_customActions`;
     const customActions = profileData[customActionsKey] || [];
     renderCustomActions(customActions);
@@ -200,7 +201,6 @@ const SettingsModule = (() => {
     }
   }
 
-  // **NEW**: All functions related to custom action management
   function renderCustomActions(actions) {
     MODAL_ELS.actionsList.innerHTML = '';
     if (!actions || actions.length === 0) {
@@ -303,6 +303,40 @@ const SettingsModule = (() => {
       } catch (error) {
         UIModule.showToast('Error', `Could not delete action: ${error.message}`, 'error');
       }
+    }
+  }
+
+  // **NEW**: Functions to manage optional permissions
+  async function initializePermissions() {
+    const hasPermission = await chrome.permissions.contains({ origins: ["<all_urls>"] });
+    fullAccessToggle.checked = hasPermission;
+  }
+
+  async function handlePermissionToggle(e) {
+    const isEnabled = e.target.checked;
+    try {
+      if (isEnabled) {
+        const granted = await chrome.permissions.request({ origins: ["<all_urls>"] });
+        if (granted) {
+          UIModule.showToast('Success', 'Full-Page Access has been enabled.', 'success');
+        } else {
+          UIModule.showToast('Info', 'Permission request was denied.', 'info');
+          e.target.checked = false; // Revert toggle if denied
+        }
+      } else {
+        const removed = await chrome.permissions.remove({ origins: ["<all_urls>"] });
+        if (removed) {
+          UIModule.showToast('Success', 'Full-Page Access has been disabled.', 'success');
+        } else {
+          // This case is unlikely but handled for robustness
+          UIModule.showToast('Error', 'Could not remove permission.', 'error');
+          e.target.checked = true;
+        }
+      }
+    } catch (err) {
+      console.error("Permission toggle error:", err);
+      UIModule.showToast('Error', 'An error occurred while changing permissions.', 'error');
+      e.target.checked = !isEnabled; // Revert on error
     }
   }
 
@@ -491,13 +525,15 @@ const SettingsModule = (() => {
         });
     });
 
-    // **NEW**: Event listeners for the custom action modal
     MODAL_ELS.addNewButton.addEventListener('click', () => openActionModal());
     MODAL_ELS.cancelButton.addEventListener('click', closeActionModal);
     MODAL_ELS.modal.addEventListener('click', (e) => {
       if (e.target === MODAL_ELS.modal) closeActionModal();
     });
     MODAL_ELS.form.addEventListener('submit', saveCustomAction);
+
+    // **NEW**: Bind the permission toggle handler
+    fullAccessToggle.addEventListener('change', handlePermissionToggle);
   }
   
   async function initialize(elements, prompts, temps, rephraseInput) {
@@ -508,6 +544,7 @@ const SettingsModule = (() => {
     
     await loadGeneralSettings();
     await initializePromptManager();
+    await initializePermissions(); // **NEW**: Initialize permission state on load
     bindEventListeners();
   }
 

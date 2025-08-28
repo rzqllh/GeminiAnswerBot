@@ -1,4 +1,3 @@
-
 {
   "manifest_version": 3,
   "name": "GeminiAnswerBot",
@@ -11,7 +10,7 @@
     "contextMenus",
     "tabs"
   ],
-  "host_permissions": [
+  "optional_host_permissions": [
     "<all_urls>"
   ],
   "action": {
