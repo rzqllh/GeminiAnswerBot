@@ -91,7 +91,6 @@ async function fetchImageAsBase64(url) {
   }
 }
 
-// **REFACTOR**: Added permission check for robust handling.
 async function handleContextAction(info, tab) {
   if (!tab || !tab.id) {
     console.error("Context action triggered without a valid tab.");
@@ -100,8 +99,6 @@ async function handleContextAction(info, tab) {
 
   const hasAllUrls = await chrome.permissions.contains({ origins: ["<all_urls>"] });
 
-  // If we don't have broad permissions, we can only act on the current tab if it's active.
-  // This is a best-effort fallback.
   if (!hasAllUrls) {
     const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!activeTab || activeTab.id !== tab.id) {
@@ -146,7 +143,6 @@ async function handleContextAction(info, tab) {
   } catch (err) {
     console.error(`Failed to inject content script for context menu action: ${err.message}`);
     if (err.message.includes("Cannot access a chrome:// URL")) {
-        // Do nothing for special browser pages.
     } else if (!hasAllUrls) {
         showNotification('permission-denied-injection', 'Permission Required', 'To use this feature on this page, please enable "Full-Page Access" in settings or open the popup first.');
     }
@@ -360,8 +356,25 @@ async function performApiCall(payload) {
       streamCallback({ success: true, done: true, fullText, totalTokenCount });
 
     } catch (error) {
+      // **HOTFIX**: Implemented robust, anti-fragile error handling.
       console.error("API call error:", error);
-      const formattedError = ErrorHandler.format(error, 'api');
+      let formattedError;
+      
+      // 1. Defensively check if ErrorHandler is available.
+      if (typeof ErrorHandler !== 'undefined' && ErrorHandler.format) {
+        formattedError = ErrorHandler.format(error, 'api');
+      } else {
+        // 2. If not, create a fallback error object to prevent crashing.
+        console.error("ErrorHandler is not defined. Using fallback error formatting.");
+        formattedError = {
+          type: 'UNKNOWN_ERROR',
+          title: 'API Call Failed',
+          message: error.message || 'An unknown error occurred in the background script.',
+          technicalMessage: error.message || 'ErrorHandler module failed to load.'
+        };
+      }
+      
+      // 3. Ensure the callback is always called with a valid error object.
       streamCallback({ success: false, error: formattedError });
     }
 }
