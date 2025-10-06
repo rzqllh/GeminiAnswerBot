@@ -583,22 +583,21 @@ if (typeof window.geminiAnswerBotContentLoaded === 'undefined') {
             sendResponse({ ready: true });
             break;
           case "get_quiz_content":
-            setTimeout(() => {
-              const selectedText = window.getSelection().toString().trim();
-              let content;
-              if (selectedText.length > 20) {
-                  content = `Question: ${selectedText}`;
-              } else {
-                  content = this.quiz.extractContent();
-              }
+            // **FIX**: Removed setTimeout wrapper for synchronous response
+            const selectedText = window.getSelection().toString().trim();
+            let content;
+            if (selectedText.length > 20) {
+                content = `Question: ${selectedText}`;
+            } else {
+                content = this.quiz.extractContent();
+            }
 
-              if (!content) {
-                  console.log("No specific quiz block found. Falling back to Readability.js for analysis.");
-                  content = this.page.fallbackContent();
-              }
-              sendResponse({ content });
-            }, 150);
-            return true;
+            if (!content) {
+                console.log("No specific quiz block found. Falling back to Readability.js for analysis.");
+                content = this.page.fallbackContent();
+            }
+            sendResponse({ content });
+            break; // Return synchronously
           
           case "geminiStreamUpdate":
             if (!payload.success) {
@@ -641,7 +640,9 @@ if (typeof window.geminiAnswerBotContentLoaded === 'undefined') {
             sendResponse({ options });
             break;
         }
-        return true;
+        // Return true only for handlers that are actually asynchronous.
+        // Since get_quiz_content is now sync, we don't need `return true` there.
+        return true; 
       });
     }
   }
