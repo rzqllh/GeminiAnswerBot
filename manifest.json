@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GeminiAnswerBot",
-  "version": "3.3.0",
+  "version": "3.4.1",
   "description": "A smart Chrome extension powered by the Google Gemini API.",
   "permissions": [
     "activeTab",
@@ -9,6 +9,9 @@
     "storage",
     "contextMenus",
     "tabs"
+  ],
+  "host_permissions": [
+    "https://generativelanguage.googleapis.com/*"
   ],
   "optional_host_permissions": [
     "<all_urls>"

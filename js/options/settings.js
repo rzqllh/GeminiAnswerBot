@@ -65,7 +65,7 @@ const SettingsModule = (() => {
   async function loadGeneralSettings() {
     const settings = await StorageManager.get(['geminiApiKey', 'selectedModel', 'autoHighlight', 'preSubmissionCheck', 'temperature', 'debugMode']);
     ELS.apiKeyInput.value = settings.geminiApiKey || '';
-    ELS.modelSelect.value = settings.selectedModel || 'gemini-1.5-pro-latest';
+    ELS.modelSelect.value = settings.selectedModel || 'gemini-2.5-pro';
     ELS.autoHighlightToggle.checked = settings.autoHighlight ?? true;
     ELS.preSubmissionCheckToggle.checked = settings.preSubmissionCheck ?? true;
     ELS.debugModeToggle.checked = settings.debugMode ?? false;

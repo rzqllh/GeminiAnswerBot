@@ -381,7 +381,7 @@ async function performApiCall(payload) {
   
 function handleTestConnection(payload, sendResponse) {
     const { apiKey } = payload;
-    const testModel = 'gemini-1.5-flash-latest';
+    const testModel = 'gemini-flash-latest';
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${testModel}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
