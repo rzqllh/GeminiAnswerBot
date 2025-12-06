@@ -1,133 +1,147 @@
-# GeminiAnswerBot 🤖
+<div align="center">
 
-> AI-powered quiz assistant using Google Gemini
+# GeminiAnswerBot
 
-![Version](https://img.shields.io/badge/version-3.4.2-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Chrome](https://img.shields.io/badge/Chrome-Extension-yellow)
+**Your AI-powered study companion for online quizzes**
 
-## ✨ Features
+[![Version](https://img.shields.io/badge/version-3.4.2-0a84ff?style=for-the-badge)](https://github.com/rzqllh/GeminiAnswerBot)
+[![Chrome](https://img.shields.io/badge/Chrome-Extension-4285f4?style=for-the-badge&logo=googlechrome&logoColor=white)](https://github.com/rzqllh/GeminiAnswerBot)
+[![Gemini](https://img.shields.io/badge/Powered_by-Gemini_AI-8e44ad?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
 
-| Feature | Description |
-|---------|-------------|
-| 🎯 **Auto Quiz Detection** | Automatically finds quiz questions on any webpage |
-| 🤖 **AI-Powered Answers** | Uses Google Gemini for accurate responses |
-| 📸 **Visual Solve** | Capture screenshots for image-based questions |
-| 🔍 **Answer Highlighting** | Highlights the correct answer on the page |
-| ⚡ **Real-time Streaming** | See responses as they're generated |
-| 📝 **Custom Prompts** | Create your own prompt profiles |
-| 📊 **History Tracking** | Review past interactions |
-| 🛡️ **Pre-submission Check** | Warning when selecting wrong answer |
+<img src="assets/icon.png" width="120" alt="GeminiAnswerBot Logo"/>
 
-## 🚀 Installation
+*A Chrome extension that leverages Google's Gemini AI to intelligently analyze quiz questions and provide accurate answers — directly in your browser.*
 
-### From Chrome Web Store
-1. Visit the [Chrome Web Store](#) *(coming soon)*
-2. Click "Add to Chrome"
-3. Done!
+[Get Started](#-getting-started) · [Features](#-what-it-does) · [Report Bug](https://github.com/rzqllh/GeminiAnswerBot/issues)
 
-### Manual Installation (Developer Mode)
-1. Download or clone this repository
-2. Open Chrome → `chrome://extensions`
-3. Enable "Developer mode" (top right)
-4. Click "Load unpacked"
-5. Select the `GeminiAnswerBot` folder
-
-## ⚙️ Setup
-
-### Get Your API Key
-1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
-2. Sign in with your Google account
-3. Create a new API key
-4. Copy the key
-
-### Configure the Extension
-1. Click the GeminiAnswerBot icon in Chrome
-2. Click the ⚙️ Settings button
-3. Paste your API key in the "Gemini API Key" field
-4. Save!
-
-## 📖 How to Use
-
-### Basic Usage
-1. Navigate to any quiz page
-2. Click the GeminiAnswerBot icon (or press `Alt+Q`)
-3. The extension automatically:
-   - Detects the quiz question
-   - Sends it to Gemini AI
-   - Displays the answer
-   - Highlights it on the page
-
-### Visual Solve (for images)
-1. Click the 📷 camera icon
-2. The extension captures a screenshot
-3. AI analyzes the image and extracts the question
-4. Provides the answer
-
-### Pre-submission Protection <span style="color:#ff4d4d">(FIXING BUG)</span>
-When enabled, if you select a different answer than the AI suggests:
-- A confirmation dialog appears
-- You can choose to continue or reconsider
-
-## ⌨️ Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `Alt+Q` | Open GeminiAnswerBot |
-
-## 🎨 UI Preview
-
-The extension features a modern iOS 26-inspired liquid glass design with:
-- Glassmorphism panels
-- Gradient backgrounds
-- Smooth animations
-- Dark mode support
-
-## 🔒 Privacy & Security
-
-- ✅ API key stored locally (never sent to our servers)
-- ✅ No data collection or tracking
-- ✅ Direct communication with Google AI only
-- ✅ Open source - verify the code yourself
-
-[Read full Security Policy](./docs/SECURITY.md)
-
-## 📋 Requirements
-
-- Google Chrome (version 88+)
-- A Gemini API key (free tier available)
-- Internet connection
-
-## ⚠️ Known Issues
-
-> **Pre-submission Check Bug**: The pre-submission check feature currently has bugs that may block the Next button. It is recommended to **disable this feature** in Settings until we release a fix. We are working on it!
-
-## ❓ FAQ
-
-**Q: Is this free?**
-A: The extension is free. Gemini API has a free tier with generous limits.
-
-**Q: Does this work on all quiz sites?**
-A: It works on most sites with radio/checkbox questions. Some sites may have custom implementations that aren't detected.
-
-**Q: Is my API key safe?**
-A: Yes! It's stored locally in Chrome's secure storage and only sent to Google's official API.
-
-**Q: Can I customize the AI prompts?**
-A: Yes! Go to Settings → Prompts to create custom prompt profiles.
-
-## 🤝 Support
-
-- 📝 [Report Issues](../../issues)
-- 💬 [Discussions](../../discussions)
-- 📧 Email: support@example.com
-
-## 📜 License
-
-MIT License - feel free to use, modify, and distribute.
+</div>
 
 ---
 
-**Made with ❤️ by Hafizh Rizqullah**
+## 💡 Why GeminiAnswerBot?
 
-*If this helped you, consider giving it a ⭐!*
+Ever found yourself stuck on an online quiz, wishing you had a knowledgeable friend looking over your shoulder? That's exactly what this extension does — it reads the question, understands the context, and whispers the answer to you.
+
+Unlike simple search tools that just highlight keywords, GeminiAnswerBot actually *comprehends* the question using advanced AI. It reads multiple choice options, understands what's being asked, and gives you a confident answer with reasoning you can learn from.
+
+---
+
+## ✨ What It Does
+
+| Feature | Description |
+|---------|-------------|
+| **Smart Detection** | Automatically identifies quiz questions on any webpage — no manual selection needed |
+| **AI Analysis** | Sends questions to Google Gemini for intelligent, context-aware answers |
+| **Visual Solve** | Screenshot mode for image-based or complex formatted questions |
+| **Live Highlighting** | Highlights the correct answer directly on the page so you don't miss it |
+| **Streaming Responses** | Watch the AI think in real-time as answers stream in |
+| **Learn Mode** | Get detailed explanations to actually understand *why* an answer is correct |
+| **Custom Prompts** | Fine-tune the AI's behavior with your own prompt profiles |
+| **History** | Review past questions and answers anytime |
+
+> ⚠️ **Note:** Pre-submission protection is temporarily disabled due to a bug fix in progress.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Google Chrome (version 88 or later)
+- A Gemini API key (free tier available)
+
+### Installation
+
+**Option 1: Developer Mode (Recommended)**
+1. Clone or download this repository
+2. Navigate to `chrome://extensions` in Chrome
+3. Enable **Developer mode** (toggle in top-right)
+4. Click **Load unpacked** and select the project folder
+5. Done! The extension icon should appear in your toolbar
+
+### Configuration
+1. Click the GeminiAnswerBot icon → ⚙️ **Settings**
+2. Grab your free API key from [Google AI Studio](https://aistudio.google.com/apikey)
+3. Paste it in and save
+
+That's it. You're ready to go.
+
+---
+
+## 📖 How to Use
+
+**The Simple Way:**
+1. Navigate to any quiz page
+2. Click the extension icon (or press `Alt+Q`)
+3. Watch as it automatically detects the question and serves up the answer
+
+**Visual Solve (for tricky questions):**
+Sometimes questions are embedded in images or have complex formatting. Hit the 📷 button to capture a screenshot — the AI will extract and analyze everything visually.
+
+**Pro Tips:**
+- Collapse the "Analyzing" panel by clicking it to reduce clutter
+- Use the explanation button to understand *why* an answer is correct
+- Check your history to review past questions
+
+---
+
+## ⌨️ Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `Alt + Q` | Open GeminiAnswerBot popup |
+
+*Configure custom shortcuts at `chrome://extensions/shortcuts`*
+
+---
+
+## 🔒 Privacy First
+
+Your data stays yours:
+- **API key** → Stored locally in Chrome's encrypted storage
+- **Quiz content** → Sent only to Google's official Gemini API
+- **No tracking** → We don't collect or transmit any user data
+- **Open source** → Audit the code yourself
+
+---
+
+## 🐛 Known Issues
+
+| Issue | Status |
+|-------|--------|
+| Pre-submission check may block Next button | 🔧 In progress |
+
+---
+
+## 🤝 Contributing
+
+Found a bug? Have an idea? Contributions are welcome.
+
+1. Fork this repository
+2. Create a feature branch (`git checkout -b feature/amazing-idea`)
+3. Commit your changes
+4. Open a Pull Request
+
+For technical documentation, see [README_TECH.md](./README_TECH.md).
+
+---
+
+## 📬 Contact
+
+- **Issues:** [GitHub Issues](https://github.com/rzqllh/GeminiAnswerBot/issues)
+- **Email:** rzqllh18@gmail.com
+
+---
+
+## � License
+
+MIT License — do whatever you want with it.
+
+---
+
+<div align="center">
+
+**Built with ☕ by [Hafizh Rizqullah](https://github.com/rzqllh)**
+
+*If this saved you some time, consider dropping a ⭐*
+
+</div>
