@@ -1,197 +1,192 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
-// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
-// 📄 js/options/history.js
-// 🕓 Created: 2024-05-22 10:10:00
-// 🧠 Modular | DRY | SOLID | Apple HIG Compliant
+// js/options/history.js - v4.0 with improved formatting
 
 const HistoryModule = (() => {
   let ELS = {};
-  
-  // **REFACTOR**: State variables for infinite scrolling
   let fullHistory = [];
   let currentPage = 0;
   let isLoading = false;
   const ITEMS_PER_PAGE = 15;
-  const SCROLL_THRESHOLD = 100; // pixels from bottom to trigger load
+  const SCROLL_THRESHOLD = 100;
 
-  /**
-   * Merender item riwayat ke dalam kartu yang terformat.
-   * @param {object} item - Objek item riwayat dari storage.
-   * @returns {HTMLElement} - Elemen div kartu yang sudah jadi.
-   */
+  // Clean ALL markdown/formatting from text for display
+  function _cleanMarkdown(text) {
+    if (!text) return '';
+    return text
+      .replace(/`/g, '')
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/\(Option [A-Z]\)/gi, '')
+      .trim();
+  }
+
+  // Parse answer fields from markdown
+  function _parseAnswerFields(answerText) {
+    if (!answerText) return { answer: 'N/A', confidence: 'N/A', reason: 'N/A' };
+
+    // Remove thought blocks
+    let text = answerText.replace(/\[THOUGHT\][\s\S]*?\[ENDTHOUGHT\]\s*/gi, '').trim();
+
+    // Extract answer
+    const answerMatch = text.match(/Answer:?\s*[`"]*([^`"\n]+)[`"]*/i);
+    const rawAnswer = answerMatch ? answerMatch[1].trim() : 'N/A';
+    const answer = _cleanMarkdown(rawAnswer);
+
+    // Extract confidence - handle **Confidence:** High format
+    const confMatch = text.match(/\*?\*?Confidence:?\*?\*?\s*(\d+%|High|Medium|Low)/i);
+    const confidence = confMatch ? confMatch[1].trim() : 'N/A';
+
+    // Extract reason
+    const reasonMatch = text.match(/\*?\*?Reason:?\*?\*?\s*([\s\S]*?)(?=\n\n|\*\*|$)/i);
+    const rawReason = reasonMatch ? reasonMatch[1].trim() : 'N/A';
+    const reason = _cleanMarkdown(rawReason);
+
+    return { answer, confidence, reason };
+  }
+
+  function _getConfidenceClass(confidence) {
+    if (!confidence || confidence === 'N/A') return 'medium';
+    const confLower = confidence.toLowerCase();
+    if (confLower.includes('high') || parseInt(confidence) >= 80) return 'high';
+    if (confLower.includes('low') || parseInt(confidence) < 50) return 'low';
+    return 'medium';
+  }
+
   function renderHistoryItem(item) {
     const card = document.createElement('div');
     card.className = 'history-card';
 
-    const question = item.cleanedContent?.match(/Question:\s*([\s\S]*?)(?=\nOptions:|\n\n|$)/i)?.[1].trim() || 'Question not found';
+    // Clean markdown from question
+    const rawQuestion = item.cleanedContent?.match(/Question:\s*([\s\S]*?)(?=\nOptions:|\n\n|$)/i)?.[1] || 'Question not found';
+    const question = _cleanMarkdown(rawQuestion);
+
+    // Parse and clean options
     const optionsMatch = item.cleanedContent?.match(/Options:\s*([\s\S]*)/i);
-    const optionsHtml = optionsMatch
-      ? '<ul>' + optionsMatch[1].trim().split('\n').map(opt => `<li>${_escapeHtml(opt.replace(/^- /, '').trim())}</li>`).join('') + '</ul>'
-      : '<ul><li>No options found.</li></ul>';
-      
-    const cleanAnswerHTML = item.answerHTML?.replace(/\[THOUGHT\][\s\S]*\[ENDTHOUGHT\]\s*/, '') || '';
-    const aiAnswer = cleanAnswerHTML.match(/Answer:\s*(.*)/i)?.[1].trim() || 'N/A';
-    const aiConfidence = cleanAnswerHTML.match(/Confidence:\s*(High|Medium|Low)/i)?.[1].trim() || 'N/A';
-    const aiReason = cleanAnswerHTML.match(/Reason:\s*([\s\S]*)/i)?.[1].trim() || 'N/A';
-    
+    let optionsHtml = '';
+    if (optionsMatch) {
+      const options = optionsMatch[1].trim().split('\n')
+        .map(opt => _cleanMarkdown(opt.replace(/^[A-Z]\.\s*/, '').replace(/^-\s*/, '')))
+        .filter(opt => opt && opt.length > 0);
+      if (options.length > 0) {
+        optionsHtml = '<ul>' + options.map((opt, i) =>
+          `<li>${String.fromCharCode(65 + i)}. ${_escapeHtml(opt)}</li>`
+        ).join('') + '</ul>';
+      }
+    }
+
+    const { answer, confidence, reason } = _parseAnswerFields(item.answerHTML);
+    const confClass = _getConfidenceClass(confidence);
+
     const formattedDate = new Date(item.timestamp).toLocaleString(undefined, {
       year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 
     card.innerHTML = `
       <div class="history-card-header">
-          <a href="${_escapeHtml(item.url)}" target="_blank" class="history-card-title" title="${_escapeHtml(item.title)}">${_escapeHtml(item.title) || 'Untitled Page'}</a>
-          <span class="history-card-date">${formattedDate}</span>
+        <a href="${_escapeHtml(item.url)}" target="_blank" class="history-card-title">${_escapeHtml(item.title) || 'Untitled'}</a>
+        <span class="history-card-date">${formattedDate}</span>
       </div>
       <div class="history-card-body">
-          <div class="history-section">
-              <h4 class="history-section-title">Question Content</h4>
-              <p class="history-question-text">${_escapeHtml(question)}</p>
-              ${optionsHtml}
-          </div>
-          <div class="history-section">
-              <h4 class="history-section-title">AI Response</h4>
-              <p class="history-ai-response">
-                  <strong>Answer:</strong> ${_escapeHtml(aiAnswer)}<br>
-                  <strong>Confidence:</strong> <span class="confidence-tag confidence-${aiConfidence.toLowerCase()}">${_escapeHtml(aiConfidence)}</span><br>
-                  <strong>Reason:</strong> ${_escapeHtml(aiReason)}
-              </p>
-          </div>
+        <div class="history-section">
+          <h4 class="history-section-title">Question</h4>
+          <p class="history-question-text">${_escapeHtml(question)}</p>
+          ${optionsHtml}
+        </div>
+        <div class="history-section">
+          <h4 class="history-section-title">AI Response</h4>
+          <p class="history-ai-response">
+            <strong>Answer:</strong> ${_escapeHtml(answer)}<br>
+            <strong>Confidence:</strong> <span class="confidence-tag confidence-${confClass}">${_escapeHtml(confidence)}</span><br>
+            <strong>Reason:</strong> ${_escapeHtml(reason)}
+          </p>
+        </div>
       </div>
     `;
     return card;
   }
 
-  /**
-   * **NEW**: Appends a page of history items to the DOM.
-   */
   function appendHistoryItems() {
     if (isLoading) return;
     isLoading = true;
 
     const start = currentPage * ITEMS_PER_PAGE;
     const end = start + ITEMS_PER_PAGE;
-    const itemsToRender = fullHistory.slice(start, end);
+    const items = fullHistory.slice(start, end);
 
-    // Remove previous loader if it exists
-    const existingLoader = ELS.historyListContainer.querySelector('.history-loader');
-    if (existingLoader) existingLoader.remove();
+    const loader = ELS.historyListContainer.querySelector('.history-loader');
+    if (loader) loader.remove();
 
-    if (itemsToRender.length === 0) {
-      isLoading = false;
-      return; // No more items to load
-    }
+    if (items.length === 0) { isLoading = false; return; }
 
     const fragment = document.createDocumentFragment();
-    itemsToRender.forEach(item => {
-      try {
-        fragment.appendChild(renderHistoryItem(item));
-      } catch (e) {
-        console.error('Failed to render history item:', item, e);
-      }
+    items.forEach(item => {
+      try { fragment.appendChild(renderHistoryItem(item)); }
+      catch (e) { console.error('Render failed:', e); }
     });
     ELS.historyListContainer.appendChild(fragment);
     currentPage++;
 
-    // Add a new loader if there are more items
     if (end < fullHistory.length) {
-      const loader = document.createElement('div');
-      loader.className = 'history-loader';
-      loader.innerHTML = '<div class="spinner"></div>';
-      ELS.historyListContainer.appendChild(loader);
+      const newLoader = document.createElement('div');
+      newLoader.className = 'history-loader';
+      newLoader.innerHTML = '<div class="spinner"></div>';
+      ELS.historyListContainer.appendChild(newLoader);
     }
-    
     isLoading = false;
   }
 
-  /**
-   * **REFACTOR**: Initializes history loading, fetching all data once.
-   */
   async function loadHistory() {
-    ELS.historyListContainer.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading history...</p></div>';
-    
+    ELS.historyListContainer.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading...</p></div>';
     const data = await StorageManager.local.get('history');
     fullHistory = data.history || [];
     currentPage = 0;
     isLoading = false;
-
-    ELS.historyListContainer.innerHTML = ''; // Clear container
+    ELS.historyListContainer.innerHTML = '';
 
     if (fullHistory.length === 0) {
-      ELS.historyListContainer.innerHTML = `
-        <div class="empty-state">
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-            <h3>No History Yet</h3>
-            <p>Your interactions with the extension will appear here.</p>
-        </div>`;
+      ELS.historyListContainer.innerHTML = '<div class="empty-state"><h3>No History Yet</h3><p>Your interactions will appear here.</p></div>';
       return;
     }
-
-    appendHistoryItems(); // Load the first page
+    appendHistoryItems();
   }
 
   async function clearHistory() {
-    const confirmed = await UIModule.showConfirm({
-      title: 'Clear History',
-      message: 'Are you sure you want to delete all interaction history? This action cannot be undone.',
-      okLabel: 'Clear All',
-      okClass: 'button-danger'
-    });
+    const confirmed = await UIModule.showConfirm({ title: 'Clear History', message: 'Delete all history?', okLabel: 'Clear All', okClass: 'button-danger' });
     if (confirmed) {
       await StorageManager.local.remove('history');
-      UIModule.showToast('Success', 'All history has been cleared.', 'success');
-      loadHistory(); // Reload to show the empty state
+      UIModule.showToast('Success', 'History cleared.', 'success');
+      loadHistory();
     }
   }
 
   async function exportHistory() {
     const { history = [] } = await StorageManager.local.get('history');
-    if (history.length === 0) {
-      UIModule.showToast('No History', 'There is no history to export.', 'info');
-      return;
-    }
-    const dataStr = JSON.stringify(history, null, 2);
-    const dataBlob = new Blob([dataStr], {type: "application/json"});
-    const url = URL.createObjectURL(dataBlob);
-    const downloadLink = document.createElement('a');
-    downloadLink.href = url;
-    downloadLink.download = `gemini-answer-bot-history-${new Date().toISOString().slice(0,10)}.json`;
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
+    if (history.length === 0) { UIModule.showToast('No History', 'Nothing to export.', 'info'); return; }
+    const blob = new Blob([JSON.stringify(history, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gemini-history-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
     URL.revokeObjectURL(url);
-    UIModule.showToast('Success', 'History has been exported!', 'success');
+    UIModule.showToast('Success', 'Exported!', 'success');
   }
 
-  /**
-   * **NEW**: Scroll handler for infinite loading.
-   * @param {Event} e - The scroll event.
-   */
   function handleScroll(e) {
     if (isLoading) return;
-    
-    const container = e.target;
-    const isAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - SCROLL_THRESHOLD;
-
-    if (isAtBottom && (currentPage * ITEMS_PER_PAGE < fullHistory.length)) {
+    const c = e.target;
+    if (c.scrollTop + c.clientHeight >= c.scrollHeight - SCROLL_THRESHOLD && currentPage * ITEMS_PER_PAGE < fullHistory.length) {
       appendHistoryItems();
     }
   }
 
   function initialize(elements) {
     ELS = elements;
-    ELS.clearHistoryButton.addEventListener('click', clearHistory);
-    ELS.exportHistoryButton.addEventListener('click', exportHistory);
+    ELS.clearHistoryButton?.addEventListener('click', clearHistory);
+    ELS.exportHistoryButton?.addEventListener('click', exportHistory);
     document.addEventListener('historyTabActivated', loadHistory);
-
-    // **NEW**: Attach scroll listener to the main content pane
-    const contentPane = document.querySelector('.settings-content');
-    if (contentPane) {
-      contentPane.addEventListener('scroll', handleScroll);
-    }
+    document.querySelector('.settings-content')?.addEventListener('scroll', handleScroll);
   }
 
-  return {
-    initialize
-  };
+  return { initialize };
 })();

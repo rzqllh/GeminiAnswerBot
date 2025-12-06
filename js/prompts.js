@@ -3,20 +3,22 @@
 // File: js/prompts.js
 
 const DEFAULT_PROMPTS = {
-  cleaning: `Extract quiz content. Format with each option on a new line using backticks for code/tags:
+  cleaning: `Extract quiz content from page. Format with each option on its own line:
 
 **Question:** [question text]
 
 **Options:**
+[List ALL options exactly as they appear - could be 2, 3, 4, 5, or more options]
 A. \`[option text]\`
 B. \`[option text]\`
 C. \`[option text]\`
-D. \`[option text]\`
+... (continue for ALL options present)
 
 Rules:
+- Include ALL options found, not just 4
 - Put each option on its own line
 - Wrap code/HTML tags in backticks
-- Keep original wording`,
+- Keep original wording exactly`,
 
   answer: `Answer the quiz. Format exactly like this:
 
@@ -49,13 +51,14 @@ Be brief, friendly, encouraging.`,
 **Result:** ✓ Confirmed / ⚠ Uncertain / ✗ Wrong
 **Note:** [brief reason]`,
 
-  'image-quiz': `Extract from image:
+  'image-quiz': `Extract quiz from image. Include ALL options visible:
 **Question:** [text]
 **Options:**
+[List ALL options - may be 2, 3, 4, 5, or more]
 A. \`[option]\`
 B. \`[option]\`
 C. \`[option]\`
-D. \`[option]\``,
+... (continue for ALL options)`,
 
   'image-analyze': `Describe the image.`,
   'image-translate': `Translate text in image to English.`

@@ -42,7 +42,7 @@ export class MessagingService {
             await this.sendMessage(tabId, { action: 'ping' }, 1000);
         } catch (e) {
             console.log('Content script not ready, injecting...', e);
-            // Inject helpers first (for _escapeHtml), then libraries, then content script
+            // Inject helpers first (for _escapeHtml), then libraries, then content scripts
             await chrome.scripting.executeScript({
                 target: { tabId },
                 files: [
@@ -50,7 +50,8 @@ export class MessagingService {
                     'js/vendor/mark.min.js',
                     'js/vendor/marked.min.js',
                     'js/vendor/dompurify.min.js',
-                    'js/content.js'
+                    'js/content.js',
+                    'js/autoclick.js'
                 ]
             });
 
@@ -62,6 +63,24 @@ export class MessagingService {
 
             // Wait a bit for initialization
             await new Promise(r => setTimeout(r, 500));
+        }
+    }
+
+    /**
+     * Send auto-click command to content script.
+     * @param {number} tabId - The tab ID.
+     * @param {string} answerText - The answer text to auto-click.
+     * @returns {Promise<Object>}
+     */
+    static async autoClickAnswer(tabId, answerText) {
+        try {
+            return await this.sendMessage(tabId, {
+                action: 'auto-click-answer',
+                payload: { text: answerText }
+            }, 3000);
+        } catch (e) {
+            console.error('Auto-click failed:', e);
+            return { success: false, message: e.message };
         }
     }
 }

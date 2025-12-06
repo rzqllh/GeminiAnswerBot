@@ -1,15 +1,15 @@
 // === Hafizh Signature Code ===
 // Author: Hafizh Rizqullah — GeminiAnswerBot
 // File: js/options.js
-// Created: 2025-08-08 16:42:03
+// Updated: v4.0 with Features module initialization
 
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', async function () {
     // Peta Elemen DOM (Single Source of Truth)
     const ELS = {
         // Navigasi & Konten
         navLinks: document.querySelectorAll('.settings-sidebar a'),
         contentPanes: document.querySelectorAll('.content-pane'),
-        
+
         // Pengaturan Umum
         saveGeneralButton: document.getElementById('saveGeneralButton'),
         testButton: document.getElementById('testButton'),
@@ -20,12 +20,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         preSubmissionCheckToggle: document.getElementById('preSubmissionCheckToggle'),
         temperatureSlider: document.getElementById('temperatureSlider'),
         temperatureValue: document.getElementById('temperatureValue'),
-        
+
         // Riwayat
         historyListContainer: document.getElementById('history-list-container'),
         clearHistoryButton: document.getElementById('clearHistoryButton'),
         exportHistoryButton: document.getElementById('exportHistoryButton'),
-        
+
         // Data
         resetSettingsButton: document.getElementById('resetSettingsButton'),
         debugModeToggle: document.getElementById('debugModeToggle'),
@@ -58,14 +58,19 @@ document.addEventListener('DOMContentLoaded', async function() {
     };
 
     const REPHRASE_LANGUAGES_INPUT = document.getElementById('rephraseLanguages');
-    
+
     // Inisialisasi semua modul
     NavModule.initialize(ELS);
     HistoryModule.initialize(ELS);
-    
-    // **FIX**: Await the asynchronous initialization of the SettingsModule
+
     try {
+        // Initialize core settings
         await SettingsModule.initialize(ELS, PROMPT_TEXTAREAS, PROMPT_TEMP_SLIDERS, REPHRASE_LANGUAGES_INPUT);
+
+        // Initialize v4.0 Features module (adds Features & Appearance panes)
+        if (typeof FeaturesModule !== 'undefined') {
+            await FeaturesModule.initialize();
+        }
     } catch (error) {
         console.error("Failed to initialize settings:", error);
         UIModule.showToast('Initialization Error', 'Could not load settings. Check the console for details.', 'error');
