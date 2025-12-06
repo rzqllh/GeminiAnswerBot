@@ -36,6 +36,7 @@
         "assets/ui-enhancements.css",
         "assets/content.css",
         "js/stealth.js",
+        "js/utils/helpers.js",
         "js/vendor/mark.min.js",
         "js/vendor/marked.min.js",
         "js/vendor/dompurify.min.js",

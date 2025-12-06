@@ -64,7 +64,7 @@ class App {
                     isImageMode: false,
                     isAnalyzing: false
                 });
-                this._triggerAutoHighlight(cached.answer);
+                // Don't auto-highlight for cached - user may have scrolled
                 return;
             }
 
@@ -118,6 +118,10 @@ class App {
 
         eventBus.on('ui:explain', () => {
             const state = this.store.getState();
+            if (!state.answer) {
+                notificationService.error('No answer to explain yet.');
+                return;
+            }
             this.store.setState({ explanation: 'Loading explanation...' });
             geminiService.call('quiz_explanation', `${state.content}\n\nAnswer: ${state.answer}`, null, this.tabId);
         });
@@ -144,6 +148,9 @@ class App {
                 this._cacheState(text);
                 this._saveToHistory(text);
                 this._triggerAutoHighlight(text);
+            } else if (purpose === 'quiz_explanation') {
+                // Explanation done - nothing extra needed, UI updates automatically
+                console.log('Explanation complete');
             }
         });
     }
@@ -278,18 +285,33 @@ class App {
 
     async _triggerAutoHighlight(answerText) {
         try {
-            const settings = await StorageService.get(['autoHighlightAnswer']);
-            if (settings.autoHighlightAnswer !== false) {
-                // Extract only the correct answer text
-                const target = this._extractHighlightTarget(answerText);
+            const settings = await StorageService.get(['autoHighlightAnswer', 'preSubmissionCheck']);
+            if (settings.autoHighlightAnswer === false) {
+                return; // Auto-highlight disabled
+            }
 
-                if (target) {
-                    console.log('Highlight target:', target);
-                    await MessagingService.sendMessage(this.tabId, {
-                        action: 'highlight-answer',
-                        payload: { text: [target] }
-                    }, 3000);
+            // Extract the correct answer text
+            const target = this._extractHighlightTarget(answerText);
+
+            if (target) {
+                console.log('Highlight target:', target);
+
+                // First ensure content script is ready
+                try {
+                    await MessagingService.ensureContentScript(this.tabId);
+                } catch (e) {
+                    console.warn('Content script injection failed, skipping highlight');
+                    return;
                 }
+
+                // Send highlight command with presubmission check option
+                await MessagingService.sendMessage(this.tabId, {
+                    action: 'highlight-answer',
+                    payload: {
+                        text: [target],
+                        preSubmissionCheck: settings.preSubmissionCheck !== false
+                    }
+                }, 3000);
             }
         } catch (e) {
             console.warn('Auto-highlight failed:', e.message);

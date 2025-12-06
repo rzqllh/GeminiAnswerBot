@@ -37,15 +37,12 @@
     --glass-border: rgba(255, 255, 255, 0.1);
     --glass-highlight: rgba(255, 255, 255, 0.05);
     --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-
     --accent: #4da3ff;
     --accent-glow: rgba(77, 163, 255, 0.3);
     --accent-gradient: linear-gradient(135deg, #4da3ff, #00c3ff, #00e5ff);
-
     --text-primary: #f5f5f7;
     --text-secondary: rgba(255, 255, 255, 0.6);
     --text-tertiary: rgba(255, 255, 255, 0.35);
-
     --bg-gradient: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
   }
 }
@@ -287,30 +284,6 @@ body {
   animation: spin 1.2s linear infinite;
 }
 
-/* Thinking animation */
-.thinking-dots::after {
-  content: '';
-  animation: dots 1.5s steps(4, end) infinite;
-}
-
-@keyframes dots {
-  0% {
-    content: '';
-  }
-
-  25% {
-    content: '.';
-  }
-
-  50% {
-    content: '..';
-  }
-
-  75% {
-    content: '...';
-  }
-}
-
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -402,6 +375,8 @@ body {
   padding: 14px 16px;
   font-size: 13px;
   line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .panel-footer {
@@ -439,6 +414,15 @@ body {
   color: var(--accent);
   border-radius: 6px;
   border: 1px solid var(--glass-border);
+}
+
+.text-sm {
+  font-size: 12px;
+}
+
+.scrollable {
+  max-height: 120px;
+  overflow-y: auto;
 }
 
 /* === Onboarding Center Box === */

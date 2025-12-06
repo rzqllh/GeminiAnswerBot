@@ -1,167 +1,133 @@
-<div align="center">
-  <a href="#">
-    <img src="https://raw.githubusercontent.com/rzqllh/GeminiAnswerBot/main/assets/icon.png" alt="GeminiAnswerBot Logo" width="128" height="128">
-  </a>
+# GeminiAnswerBot 🤖
 
-  <h1><strong>GeminiAnswerBot</strong></h1>
+> AI-powered quiz assistant using Google Gemini
 
-  <p><strong>Context-Aware AI Copilot for Quiz Solving and Instant Content Assistance</strong></p>
-  <p>Engineered for accuracy, privacy, and seamless browser integration — powered by Google Gemini.</p>
+![Version](https://img.shields.io/badge/version-3.4.2-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Chrome](https://img.shields.io/badge/Chrome-Extension-yellow)
 
-  <p>
-    <img src="https://img.shields.io/badge/version-3.0.0-blue?style=for-the-badge" alt="Version">
-    <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
-    <img src="https://img.shields.io/badge/status-actively--maintained-brightgreen?style=for-the-badge" alt="Maintained">
-  </p>
-</div>
+## ✨ Features
 
-<!-- OG:image:https://raw.githubusercontent.com/rzqllh/GeminiAnswerBot/main/assets/og-image.png -->
+| Feature | Description |
+|---------|-------------|
+| 🎯 **Auto Quiz Detection** | Automatically finds quiz questions on any webpage |
+| 🤖 **AI-Powered Answers** | Uses Google Gemini for accurate responses |
+| 📸 **Visual Solve** | Capture screenshots for image-based questions |
+| 🔍 **Answer Highlighting** | Highlights the correct answer on the page |
+| ⚡ **Real-time Streaming** | See responses as they're generated |
+| 📝 **Custom Prompts** | Create your own prompt profiles |
+| 📊 **History Tracking** | Review past interactions |
+| 🛡️ **Pre-submission Check** | Warning when selecting wrong answer |
 
----
+## 🚀 Installation
 
-> “Well-architected tools disappear into your workflow — until you realize you can’t work without them.”
+### From Chrome Web Store
+1. Visit the [Chrome Web Store](#) *(coming soon)*
+2. Click "Add to Chrome"
+3. Done!
 
----
+### Manual Installation (Developer Mode)
+1. Download or clone this repository
+2. Open Chrome → `chrome://extensions`
+3. Enable "Developer mode" (top right)
+4. Click "Load unpacked"
+5. Select the `GeminiAnswerBot` folder
 
-## 🔍 Overview
+## ⚙️ Setup
 
-**GeminiAnswerBot** is a context-aware AI assistant designed to solve quizzes, summarize content, and assist with natural language understanding — right inside your browser. It leverages the Gemini API to deliver high-accuracy answers, with an interface crafted for speed and usability.
+### Get Your API Key
+1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
+2. Sign in with your Google account
+3. Create a new API key
+4. Copy the key
 
-> No telemetry, no tracking. Everything runs locally.
+### Configure the Extension
+1. Click the GeminiAnswerBot icon in Chrome
+2. Click the ⚙️ Settings button
+3. Paste your API key in the "Gemini API Key" field
+4. Save!
 
----
+## 📖 How to Use
 
-## ⚡ Quick Capabilities
+### Basic Usage
+1. Navigate to any quiz page
+2. Click the GeminiAnswerBot icon (or press `Alt+Q`)
+3. The extension automatically:
+   - Detects the quiz question
+   - Sends it to Gemini AI
+   - Displays the answer
+   - Highlights it on the page
 
-```
-✔️ Solve visible quizzes with a single click
-✔️ Summarize, explain, or translate selected text
-✔️ Analyze image-based questions (Gemini Vision)
-✔️ Refined UI with loading states and shortcuts
-✔️ Modular architecture built for maintainability
-```
+### Visual Solve (for images)
+1. Click the 📷 camera icon
+2. The extension captures a screenshot
+3. AI analyzes the image and extracts the question
+4. Provides the answer
 
----
+### Pre-submission Protection
+When enabled, if you select a different answer than the AI suggests:
+- A confirmation dialog appears
+- You can choose to continue or reconsider
 
-## 🎯 Built for
+## ⌨️ Keyboard Shortcuts
 
-- Teams using LMS platforms or internal quiz tools
-- Engineers evaluating Chrome Extension architecture
-- Researchers using Gemini for applied NLP tasks
+| Shortcut | Action |
+|----------|--------|
+| `Alt+Q` | Open GeminiAnswerBot |
 
----
+## 🎨 UI Preview
 
-## 📸 Preview
+The extension features a modern iOS 26-inspired liquid glass design with:
+- Glassmorphism panels
+- Gradient backgrounds
+- Smooth animations
+- Dark mode support
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/rzqllh/GeminiAnswerBot/main/assets/og-image.png" alt="GeminiAnswerBot OG Preview" width="80%">
-</p>
+## 🔒 Privacy & Security
 
----
+- ✅ API key stored locally (never sent to our servers)
+- ✅ No data collection or tracking
+- ✅ Direct communication with Google AI only
+- ✅ Open source - verify the code yourself
 
-## 🔧 Features
+[Read full Security Policy](./docs/SECURITY.md)
 
-### ✅ Context-Aware Quiz Solving  
-Intelligently detects and solves only the quiz elements in your current viewport.
+## 📋 Requirements
 
-### 📄 AI Toolkit for Text  
-Right-click selected text to:
-- Summarize
-- Explain concepts
-- Translate instantly
+- Google Chrome (version 88+)
+- A Gemini API key (free tier available)
+- Internet connection
 
-### 🖼 Image Intelligence  
-Right-click any image to:
-- Solve embedded questions
-- Read or translate visual content
+## ⚠️ Known Issues
 
-### 🧩 Modular Codebase  
-Fully SOLID, readable, and maintainable with:
-- `content.js` → DOM parsing & interaction
-- `popup.js` → View logic & AI rendering
-- `background.js` → Chrome API handler
-- `options/*.js` → Micro-modules for settings & history
-
-### 🔐 Privacy-First  
-No tracking. Your API key and history are stored **locally only**.
-
----
-
-## 🚀 Getting Started
-
-### Requirements
-
-- Chromium-based browser (Chrome, Edge, Brave)
-- Google Gemini API key
-
-### Install
-
-1. Clone or download this repository
-2. Go to `chrome://extensions/`
-3. Enable **Developer Mode**
-4. Click **Load Unpacked**, select this folder
-5. Right-click the extension icon → **Options**
-6. Paste your API Key → Save → Test Connection
-
----
-
-## 🧠 Architecture
-
-```
-├── js/
-│ ├── content.js # DOM observer, viewport scanner
-│ ├── popup.js # UI logic, rendering, feedback
-│ ├── background.js # Chrome events, messaging
-│ └── options/
-│ ├── ui.js
-│ ├── nav.js
-│ ├── history.js
-│ └── settings.js
-├── assets/ # CSS, icon, og-image
-├── ui/ # popup.html, options.html
-└── manifest.json
-```
-
-
-- Uses message-passing for clear separation of concerns
-- Loads scripts on-demand for performance
-- Uses CSS variables & BEM for styling
-
----
-
-## 🔍 What's Next
-
-- Gemini 1.5 Pro toggle support
-- Firefox compatibility
-- Prompt profile presets & config import/export
-
----
+> **Pre-submission Check Bug**: The pre-submission check feature currently has bugs that may block the Next button. It is recommended to **disable this feature** in Settings until we release a fix. We are working on it!
 
 ## ❓ FAQ
 
-> **Does it send data to a backend?**  
-No. Everything runs locally. API key calls only go to Google Gemini.
+**Q: Is this free?**
+A: The extension is free. Gemini API has a free tier with generous limits.
 
-> **Is this production-ready?**  
-Yes. This extension has been tested on Chrome v124+ with Gemini API 1.5.
+**Q: Does this work on all quiz sites?**
+A: It works on most sites with radio/checkbox questions. Some sites may have custom implementations that aren't detected.
 
-> **Can I use this without a key?**  
-No. You must bring your own Gemini API key.
+**Q: Is my API key safe?**
+A: Yes! It's stored locally in Chrome's secure storage and only sent to Google's official API.
 
----
+**Q: Can I customize the AI prompts?**
+A: Yes! Go to Settings → Prompts to create custom prompt profiles.
 
-## 👨‍💻 Contributing
+## 🤝 Support
 
-While the repo is public, it is maintained primarily for internal usage. Forks are welcome. Feature requests via Issues are appreciated but not guaranteed.
-
----
+- 📝 [Report Issues](../../issues)
+- 💬 [Discussions](../../discussions)
+- 📧 Email: support@example.com
 
 ## 📜 License
 
-[MIT License](./LICENSE)
+MIT License - feel free to use, modify, and distribute.
 
 ---
 
-<p align="center">
-  <em>Crafted by Hafizh Rizqullah — built for clarity, speed, and elegance in everyday tools.</em>
-</p>
+**Made with ❤️ by Hafizh Rizqullah**
+
+*If this helped you, consider giving it a ⭐!*

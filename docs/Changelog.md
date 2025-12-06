@@ -1,55 +1,159 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to GeminiAnswerBot will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [3.1.0] - 2025-08-01
-
-### Added
-- **Resilient Storage System**: Implemented a new `StorageManager` wrapper around the `chrome.storage` API. This provides an automatic fallback from `sync` to `local` storage, ensuring the extension remains fully functional even if browser policies (like blocking third-party cookies) disable sync storage.
-- **Sync Status Warning**: The options page now displays a clear warning message to the user if `storage.sync` is unavailable, informing them that settings are being saved locally to the current device only.
-- **Interactive Slider Tooltips**: All temperature sliders on the options page now display a tooltip with the current value on hover, providing better visual feedback and aligning with modern UI standards.
-
-### Changed
-- **Storage Architecture**: Refactored the entire application (`background.js`, `popup.js`, `settings.js`, `history.js`) to use the new centralized `StorageManager`. This simplifies the codebase, removes redundant error handling, and improves overall stability.
-- **UI/UX Refinement**: Overhauled the styling of form controls, particularly sliders, to better match Apple's Human Interface Guidelines (HIG) for a cleaner and more professional look.
+## [3.4.2] - 2024-12-06
 
 ### Fixed
-- **Critical Save/Load Bug on macOS/Secure Browsers**: Resolved a major issue where the extension would fail to save settings or function correctly on browsers with stricter security settings. The new storage system ensures functionality is always preserved.
-- **Password Visibility Toggle**: Corrected a JavaScript bug where the "Show/Hide API Key" button was not functioning. It now correctly toggles the input field's visibility.
+- Presubmission check modal now displays correctly
+- Added `_escapeHtml` helper to content script injection
+- Console errors for "Receiving end does not exist" resolved
+- Explanation button now validates answer before calling
+
+### Changed
+- Highlight color changed from yellow to blue (#8aa9fe)
+- Removed spinner icon from analyzing status bar
+- iOS 26 Liquid Glass styling with Samsung accents
+
+### Known Issues
+- ⚠️ **Pre-submission check** may block the Next button on some sites. Recommended to disable in Settings until fixed.
 
 ---
 
-### Changed
-- **Error Handling Architecture**: Centralized all error handling logic into a new `errorHandler.js` module. This ensures consistent error processing and reporting across the extension, making the codebase more robust and easier to maintain.
-
-## [3.0.0] - 2024-05-22
-
-This is a major architectural and user experience overhaul, focusing on reliability, accuracy, and a professional user interface. The extension's core logic has been re-engineered for robustness and maintainability.
-
-### Added
-- **Viewport-Aware Quiz Detection**: Implemented a synchronous, on-demand viewport calculation to intelligently identify the quiz block currently visible to the user. This provides a massive accuracy boost on long pages with multiple questions.
-- **Skeleton Loaders**: Replaced generic spinners with elegant, content-aware skeleton loaders in the popup UI. This enhances the user experience by improving perceived performance while waiting for API responses.
-- **Centralized UI Components**: Created a dedicated `ui.js` module in the options page to handle reusable components like toasts and modals, adhering to the DRY principle.
-- **Git Tagging for Backups**: Integrated a workflow step to create version tags in Git as safe checkpoints before major refactoring sprints.
-
-### Changed
-- **Core Architecture (Options Page)**: The monolithic `js/options.js` has been completely refactored into smaller, single-responsibility modules (`nav.js`, `history.js`, `settings.js`, `ui.js`), significantly improving maintainability and scalability.
-- **Quiz Extraction Algorithm**: The entire quiz detection logic was re-architected. It now identifies self-contained "quiz blocks" (question + options) and analyzes the one most visible in the viewport, replacing the older, less reliable proximity-scoring method.
-- **Popup UI/UX**: The popup layout has been revamped using a modern flexbox structure with consistent `gap` spacing, eliminating overlapping elements. A centralized typography system was also implemented for a consistent and polished look across all information cards.
-- **Context Menu Reliability**: Re-architected the communication between the background script and the popup to use a robust, real-time message-passing system, fixing critical race conditions.
+## [3.4.1] - 2024-12-05
 
 ### Fixed
-- **Critical Accuracy Bug**: Solved the core issue where the extension would inaccurately solve the first quiz on a long page, regardless of the user's scroll position. The extension is now fully context-aware.
-- **Options Page Blank**: Resolved a critical bug where the options page was completely blank. The HTML structure for all settings panes (`General`, `Prompts`, `History`, `Data`) was missing and has now been correctly implemented in `ui/options.html`.
-- **Option Extraction Failure**: Enhanced the option detection algorithm to correctly parse quizzes that use non-standard HTML layouts (e.g., text without `<label>` tags), making it more resilient.
-- **Unresponsive UI Feedback**: Eliminated abrupt content loading by implementing contextual skeleton loaders, providing clear feedback to the user during API calls.
-- **Unreadable History Page**: The history page now correctly parses and renders past interactions into clean, readable, and consistently formatted cards.
-- **Code Formatting Issues**: Resolved a bug where inline `<code>` tags in rendered markdown were not displayed correctly.
+- Markdown formatting now properly renders bold, italic, and code
+- Options display with proper newlines using `white-space: pre-wrap`
+- History page now loads correctly with `StorageManager.local` accessor
+- Auto-highlight extracts only the correct answer (not all backticks)
+
+### Added
+- `_parseMarkdown()` method in UIManager for safe markdown rendering
+- `_saveToHistory()` method for automatic history saving
+- Shimmer animation for analyzing status
 
 ---
 
-## [2.0.0] - 2024-05-21
-- Initial stable release after reverting a problematic feature branch. Established a reliable baseline for future development.
+## [3.4.0] - 2024-12-01
+
+### Added
+- Comprehensive settings page with prompt profiles
+- Custom prompt editing and profile management
+- History page with export/clear functionality
+- Data management (export/import/reset)
+
+### Changed
+- Refactored to modular ES6 architecture
+- Settings now use `chrome.storage.sync` for cross-device sync
+- Improved error handling and user notifications
+
+---
+
+## [3.3.0] - 2024-11-15
+
+### Added
+- Pre-submission answer verification
+- Confirmation dialog when user selects wrong answer
+- Visual Solve (screenshot-based) mode
+- Full page analysis feature
+
+### Fixed
+- Quiz block detection improved for various websites
+- Better option extraction from radio/checkbox inputs
+
+---
+
+## [3.2.0] - 2024-11-01
+
+### Added
+- Streaming AI responses with real-time updates
+- Auto-highlight answer on page using Mark.js
+- Context menu integration (right-click actions)
+- Keyboard shortcut (Alt+Q)
+
+### Changed
+- Switched to Gemini 1.5 Flash as default model
+- Improved prompt templates for better accuracy
+
+---
+
+## [3.1.0] - 2024-10-15
+
+### Added
+- Multiple Gemini model support (Flash, Pro, etc.)
+- Response caching with session storage
+- Collapsible question/answer cards
+
+### Fixed
+- API error handling improvements
+- Content script injection reliability
+
+---
+
+## [3.0.0] - 2024-10-01
+
+### Changed
+- **Breaking:** Migrated to Manifest V3
+- Complete architecture rewrite
+- New modern glassmorphism UI
+
+### Added
+- Background service worker
+- Modular service-based architecture
+- Professional popup interface
+
+### Removed
+- Deprecated Manifest V2 features
+- Legacy content script approach
+
+---
+
+## [2.5.0] - 2024-09-15
+
+### Added
+- Image-based quiz solving (OCR)
+- Screenshot capture for visual questions
+- Multi-language support
+
+---
+
+## [2.0.0] - 2024-09-01
+
+### Changed
+- Migrated from OpenAI to Google Gemini API
+- New API key configuration system
+- Improved response formatting
+
+### Added
+- Explanation feature for answers
+- Confidence level indicators
+
+---
+
+## [1.5.0] - 2024-08-15
+
+### Added
+- Auto-detection of quiz questions
+- Support for multiple choice and checkbox questions
+- Basic highlighting of answers
+
+---
+
+## [1.0.0] - 2024-08-01
+
+### Added
+- Initial release
+- Basic quiz question extraction
+- AI-powered answer generation
+- Simple popup interface
+- API key configuration
+
+---
+
+## Legend
+- **Added** - New features
+- **Changed** - Changes in existing functionality
+- **Fixed** - Bug fixes
+- **Removed** - Removed features
+- **Security** - Security improvements

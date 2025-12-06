@@ -1,20 +1,19 @@
 /**
  * @file js/services/MessagingService.js
- * @description Manages communication with the content script (ping, extraction, highlighting).
+ * @description Centralized messaging utilities for communicating between popup and content scripts.
  */
 
 export class MessagingService {
     /**
-     * Send a message to a specific tab with a timeout.
+     * Send a message to a tab with a timeout.
      * @param {number} tabId - The tab ID.
-     * @param {Object} message - The message payload.
-     * @param {number} timeoutMs - Timeout in milliseconds.
-     * @returns {Promise<any>} The response from the content script.
+     * @param {object} message - The message to send.
+     * @param {number} [timeoutMs=5000] - Timeout in milliseconds.
+     * @returns {Promise<any>}
      */
     static sendMessage(tabId, message, timeoutMs = 5000) {
         return new Promise((resolve, reject) => {
             let isTimedOut = false;
-
             const timer = setTimeout(() => {
                 isTimedOut = true;
                 reject(new Error(`Timeout waiting for content script response (${message.action})`));
@@ -43,10 +42,16 @@ export class MessagingService {
             await this.sendMessage(tabId, { action: 'ping' }, 1000);
         } catch (e) {
             console.log('Content script not ready, injecting...', e);
-            // Inject Mark.js first (required for highlighting)
+            // Inject helpers first (for _escapeHtml), then libraries, then content script
             await chrome.scripting.executeScript({
                 target: { tabId },
-                files: ['js/vendor/mark.min.js', 'js/vendor/marked.min.js', 'js/vendor/dompurify.min.js', 'js/content.js']
+                files: [
+                    'js/utils/helpers.js',
+                    'js/vendor/mark.min.js',
+                    'js/vendor/marked.min.js',
+                    'js/vendor/dompurify.min.js',
+                    'js/content.js'
+                ]
             });
 
             // Inject CSS safely
