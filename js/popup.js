@@ -24,7 +24,8 @@ class App {
             imageUrl: null,
             imageStep: 'idle',
             isCollapsed: true,
-            isAnalyzing: true
+            isAnalyzing: true,
+            confidenceScore: null
         });
 
         this.ui = new UIManager(this.store);
@@ -136,7 +137,7 @@ class App {
             }
         });
 
-        eventBus.on('stream:done', ({ purpose, text }) => {
+        eventBus.on('stream:done', ({ purpose, text, confidenceScore }) => {
             if (purpose === 'image-quiz') {
                 this.store.setState({ content: text, imageStep: 'cleaning' });
                 geminiService.call('cleaning', text, null, this.tabId);
@@ -144,10 +145,16 @@ class App {
                 this.store.setState({ content: text });
                 geminiService.call('answer', text, null, this.tabId);
             } else if (purpose === 'answer') {
-                this.store.setState({ answer: text, imageStep: 'done', isAnalyzing: false });
+                this.store.setState({ 
+                    answer: text, 
+                    imageStep: 'done', 
+                    isAnalyzing: false,
+                    confidenceScore: confidenceScore ?? null
+                });
                 this._cacheState(text);
                 this._saveToHistory(text);
                 this._triggerAutoHighlight(text);
+                this._saveToContextMemory(text);
             } else if (purpose === 'quiz_explanation') {
                 // Explanation done - nothing extra needed, UI updates automatically
                 console.log('Explanation complete');
@@ -166,8 +173,9 @@ class App {
                     view: 'quiz',
                     content: 'Scanning and cleaning content...',
                     isImageMode: false,
-                    isAnalyzing: true
-                });
+                    isAnalyzing: true,
+            confidenceScore: null
+        });
                 geminiService.call('cleaning', res.content, null, this.tabId);
             } else {
                 this.store.setState({ view: 'error' });
@@ -187,7 +195,8 @@ class App {
             imageUrl: dataUrl,
             imageStep: 'ocr',
             content: 'Extracting text from image...',
-            isAnalyzing: true
+            isAnalyzing: true,
+            confidenceScore: null
         });
         geminiService.call('image-quiz', '', dataUrl, this.tabId);
     }
@@ -283,9 +292,34 @@ class App {
         return null;
     }
 
+    
+    /**
+     * v4.0: Save current Q&A to context memory for session continuity
+     */
+    async _saveToContextMemory(answerText) {
+        try {
+            const settings = await StorageService.get(['enableContextMemory', 'contextMemoryLimit']);
+            if (settings.enableContextMemory === false) return;
+            
+            const state = this.store.getState();
+            const question = state.content?.substring(0, 500) || '';
+            const answer = answerText?.substring(0, 500) || '';
+            
+            if (question && answer) {
+                await StorageService.local.addToContextMemory(
+                    { question, answer },
+                    settings.contextMemoryLimit || 5
+                );
+                console.log('Saved to context memory');
+            }
+        } catch (e) {
+            console.warn('Failed to save context memory:', e);
+        }
+    }
+
     async _triggerAutoHighlight(answerText) {
         try {
-            const settings = await StorageService.get(['autoHighlightAnswer', 'preSubmissionCheck']);
+            const settings = await StorageService.get(['autoHighlightAnswer', 'preSubmissionCheck', 'autoClickEnabled']);
             if (settings.autoHighlightAnswer === false) {
                 return; // Auto-highlight disabled
             }
@@ -312,6 +346,17 @@ class App {
                         preSubmissionCheck: settings.preSubmissionCheck !== false
                     }
                 }, 3000);
+
+                // v4.0: Auto-click the answer if enabled
+                if (settings.autoClickEnabled === true) {
+                    console.log('Auto-click enabled, attempting to click answer...');
+                    const clickResult = await MessagingService.autoClickAnswer(this.tabId, target);
+                    if (clickResult.success) {
+                        console.log('Auto-click successful:', clickResult.message);
+                    } else {
+                        console.warn('Auto-click failed:', clickResult.message);
+                    }
+                }
             }
         } catch (e) {
             console.warn('Auto-highlight failed:', e.message);

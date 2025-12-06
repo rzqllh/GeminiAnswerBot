@@ -885,3 +885,52 @@ input[type="range"]::-moz-range-thumb {
   gap: 12px;
   margin-top: 24px;
 }
+/* v4.0: Manual dark/light mode override classes */
+body.dark-mode {
+  --bg-color: #1c1c1e;
+  --sidebar-bg: rgba(28, 28, 30, 0.55);
+  --content-bg: rgba(44, 44, 46, 0.7);
+  --card-bg: rgba(28, 28, 30, 0.7);
+  --primary-text: #ffffff;
+  --secondary-text: #a1a1aa;
+  --border-color: rgba(255, 255, 255, 0.15);
+  --input-bg: rgba(58, 58, 60, 0.75);
+  --button-secondary-bg: #3a3a3c;
+  --button-secondary-hover: #48484a;
+}
+
+body.light-mode {
+  --bg-color: #f2f2f7;
+  --sidebar-bg: rgba(225, 225, 225, 0.55);
+  --content-bg: rgba(255, 255, 255, 0.65);
+  --card-bg: rgba(255, 255, 255, 0.8);
+  --primary-text: #1d1d1f;
+  --secondary-text: rgba(29, 29, 31, 0.75);
+  --border-color: rgba(0, 0, 0, 0.1);
+  --input-bg: rgba(245, 245, 247, 0.25);
+  --button-secondary-bg: #e9e9eb;
+  --button-secondary-hover: #e1e1e3;
+}
+
+/* v4.0: Confidence badge styling for history */
+.confidence-tag {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.85em;
+}
+
+.confidence-high {
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+}
+
+.confidence-medium {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+}
+
+.confidence-low {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}

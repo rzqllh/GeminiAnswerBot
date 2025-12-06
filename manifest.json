@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GeminiAnswerBot",
-  "version": "3.4.2",
+  "version": "4.0.0",
   "description": "A smart Chrome extension powered by the Google Gemini API.",
   "permissions": [
     "activeTab",
@@ -40,7 +40,8 @@
         "js/vendor/mark.min.js",
         "js/vendor/marked.min.js",
         "js/vendor/dompurify.min.js",
-        "js/content.js"
+        "js/content.js",
+        "js/autoclick.js"
       ],
       "matches": [
         "<all_urls>"
