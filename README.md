@@ -64,7 +64,7 @@
 3. AI analyzes the image and extracts the question
 4. Provides the answer
 
-### Pre-submission Protection
+### Pre-submission Protection <span style="color:#ff4d4d">(FIXING BUG)</span>
 When enabled, if you select a different answer than the AI suggests:
 - A confirmation dialog appears
 - You can choose to continue or reconsider
