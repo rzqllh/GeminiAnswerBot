@@ -24,7 +24,7 @@ class App {
             imageUrl: null,
             imageStep: 'idle',
             isCollapsed: true,
-            isAnalyzing: true  // Track analyzing state
+            isAnalyzing: true
         });
 
         this.ui = new UIManager(this.store);
@@ -61,9 +61,8 @@ class App {
                     content: cached.content,
                     answer: cached.answer,
                     isImageMode: false,
-                    isAnalyzing: false  // Not analyzing when loading from cache
+                    isAnalyzing: false
                 });
-                // Re-trigger highlight with cached answer
                 this._triggerAutoHighlight(cached.answer);
                 return;
             }
@@ -79,7 +78,6 @@ class App {
     }
 
     _bindGlobalEvents() {
-        // UI Events -> Logic
         eventBus.on('ui:rescan', () => {
             this._clearCache();
             this._startScan();
@@ -123,7 +121,6 @@ class App {
             geminiService.call('quiz_explanation', `${state.content}\n\nAnswer: ${state.answer}`, null, this.tabId);
         });
 
-        // Stream Events -> State Updates
         eventBus.on('stream:update', ({ purpose, fullText }) => {
             if (purpose === 'answer') {
                 this.store.setState({ answer: fullText });
@@ -136,19 +133,14 @@ class App {
 
         eventBus.on('stream:done', ({ purpose, text }) => {
             if (purpose === 'image-quiz') {
-                // OCR Done -> Start Cleaning
                 this.store.setState({ content: text, imageStep: 'cleaning' });
                 geminiService.call('cleaning', text, null, this.tabId);
             } else if (purpose === 'cleaning') {
-                // Cleaning Done -> Start Answering
                 this.store.setState({ content: text });
                 geminiService.call('answer', text, null, this.tabId);
             } else if (purpose === 'answer') {
-                // Answer Done -> Stop analyzing
                 this.store.setState({ answer: text, imageStep: 'done', isAnalyzing: false });
-                // Cache the result
                 this._cacheState(text);
-                // Auto-highlight the answer
                 this._triggerAutoHighlight(text);
             }
         });
@@ -200,7 +192,6 @@ class App {
         }
     }
 
-    // --- Caching Methods ---
     async _cacheState(answer) {
         const state = this.store.getState();
         const cacheData = {
@@ -221,15 +212,56 @@ class App {
         await chrome.storage.session.remove(CACHE_KEY);
     }
 
-    // --- Auto-Highlight ---
+    /**
+     * Extract highlight targets from AI answer
+     * Handles multiple formats: `<h1>`, Option C, (C), etc.
+     */
+    _extractHighlightTargets(answerText) {
+        const targets = [];
+
+        // 1. Extract content inside backticks (like `<h1>`)
+        const backtickMatches = answerText.match(/`([^`]+)`/g);
+        if (backtickMatches) {
+            backtickMatches.forEach(match => {
+                const content = match.replace(/`/g, '').trim();
+                if (content) targets.push(content);
+            });
+        }
+
+        // 2. Extract option letter patterns: (A), (B), Option A, etc.
+        const optionMatch = answerText.match(/(?:\(([A-D])\)|Option\s*([A-D]))/i);
+        if (optionMatch) {
+            const letter = optionMatch[1] || optionMatch[2];
+            if (letter) targets.push(letter);
+        }
+
+        // 3. Extract text after "Answer:" (fallback)
+        const answerMatch = answerText.match(/\*?\*?Answer:?\*?\*?\s*(.+?)(?:\s*\(|$|\n)/i);
+        if (answerMatch && answerMatch[1]) {
+            const extracted = answerMatch[1].replace(/`/g, '').trim();
+            if (extracted && !targets.includes(extracted)) {
+                targets.push(extracted);
+            }
+        }
+
+        // Remove duplicates and empty strings
+        return [...new Set(targets.filter(t => t && t.length > 0))];
+    }
+
     async _triggerAutoHighlight(answerText) {
         try {
             const settings = await StorageService.get(['autoHighlightAnswer']);
-            if (settings.autoHighlightAnswer !== false) { // Default to true
-                await MessagingService.sendMessage(this.tabId, {
-                    action: 'highlight-answer',  // Fixed: Use hyphen to match content.js
-                    payload: { text: [answerText] }  // Fixed: Use 'text' array as expected by content.js
-                }, 3000);
+            if (settings.autoHighlightAnswer !== false) {
+                // Extract multiple possible highlight targets
+                const targets = this._extractHighlightTargets(answerText);
+
+                if (targets.length > 0) {
+                    console.log('Highlight targets:', targets);
+                    await MessagingService.sendMessage(this.tabId, {
+                        action: 'highlight-answer',
+                        payload: { text: targets }
+                    }, 3000);
+                }
             }
         } catch (e) {
             console.warn('Auto-highlight failed:', e.message);

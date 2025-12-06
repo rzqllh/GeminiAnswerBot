@@ -72,6 +72,30 @@ export class UIManager {
         this.elements.explanationButton?.addEventListener('click', () => eventBus.emit('ui:explain'));
     }
 
+    /**
+     * Parse markdown to HTML safely
+     * Escapes HTML tags inside backticks, then parses markdown
+     */
+    _parseMarkdown(text) {
+        if (!text) return '';
+
+        // First, protect code blocks and inline code from being parsed as HTML
+        // Replace < and > ONLY inside backticks
+        let processed = text;
+
+        // Handle inline code: `<h1>` -> `&lt;h1&gt;`
+        processed = processed.replace(/`([^`]+)`/g, (match, code) => {
+            const escaped = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return `\`${escaped}\``;
+        });
+
+        // Parse markdown
+        const html = marked.parse(processed);
+
+        // Sanitize
+        return DOMPurify.sanitize(html);
+    }
+
     render(state) {
         // View Switching
         if (state.view) {
@@ -81,7 +105,6 @@ export class UIManager {
         // Analyzing Status (hide when done)
         if (this.elements.contentDisplayWrapper) {
             if (state.isAnalyzing === false && state.answer) {
-                // Hide analyzing status when we have an answer
                 this.elements.contentDisplayWrapper.classList.add('hidden');
             } else if (state.isAnalyzing) {
                 this.elements.contentDisplayWrapper.classList.remove('hidden');
@@ -91,13 +114,12 @@ export class UIManager {
         // Content Updates (Question Card)
         if (state.content) {
             this.renderer.renderContent(state.content);
-            // Show Question card
             if (this.elements.questionContainer) {
                 this.elements.questionContainer.classList.remove('hidden');
             }
             if (this.elements.questionDisplay) {
-                // Use textContent to display raw text safely
-                this.elements.questionDisplay.textContent = state.content;
+                // Parse markdown for question display
+                this.elements.questionDisplay.innerHTML = this._parseMarkdown(state.content);
             }
         }
 
@@ -105,8 +127,8 @@ export class UIManager {
         if (state.answer) {
             if (this.elements.answerContainer) this.elements.answerContainer.classList.remove('hidden');
             if (this.elements.answerDisplay) {
-                // Use textContent to avoid HTML parsing issues
-                this.elements.answerDisplay.textContent = state.answer;
+                // Parse markdown for answer display
+                this.elements.answerDisplay.innerHTML = this._parseMarkdown(state.answer);
             }
         }
 
@@ -114,9 +136,7 @@ export class UIManager {
         if (state.explanation) {
             if (this.elements.explanationContainer) this.elements.explanationContainer.classList.remove('hidden');
             if (this.elements.explanationDisplay) {
-                // Explanation can use markdown since it's prose
-                const cleanHtml = DOMPurify.sanitize(marked.parse(state.explanation));
-                this.elements.explanationDisplay.innerHTML = cleanHtml;
+                this.elements.explanationDisplay.innerHTML = this._parseMarkdown(state.explanation);
             }
         }
 
