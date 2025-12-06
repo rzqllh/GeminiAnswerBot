@@ -3,12 +3,9 @@
 // File: js/background.js
 // Created: 2025-08-27 12:05:00
 
-// CRITICAL: Scripts must be imported at the top level of the service worker.
-try {
-  importScripts('../js/utils/storage.js', '../js/utils/errorHandler.js', '../js/prompts.js');
-} catch (e) {
-  console.error('Failed to import scripts in background worker:', e);
-}
+import { StorageManager } from './utils/storage.module.js';
+import { ErrorHandler } from './utils/errorHandler.module.js';
+import { DEFAULT_PROMPTS } from './prompts.module.js';
 
 let pendingContextData = {};
 
@@ -43,7 +40,7 @@ async function runMigration(reason) {
 
       if (data && data.promptProfiles) {
         console.log('GeminiAnswerBot: Old `promptProfiles` structure found. Starting migration...');
-        
+
         const profiles = data.promptProfiles;
         const profileNames = Object.keys(profiles);
         const newStorageItems = {
@@ -146,13 +143,13 @@ async function handleContextAction(info, tab) {
   } catch (err) {
     console.error(`Failed to inject content script for context menu action: ${err.message}`);
     if (err.message.includes("Cannot access a chrome:// URL")) {
-        // Do nothing for special browser pages.
+      // Do nothing for special browser pages.
     } else if (!hasAllUrls) {
-        showNotification('permission-denied-injection', 'Permission Required', 'To use this feature on this page, please enable "Full-Page Access" in settings or open the popup first.');
+      showNotification('permission-denied-injection', 'Permission Required', 'To use this feature on this page, please enable "Full-Page Access" in settings or open the popup first.');
     }
     return;
   }
-  
+
   if (info.selectionText) {
     chrome.tabs.sendMessage(tab.id, {
       action: 'showDialogForContextMenu',
@@ -167,7 +164,7 @@ async function handleContextAction(info, tab) {
 async function updateContextMenus() {
   try {
     await chrome.contextMenus.removeAll();
-  
+
     chrome.contextMenus.create({
       id: "gemini-text-parent",
       title: "GeminiAnswerBot Actions",
@@ -176,11 +173,11 @@ async function updateContextMenus() {
 
     const { activeProfile = 'Default' } = await StorageManager.get('activeProfile');
     const profileName = activeProfile;
-    
+
     const rephraseLangKey = `profile_${profileName}_rephraseLanguages`;
     const customActionsKey = `profile_${profileName}_customActions`;
     const result = await StorageManager.get([rephraseLangKey, customActionsKey]);
-    
+
     const standardActions = [
       { id: 'summarize', title: 'Summarize Selection' },
       { id: 'explanation', title: 'Explain Selection' },
@@ -232,17 +229,17 @@ async function updateContextMenus() {
       title: "Gemini Image Actions",
       contexts: ["image"]
     });
-    
+
     const imageActions = [
-        { id: 'image-quiz', title: 'Answer Quiz from Image' },
-        { id: 'image-analyze', title: 'Describe this Image' },
-        { id: 'image-translate', title: 'Translate Text in Image' }
+      { id: 'image-quiz', title: 'Answer Quiz from Image' },
+      { id: 'image-analyze', title: 'Describe this Image' },
+      { id: 'image-translate', title: 'Translate Text in Image' }
     ];
     imageActions.forEach(action => {
-        chrome.contextMenus.create({
-            id: action.id, parentId: "gemini-image-parent",
-            title: action.title, contexts: ["image"]
-        });
+      chrome.contextMenus.create({
+        id: action.id, parentId: "gemini-image-parent",
+        title: action.title, contexts: ["image"]
+      });
     });
   } catch (error) {
     console.error("Failed to update context menus, possibly due to storage issues:", error);
@@ -262,118 +259,118 @@ chrome.permissions.onAdded.addListener(updateContextMenus);
 chrome.permissions.onRemoved.addListener(updateContextMenus);
 
 async function performApiCall(payload) {
-    const { apiKey, model, systemPrompt, userContent, base64ImageData, purpose, tabId } = payload;
-    
-    const streamCallback = (streamData) => {
-      const message = {
-        action: 'geminiStreamUpdate',
-        payload: { ...streamData, originalUserContent: userContent },
-        purpose: purpose
-      };
+  const { apiKey, model, systemPrompt, userContent, base64ImageData, purpose, tabId } = payload;
 
-      if (tabId) {
-        chrome.tabs.sendMessage(tabId, message).catch(err => {
-          if (!err.message.includes('Receiving end does not exist')) {
-            console.warn(`Error sending stream to tab ${tabId}:`, err);
-          }
-        });
-      } else {
-        chrome.runtime.sendMessage(message).catch(err => {
-          if (!err.message.includes('Receiving end does not exist')) {
-            console.warn('Error sending stream update to runtime:', err);
-          }
-        });
-      }
+  const streamCallback = (streamData) => {
+    const message = {
+      action: 'geminiStreamUpdate',
+      payload: { ...streamData, originalUserContent: userContent },
+      purpose: purpose
     };
 
-    try {
-      const settings = await StorageManager.get(['activeProfile', 'temperature']);
-      const activeProfileName = settings.activeProfile || 'Default';
-      
-      const globalTemp = settings.temperature ?? 0.4;
-      const purposeBase = purpose.split('-')[0];
-      const tempKey = `profile_${activeProfileName}_${purposeBase}_temp`;
-      const tempResult = await StorageManager.get(tempKey);
-      const finalTemperature = tempResult[tempKey] ?? globalTemp;
-
-      const generationConfig = { temperature: finalTemperature };
-      const endpoint = 'streamGenerateContent';
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}&alt=sse`;
-    
-      const contentParts = [{ text: userContent }];
-      if (base64ImageData && base64ImageData.startsWith('data:image')) {
-          const [meta, data] = base64ImageData.split(',');
-          const mimeType = meta.match(/:(.*?);/)[1];
-          contentParts.push({
-              inline_data: { mime_type: mimeType, data }
-          });
-      }
-
-      const apiPayload = {
-        contents: [{ role: "user", parts: contentParts }],
-        generationConfig
-      };
-
-      if (systemPrompt && typeof systemPrompt === 'string' && systemPrompt.trim() !== '') {
-        apiPayload.system_instruction = { parts: [{ text: systemPrompt }] };
-      }
-    
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(apiPayload)
-      });
-  
-      if (!response.ok) {
-        const errorBody = await response.json();
-        const errorMessage = errorBody.error?.message || `Request failed with status ${response.status}`;
-        throw { type: 'API_ERROR', message: errorMessage, status: errorBody.error?.status };
-      }
-
-      if (!response.body) throw { type: 'NETWORK_ERROR', message: 'Response body is empty.' };
-  
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let fullText = "", totalTokenCount = 0;
-  
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
-  
-        for (const line of lines) {
-          try {
-            const jsonStr = line.substring(6);
-            const data = JSON.parse(jsonStr);
-            const textPart = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (textPart) {
-              fullText += textPart;
-              streamCallback({ success: true, chunk: textPart });
-            }
-            if (data.usageMetadata?.totalTokenCount) {
-              totalTokenCount = data.usageMetadata.totalTokenCount;
-            }
-          } catch (e) { console.warn("Error parsing stream chunk:", e); }
+    if (tabId) {
+      chrome.tabs.sendMessage(tabId, message).catch(err => {
+        if (!err.message.includes('Receiving end does not exist')) {
+          console.warn(`Error sending stream to tab ${tabId}:`, err);
         }
-      }
-      streamCallback({ success: true, done: true, fullText, totalTokenCount });
-
-    } catch (error) {
-      console.error("API call error:", error);
-      const formattedError = ErrorHandler.format(error, 'api');
-      streamCallback({ success: false, error: formattedError });
+      });
+    } else {
+      chrome.runtime.sendMessage(message).catch(err => {
+        if (!err.message.includes('Receiving end does not exist')) {
+          console.warn('Error sending stream update to runtime:', err);
+        }
+      });
     }
-}
-  
-function handleTestConnection(payload, sendResponse) {
-    const { apiKey } = payload;
-    const testModel = 'gemini-1.5-flash-latest';
-    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${testModel}:generateContent?key=${apiKey}`, {
+  };
+
+  try {
+    const settings = await StorageManager.get(['activeProfile', 'temperature']);
+    const activeProfileName = settings.activeProfile || 'Default';
+
+    const globalTemp = settings.temperature ?? 0.4;
+    const purposeBase = purpose.split('-')[0];
+    const tempKey = `profile_${activeProfileName}_${purposeBase}_temp`;
+    const tempResult = await StorageManager.get(tempKey);
+    const finalTemperature = tempResult[tempKey] ?? globalTemp;
+
+    const generationConfig = { temperature: finalTemperature };
+    const endpoint = 'streamGenerateContent';
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}&alt=sse`;
+
+    const contentParts = [{ text: userContent }];
+    if (base64ImageData && base64ImageData.startsWith('data:image')) {
+      const [meta, data] = base64ImageData.split(',');
+      const mimeType = meta.match(/:(.*?);/)[1];
+      contentParts.push({
+        inline_data: { mime_type: mimeType, data }
+      });
+    }
+
+    const apiPayload = {
+      contents: [{ role: "user", parts: contentParts }],
+      generationConfig
+    };
+
+    if (systemPrompt && typeof systemPrompt === 'string' && systemPrompt.trim() !== '') {
+      apiPayload.system_instruction = { parts: [{ text: systemPrompt }] };
+    }
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: "Reply with only 'OK'." }] }] })
-    })
+      body: JSON.stringify(apiPayload)
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.json();
+      const errorMessage = errorBody.error?.message || `Request failed with status ${response.status}`;
+      throw { type: 'API_ERROR', message: errorMessage, status: errorBody.error?.status };
+    }
+
+    if (!response.body) throw { type: 'NETWORK_ERROR', message: 'Response body is empty.' };
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = "", totalTokenCount = 0;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
+
+      for (const line of lines) {
+        try {
+          const jsonStr = line.substring(6);
+          const data = JSON.parse(jsonStr);
+          const textPart = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (textPart) {
+            fullText += textPart;
+            streamCallback({ success: true, chunk: textPart });
+          }
+          if (data.usageMetadata?.totalTokenCount) {
+            totalTokenCount = data.usageMetadata.totalTokenCount;
+          }
+        } catch (e) { console.warn("Error parsing stream chunk:", e); }
+      }
+    }
+    streamCallback({ success: true, done: true, fullText, totalTokenCount });
+
+  } catch (error) {
+    console.error("API call error:", error);
+    const formattedError = ErrorHandler.format(error, 'api');
+    streamCallback({ success: false, error: formattedError });
+  }
+}
+
+function handleTestConnection(payload, sendResponse) {
+  const { apiKey } = payload;
+  const testModel = 'gemini-flash-latest';
+  fetch(`https://generativelanguage.googleapis.com/v1beta/models/${testModel}:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts: [{ text: "Reply with only 'OK'." }] }] })
+  })
     .then(res => res.ok ? res.json() : res.json().then(err => { throw new Error(err.error?.message || "An unknown error occurred."); }))
     .then(result => {
       const text = result.candidates?.[0]?.content?.parts?.[0]?.text.trim() || "";
@@ -387,151 +384,151 @@ function handleTestConnection(payload, sendResponse) {
 }
 
 function extractQuestionForSearch(cleanedContent) {
-    const match = cleanedContent.match(/Question:\s*([\s\S]*?)(?=\nOptions:|\n\n|$)/i);
-    return match ? match[1].trim() : cleanedContent;
+  const match = cleanedContent.match(/Question:\s*([\s\S]*?)(?=\nOptions:|\n\n|$)/i);
+  return match ? match[1].trim() : cleanedContent;
 }
 
 chrome.contextMenus.onClicked.addListener(handleContextAction);
-  
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    const tabId = sender.tab?.id;
-    switch(request.action) {
-        case 'callGeminiStream':
-            performApiCall({ ...request.payload, tabId: null });
-            break;
-        case 'testApiConnection':
-            handleTestConnection(request.payload, sendResponse);
-            return true;
-        case 'updateContextMenus':
-            updateContextMenus();
-            break;
-        
-        case 'triggerContextMenuAction':
-            (async () => {
-                const { action, selectionText } = request.payload;
-                const { tab } = sender;
-                const { geminiApiKey, selectedModel, activeProfile } = await StorageManager.get(['geminiApiKey', 'selectedModel', 'activeProfile']);
-                
-                const profileName = activeProfile || 'Default';
-                let systemPrompt = '';
-                let userContent = selectionText;
-                let purpose = action;
+  const tabId = sender.tab?.id;
+  switch (request.action) {
+    case 'callGeminiStream':
+      performApiCall({ ...request.payload, tabId: null });
+      break;
+    case 'testApiConnection':
+      handleTestConnection(request.payload, sendResponse);
+      return true;
+    case 'updateContextMenus':
+      updateContextMenus();
+      break;
 
-                if (action.startsWith('rephrase-')) {
-                    const language = action.split('-')[1];
-                    const promptKey = `profile_${profileName}_rephrase`;
-                    const result = await StorageManager.get(promptKey);
-                    systemPrompt = result[promptKey] || DEFAULT_PROMPTS.rephrase;
-                    userContent = `Target Language: ${language}\n\nText to rephrase:\n${selectionText}`;
-                } else if (DEFAULT_PROMPTS[action]) { // Standard actions
-                    const promptKey = `profile_${profileName}_${action}`;
-                    const result = await StorageManager.get(promptKey);
-                    systemPrompt = result[promptKey] || DEFAULT_PROMPTS[action];
-                } else if (action.startsWith('custom_')) { // Custom actions
-                    const customActionsKey = `profile_${profileName}_customActions`;
-                    const result = await StorageManager.get(customActionsKey);
-                    const customActions = result[customActionsKey] || [];
-                    const customAction = customActions.find(a => a.id === action);
-                    if (customAction) {
-                        systemPrompt = customAction.prompt;
-                        purpose = customAction.name; // Use the name for display purposes
-                    } else {
-                        console.error(`Custom action with ID ${action} not found.`);
-                        return;
-                    }
-                }
-        
-                performApiCall({
-                    apiKey: geminiApiKey,
-                    model: selectedModel,
-                    systemPrompt,
-                    userContent,
-                    purpose: purpose,
-                    tabId: tab.id,
+    case 'triggerContextMenuAction':
+      (async () => {
+        const { action, selectionText } = request.payload;
+        const { tab } = sender;
+        const { geminiApiKey, selectedModel, activeProfile } = await StorageManager.get(['geminiApiKey', 'selectedModel', 'activeProfile']);
+
+        const profileName = activeProfile || 'Default';
+        let systemPrompt = '';
+        let userContent = selectionText;
+        let purpose = action;
+
+        if (action.startsWith('rephrase-')) {
+          const language = action.split('-')[1];
+          const promptKey = `profile_${profileName}_rephrase`;
+          const result = await StorageManager.get(promptKey);
+          systemPrompt = result[promptKey] || DEFAULT_PROMPTS.rephrase;
+          userContent = `Target Language: ${language}\n\nText to rephrase:\n${selectionText}`;
+        } else if (DEFAULT_PROMPTS[action]) { // Standard actions
+          const promptKey = `profile_${profileName}_${action}`;
+          const result = await StorageManager.get(promptKey);
+          systemPrompt = result[promptKey] || DEFAULT_PROMPTS[action];
+        } else if (action.startsWith('custom_')) { // Custom actions
+          const customActionsKey = `profile_${profileName}_customActions`;
+          const result = await StorageManager.get(customActionsKey);
+          const customActions = result[customActionsKey] || [];
+          const customAction = customActions.find(a => a.id === action);
+          if (customAction) {
+            systemPrompt = customAction.prompt;
+            purpose = customAction.name; // Use the name for display purposes
+          } else {
+            console.error(`Custom action with ID ${action} not found.`);
+            return;
+          }
+        }
+
+        performApiCall({
+          apiKey: geminiApiKey,
+          model: selectedModel,
+          systemPrompt,
+          userContent,
+          purpose: purpose,
+          tabId: tab.id,
+        });
+      })();
+      break;
+
+    case 'popupReady':
+      if (tabId && pendingContextData[tabId]) {
+        const data = pendingContextData[tabId];
+        delete pendingContextData[tabId];
+        sendResponse(data);
+      } else {
+        sendResponse(null);
+      }
+      return true;
+
+    case 'verifyAnswerWithSearch':
+      (async () => {
+        const { cleanedContent, initialAnswer } = request.payload;
+        const question = extractQuestionForSearch(cleanedContent);
+        const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(question)}`;
+        try {
+          const tab = await chrome.tabs.create({ url: searchUrl, active: false });
+          const verificationContext = { cleanedContent, initialAnswer };
+          await StorageManager.session.set({ [`verification_${tab.id}`]: verificationContext });
+
+          const listener = (updatedTabId, changeInfo) => {
+            if (updatedTabId === tab.id && changeInfo.status === 'complete') {
+              chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['js/googleScraper.js'] })
+                .catch(err => {
+                  console.error("Failed to inject scraper script:", err);
+                  chrome.tabs.remove(tab.id);
+                  StorageManager.session.remove(`verification_${tab.id}`);
+                  const formattedError = ErrorHandler.format({ message: "Verification failed: Could not inject scraper." }, 'verification');
+                  chrome.runtime.sendMessage({ action: 'geminiStreamUpdate', payload: { success: false, error: formattedError }, purpose: 'verification' });
                 });
-            })();
-            break;
-
-        case 'popupReady':
-            if (tabId && pendingContextData[tabId]) {
-                const data = pendingContextData[tabId];
-                delete pendingContextData[tabId];
-                sendResponse(data);
-            } else {
-                sendResponse(null);
+              chrome.tabs.onUpdated.removeListener(listener);
             }
-            return true;
+          };
+          chrome.tabs.onUpdated.addListener(listener);
+        } catch (error) {
+          const formattedError = ErrorHandler.format(error, 'verification');
+          chrome.runtime.sendMessage({ action: 'geminiStreamUpdate', payload: { success: false, error: formattedError }, purpose: 'verification' });
+        }
+      })();
+      break;
 
-        case 'verifyAnswerWithSearch':
-            (async () => {
-                const { cleanedContent, initialAnswer } = request.payload;
-                const question = extractQuestionForSearch(cleanedContent);
-                const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(question)}`;
-                try {
-                    const tab = await chrome.tabs.create({ url: searchUrl, active: false });
-                    const verificationContext = { cleanedContent, initialAnswer };
-                    await StorageManager.session.set({ [`verification_${tab.id}`]: verificationContext });
+    case 'scrapedData':
+      (async () => {
+        const key = `verification_${sender.tab.id}`;
+        const data = await StorageManager.session.get(key);
+        const context = data[key];
 
-                    const listener = (updatedTabId, changeInfo) => {
-                        if (updatedTabId === tab.id && changeInfo.status === 'complete') {
-                            chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['js/googleScraper.js'] })
-                                .catch(err => {
-                                    console.error("Failed to inject scraper script:", err);
-                                    chrome.tabs.remove(tab.id);
-                                    StorageManager.session.remove(`verification_${tab.id}`);
-                                    const formattedError = ErrorHandler.format({ message: "Verification failed: Could not inject scraper." }, 'verification');
-                                    chrome.runtime.sendMessage({ action: 'geminiStreamUpdate', payload: { success: false, error: formattedError }, purpose: 'verification' });
-                                });
-                            chrome.tabs.onUpdated.removeListener(listener);
-                        }
-                    };
-                    chrome.tabs.onUpdated.addListener(listener);
-                } catch (error) {
-                    const formattedError = ErrorHandler.format(error, 'verification');
-                    chrome.runtime.sendMessage({ action: 'geminiStreamUpdate', payload: { success: false, error: formattedError }, purpose: 'verification' });
-                }
-            })();
-            break;
+        if (!context) {
+          console.error("No verification context found for tab:", sender.tab.id);
+          chrome.tabs.remove(sender.tab.id);
+          return;
+        }
+        const searchSnippets = request.payload.map(r => `Snippet: ${r.title}\n${r.snippet}`).join('\n\n');
+        const verificationContent = `[BEGIN DATA]\n--- Original Quiz ---\n${context.cleanedContent}\n--- Initial Answer ---\nAnswer: ${context.initialAnswer}\n--- Web Search Results ---\n${searchSnippets || 'No relevant information found.'}\n[END DATA]`;
 
-        case 'scrapedData':
-            (async () => {
-                const key = `verification_${sender.tab.id}`;
-                const data = await StorageManager.session.get(key);
-                const context = data[key];
+        const { geminiApiKey, selectedModel } = await StorageManager.get(['geminiApiKey', 'selectedModel']);
+        performApiCall({
+          apiKey: geminiApiKey,
+          model: selectedModel,
+          systemPrompt: DEFAULT_PROMPTS.verification,
+          userContent: verificationContent,
+          purpose: 'verification',
+          tabId: null
+        });
 
-                if (!context) {
-                    console.error("No verification context found for tab:", sender.tab.id);
-                    chrome.tabs.remove(sender.tab.id);
-                    return;
-                }
-                const searchSnippets = request.payload.map(r => `Snippet: ${r.title}\n${r.snippet}`).join('\n\n');
-                const verificationContent = `[BEGIN DATA]\n--- Original Quiz ---\n${context.cleanedContent}\n--- Initial Answer ---\nAnswer: ${context.initialAnswer}\n--- Web Search Results ---\n${searchSnippets || 'No relevant information found.'}\n[END DATA]`;
-                
-                const { geminiApiKey, selectedModel } = await StorageManager.get(['geminiApiKey', 'selectedModel']);
-                performApiCall({
-                    apiKey: geminiApiKey,
-                    model: selectedModel,
-                    systemPrompt: DEFAULT_PROMPTS.verification,
-                    userContent: verificationContent,
-                    purpose: 'verification',
-                    tabId: null
-                });
+        await StorageManager.session.remove(key);
+        chrome.tabs.remove(sender.tab.id);
+      })();
+      break;
 
-                await StorageManager.session.remove(key);
-                chrome.tabs.remove(sender.tab.id);
-            })();
-            break;
-        
-        case 'scrapingFailed':
-            (async () => {
-                console.error("Scraping failed:", request.error);
-                const key = `verification_${sender.tab.id}`;
-                await StorageManager.session.remove(key);
-                chrome.tabs.remove(sender.tab.id);
-                const formattedError = ErrorHandler.format({ message: "Could not scrape Google Search results." }, 'verification');
-                chrome.runtime.sendMessage({ action: 'geminiStreamUpdate', payload: { success: false, error: formattedError }, purpose: 'verification' });
-            })();
-            break;
-    }
-    return true;
+    case 'scrapingFailed':
+      (async () => {
+        console.error("Scraping failed:", request.error);
+        const key = `verification_${sender.tab.id}`;
+        await StorageManager.session.remove(key);
+        chrome.tabs.remove(sender.tab.id);
+        const formattedError = ErrorHandler.format({ message: "Could not scrape Google Search results." }, 'verification');
+        chrome.runtime.sendMessage({ action: 'geminiStreamUpdate', payload: { success: false, error: formattedError }, purpose: 'verification' });
+      })();
+      break;
+  }
+  return true;
 });

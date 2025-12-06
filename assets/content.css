@@ -1,0 +1,9 @@
+/* Styles injected into the web page */
+.gemini-answer-highlight {
+    background-color: #fef08a;
+    /* Yellow-200 */
+    color: #000;
+    padding: 2px 0;
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px #fde047;
+}

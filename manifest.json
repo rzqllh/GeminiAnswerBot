@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GeminiAnswerBot",
-  "version": "3.3.0",
+  "version": "3.4.2",
   "description": "A smart Chrome extension powered by the Google Gemini API.",
   "permissions": [
     "activeTab",
@@ -9,6 +9,9 @@
     "storage",
     "contextMenus",
     "tabs"
+  ],
+  "host_permissions": [
+    "https://generativelanguage.googleapis.com/*"
   ],
   "optional_host_permissions": [
     "<all_urls>"
@@ -23,22 +26,33 @@
     "128": "assets/icon.png"
   },
   "background": {
-    "service_worker": "js/background.js"
+    "service_worker": "js/background.js",
+    "type": "module"
   },
   "options_page": "ui/options.html",
   "web_accessible_resources": [
     {
       "resources": [
-        "assets/highlighter.css",
-        "assets/dialog.css",
-        "assets/toolbar.css",
-        "assets/resultDialog.css",
-        "js/googleScraper.js",
-        "js/vendor/Readability.js"
+        "assets/ui-enhancements.css",
+        "assets/content.css",
+        "js/stealth.js",
+        "js/vendor/mark.min.js",
+        "js/vendor/marked.min.js",
+        "js/vendor/dompurify.min.js",
+        "js/content.js"
       ],
       "matches": [
         "<all_urls>"
       ]
     }
-  ]
+  ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Q",
+        "mac": "Alt+Q"
+      },
+      "description": "Open GeminiAnswerBot"
+    }
+  }
 }

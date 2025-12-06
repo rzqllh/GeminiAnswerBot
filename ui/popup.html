@@ -1,146 +1,109 @@
-<!-- // === Hafizh Rizqullah | GeminiAnswerBot ===
-// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
-// 📄 ui/popup.html
-// 🕓 Created: 2024-05-22 19:15:00
-// 🧠 Modular | DRY | SOLID | Apple HIG Compliant -->
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GeminiAnswerBot</title>
-  <link rel="stylesheet" type="text/css" href="../assets/popup.css">
+  <link rel="stylesheet" href="../assets/popup.css">
+  <script src="../js/vendor/lucide.js"></script>
 </head>
+
 <body>
-  <div class="container">
+  <div class="app">
+    <!-- Header -->
     <header class="header">
-      <div class="header-title">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="header-icon">
-          <path d="M12 2L14.472 9.528L22 12L14.472 14.472L12 22L9.528 14.472L2 12L9.528 9.528L12 2Z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" />
-        </svg>
-        <span>GeminiAnswerBot</span>
+      <div class="header-left">
+        <div class="logo"><i data-lucide="sparkles"></i></div>
+        <span class="title">Gemini</span>
       </div>
-      <div class="header-actions">
-        <button id="analyzePageButton" class="icon-button" title="Analyze Full Page">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21.5A2.5 2.5 0 0 1 6.5 19H20a2 2 0 0 0 2-2V8.5A2.5 2.5 0 0 0 19.5 6H13A2.5 2.5 0 0 1 10.5 3.5H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2z"></path></svg>
-        </button>
-        <button id="rescanButton" class="icon-button" title="Rescan for Quiz">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6m-13 14v-6h6M22 11.5A10 10 0 0 0 3.5 7.1L2 9.5M2 12.5a10 10 0 0 0 18.5 4.4l1.5-2.4" /></svg>
-        </button>
-        <button id="settingsButton" class="icon-button" title="Open Settings">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83a2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33a1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2a2 2 0 0 1-2-2v-.09a1.65 1.65 0 0 0-1-1.51a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0a2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2a2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83a2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2a2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0a2 2 0 0 1 0 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2a2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
-        </button>
+      <div class="header-right">
+        <button id="visualSolveButton" class="btn-icon" title="Visual Solve"><i data-lucide="camera"></i></button>
+        <button id="analyzePageButton" class="btn-icon" title="Analyze Page"><i data-lucide="file-text"></i></button>
+        <button id="rescanButton" class="btn-icon" title="Rescan"><i data-lucide="rotate-cw"></i></button>
+        <button id="settingsButton" class="btn-icon" title="Settings"><i data-lucide="settings"></i></button>
       </div>
     </header>
 
-    <main id="mainContent" class="content-area">
-      <div id="messageArea" class="hidden"></div>
-      
-      <div id="onboardingContainer" class="main-panel hidden">
-        <div class="panel-content onboarding-content">
-          <svg class="onboarding-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L14.472 9.528L22 12L14.472 14.472L12 22L9.528 14.472L2 12L9.528 9.528L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-          <h3>Welcome to GeminiAnswerBot!</h3>
-          <p>To get started, you need to add your Google Gemini API key in the settings.</p>
-          <button id="onboardingGoToSettings" class="action-button">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83a2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33a1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2a2 2 0 0 1-2-2v-.09a1.65 1.65 0 0 0-1-1.51a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0a2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2a2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83a2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2a2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0a2 2 0 0 1 0 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2a2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
-            Go to Settings
-          </button>
+    <!-- Content -->
+    <main class="content">
+      <!-- Onboarding -->
+      <div id="onboardingContainer" class="view hidden">
+        <div class="center-box">
+          <div class="icon-box"><i data-lucide="key"></i></div>
+          <h2>Welcome</h2>
+          <p>Set up your API key to start.</p>
+          <button id="onboardingGoToSettings" class="btn-primary">Open Settings</button>
         </div>
       </div>
 
-      <div id="generalTaskContainer" class="main-panel hidden">
-        <div class="panel-header">
-          <span id="generalTaskTitle" class="panel-title-pill">Result</span>
-          <div class="panel-header-action" id="copyGeneralTask" title="Copy Result">
-             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+      <!-- General Task -->
+      <div id="generalTaskContainer" class="view hidden">
+        <div class="panel">
+          <div class="panel-header">
+            <span id="generalTaskTitle">Result</span>
+            <button id="copyGeneralTask" class="btn-icon-sm"><i data-lucide="copy"></i></button>
+          </div>
+          <div id="generalTaskDisplay" class="panel-body"></div>
+        </div>
+      </div>
+
+      <!-- Quiz Mode -->
+      <div id="quizModeContainer" class="view">
+
+        <!-- Status -->
+        <div id="contentDisplayWrapper" class="status-row collapsed">
+          <div class="status-header toggle-header">
+            <span class="status-label"><i data-lucide="loader-2" class="spin"></i> Analyzing...</span>
+            <i data-lucide="chevron-down" class="chevron"></i>
+          </div>
+          <div id="contentDisplay" class="status-detail"></div>
+        </div>
+
+        <!-- Image Preview -->
+        <div id="imagePreviewContainer" class="image-row hidden">
+          <img id="imagePreview" src="" alt="">
+          <span id="imageStatusText">Processing...</span>
+        </div>
+
+        <!-- Question -->
+        <div id="questionContainer" class="panel hidden">
+          <div class="panel-header"><span>Question</span></div>
+          <div id="questionDisplay" class="panel-body text-sm"></div>
+        </div>
+
+        <!-- Answer -->
+        <div id="answerContainer" class="panel panel-accent hidden">
+          <div class="panel-header">
+            <span>Answer</span>
+            <div class="header-actions">
+              <button id="copyAnswer" class="btn-icon-sm"><i data-lucide="copy"></i></button>
+              <button id="retryAnswer" class="btn-icon-sm"><i data-lucide="refresh-cw"></i></button>
+            </div>
+          </div>
+          <div id="answerDisplay" class="panel-body"></div>
+          <div class="panel-footer">
+            <button id="explanationButton" class="btn-secondary">Explain</button>
           </div>
         </div>
-        <div id="generalTaskDisplay" class="panel-content"></div>
-      </div>
 
-      <div id="quizModeContainer">
-        <div id="panel-container">
-            <div id="imagePreviewContainer" class="main-panel hidden">
-              <div class="panel-header"><span class="panel-title-pill">Image Preview</span></div>
-              <div class="panel-content"><img id="imagePreview" src="" alt="Image Preview"/><p id="imageStatusText">Processing image...</p></div>
-            </div>
-            
-            <div id="contentDisplayWrapper" class="main-panel">
-              <div class="panel-header"><span class="panel-title-pill">Analysis</span></div>
-              <div id="contentDisplay" class="panel-content"></div>
-            </div>
-
-            <div id="aiActionsWrapper" class="action-buttons-container hidden">
-              <button id="explanationButton" class="action-button">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                Explanation
-              </button>
-            </div>
-            
-            <div id="answerContainer" class="main-panel hidden">
-               <div class="panel-header">
-                 <span id="answerCardTitle" class="panel-title-pill">Answer</span>
-                 <div class="panel-header-action" id="showReasoningButton" title="Show AI Reasoning">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                 </div>
-                 <div class="panel-header-action" id="copyAnswer" title="Copy Answer">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-                 </div>
-                 <div class="panel-header-action" id="retryAnswer" title="Retry Answer">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6m-13 14v-6h6M22 11.5A10 10 0 0 0 3.5 7.1L2 9.5M2 12.5a10 10 0 0 0 18.5 4.4l1.5-2.4" /></svg>
-                 </div>
-               </div>
-               <div id="answerDisplay" class="panel-content"></div>
-               <div id="verificationContainer" class="verification-container hidden">
-                 <button id="verifyButton" class="action-button verify">
-                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"></path><line x1="16" y1="8" x2="2" y2="22"></line><line x1="17.5" y1="15" x2="9" y2="15"></line></svg>
-                   Verify with Google
-                 </button>
-               </div>
-               <div id="reasoningDisplay" class="panel-content reasoning-content hidden"></div>
-               <div id="feedbackContainer" class="panel-footer hidden">
-                 <span class="footer-label">Is this answer correct?</span>
-                 <div class="feedback-buttons">
-                    <button id="feedbackCorrect" class="feedback-button" title="Correct">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
-                    </button>
-                    <button id="feedbackIncorrect" class="feedback-button" title="Incorrect">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v7a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>
-                    </button>
-                 </div>
-              </div>
-            </div>
-
-            <div id="correctionPanel" class="main-panel hidden">
-                <div class="panel-header"><span class="panel-title-pill">Select Correct Answer</span></div>
-                <div id="correctionOptions" class="panel-content"></div>
-            </div>
-
-            <div id="explanationContainer" class="main-panel hidden">
-               <div class="panel-header">
-                 <span class="panel-title-pill">Explanation</span>
-                 <div class="panel-header-action" id="copyExplanation" title="Copy Explanation">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-                 </div>
-                 <div class="panel-header-action" id="retryExplanation" title="Retry Explanation">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6m-13 14v-6h6M22 11.5A10 10 0 0 0 3.5 7.1L2 9.5M2 12.5a10 10 0 0 0 18.5 4.4l1.5-2.4" /></svg>
-                 </div>
-               </div>
-               <div id="explanationDisplay" class="panel-content"></div>
-            </div>
+        <!-- Explanation -->
+        <div id="explanationContainer" class="panel hidden">
+          <div class="panel-header">
+            <span>Explanation</span>
+            <button id="copyExplanation" class="btn-icon-sm"><i data-lucide="copy"></i></button>
+          </div>
+          <div id="explanationDisplay" class="panel-body text-sm scrollable"></div>
         </div>
+
       </div>
     </main>
   </div>
-  <!-- **FIX**: Load utilities BEFORE the main application script -->
+
   <script src="../js/vendor/dompurify.min.js"></script>
-  <script src="../js/utils/helpers.js"></script>
-  <script src="../js/utils/errorHandler.js"></script>
-  <script src="../js/utils/storage.js"></script>
-  <script src="../js/vendor/marked.min.js"></script> 
-  <script src="../js/prompts.js"></script>
-  
-  <!-- Main application script is now last -->
-  <script src="../js/popup.js"></script>
+  <script src="../js/vendor/marked.min.js"></script>
+  <script src="../js/lucide-init.js"></script>
+  <script type="module" src="../js/popup.js"></script>
 </body>
+
 </html>
