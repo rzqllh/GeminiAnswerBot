@@ -74,25 +74,12 @@ export class UIManager {
 
     /**
      * Parse markdown to HTML safely
-     * Escapes HTML tags inside backticks, then parses markdown
+     * Uses marked.js directly - backticks become <code> tags which are styled
      */
     _parseMarkdown(text) {
         if (!text) return '';
-
-        // First, protect code blocks and inline code from being parsed as HTML
-        // Replace < and > ONLY inside backticks
-        let processed = text;
-
-        // Handle inline code: `<h1>` -> `&lt;h1&gt;`
-        processed = processed.replace(/`([^`]+)`/g, (match, code) => {
-            const escaped = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            return `\`${escaped}\``;
-        });
-
-        // Parse markdown
-        const html = marked.parse(processed);
-
-        // Sanitize
+        // Just use marked directly - it handles code blocks properly
+        const html = marked.parse(text);
         return DOMPurify.sanitize(html);
     }
 
@@ -118,7 +105,7 @@ export class UIManager {
                 this.elements.questionContainer.classList.remove('hidden');
             }
             if (this.elements.questionDisplay) {
-                // Parse markdown for question display
+                // Parse markdown for proper formatting
                 this.elements.questionDisplay.innerHTML = this._parseMarkdown(state.content);
             }
         }
@@ -127,7 +114,7 @@ export class UIManager {
         if (state.answer) {
             if (this.elements.answerContainer) this.elements.answerContainer.classList.remove('hidden');
             if (this.elements.answerDisplay) {
-                // Parse markdown for answer display
+                // Parse markdown for answer
                 this.elements.answerDisplay.innerHTML = this._parseMarkdown(state.answer);
             }
         }

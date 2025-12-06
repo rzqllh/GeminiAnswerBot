@@ -44,6 +44,7 @@ class App {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             this.tabId = tab.id;
             this.tabUrl = tab.url;
+            this.tabTitle = tab.title;
 
             // Check for Context Menu Action (from background)
             const bgResponse = await chrome.runtime.sendMessage({ action: 'popupReady' });
@@ -141,6 +142,7 @@ class App {
             } else if (purpose === 'answer') {
                 this.store.setState({ answer: text, imageStep: 'done', isAnalyzing: false });
                 this._cacheState(text);
+                this._saveToHistory(text);
                 this._triggerAutoHighlight(text);
             }
         });
@@ -213,53 +215,79 @@ class App {
     }
 
     /**
-     * Extract highlight targets from AI answer
-     * Handles multiple formats: `<h1>`, Option C, (C), etc.
+     * Save interaction to history
      */
-    _extractHighlightTargets(answerText) {
-        const targets = [];
+    async _saveToHistory(answerText) {
+        try {
+            const state = this.store.getState();
+            const historyItem = {
+                timestamp: Date.now(),
+                url: this.tabUrl,
+                title: this.tabTitle || 'Unknown Page',
+                cleanedContent: state.content,
+                answerHTML: answerText
+            };
 
-        // 1. Extract content inside backticks (like `<h1>`)
-        const backtickMatches = answerText.match(/`([^`]+)`/g);
-        if (backtickMatches) {
-            backtickMatches.forEach(match => {
-                const content = match.replace(/`/g, '').trim();
-                if (content) targets.push(content);
-            });
+            // Get existing history
+            const data = await chrome.storage.local.get('history');
+            const history = data.history || [];
+
+            // Add new item at beginning
+            history.unshift(historyItem);
+
+            // Keep only last 100 items
+            if (history.length > 100) {
+                history.length = 100;
+            }
+
+            // Save back
+            await chrome.storage.local.set({ history });
+            console.log('History saved:', historyItem.title);
+        } catch (e) {
+            console.warn('Failed to save history:', e.message);
+        }
+    }
+
+    /**
+     * Extract ONLY the correct answer text for highlighting
+     * Returns single target, not all backticks
+     */
+    _extractHighlightTarget(answerText) {
+        // 1. First try: Get content after "Answer:" and inside backticks
+        // Pattern: **Answer:** `<h1>` (Option C)
+        const answerWithBacktick = answerText.match(/\*?\*?Answer:?\*?\*?\s*`([^`]+)`/i);
+        if (answerWithBacktick) {
+            return answerWithBacktick[1].trim();
         }
 
-        // 2. Extract option letter patterns: (A), (B), Option A, etc.
-        const optionMatch = answerText.match(/(?:\(([A-D])\)|Option\s*([A-D]))/i);
-        if (optionMatch) {
-            const letter = optionMatch[1] || optionMatch[2];
-            if (letter) targets.push(letter);
-        }
-
-        // 3. Extract text after "Answer:" (fallback)
-        const answerMatch = answerText.match(/\*?\*?Answer:?\*?\*?\s*(.+?)(?:\s*\(|$|\n)/i);
-        if (answerMatch && answerMatch[1]) {
-            const extracted = answerMatch[1].replace(/`/g, '').trim();
-            if (extracted && !targets.includes(extracted)) {
-                targets.push(extracted);
+        // 2. Second try: Get content after "Answer:" before parenthesis or newline
+        const answerMatch = answerText.match(/\*?\*?Answer:?\*?\*?\s*([^(\n]+)/i);
+        if (answerMatch) {
+            let answer = answerMatch[1].trim();
+            // Remove backticks if present
+            answer = answer.replace(/`/g, '').trim();
+            // Remove markdown formatting
+            answer = answer.replace(/\*\*/g, '').trim();
+            if (answer.length > 0 && answer.length < 100) {
+                return answer;
             }
         }
 
-        // Remove duplicates and empty strings
-        return [...new Set(targets.filter(t => t && t.length > 0))];
+        return null;
     }
 
     async _triggerAutoHighlight(answerText) {
         try {
             const settings = await StorageService.get(['autoHighlightAnswer']);
             if (settings.autoHighlightAnswer !== false) {
-                // Extract multiple possible highlight targets
-                const targets = this._extractHighlightTargets(answerText);
+                // Extract only the correct answer text
+                const target = this._extractHighlightTarget(answerText);
 
-                if (targets.length > 0) {
-                    console.log('Highlight targets:', targets);
+                if (target) {
+                    console.log('Highlight target:', target);
                     await MessagingService.sendMessage(this.tabId, {
                         action: 'highlight-answer',
-                        payload: { text: targets }
+                        payload: { text: [target] }
                     }, 3000);
                 }
             }
