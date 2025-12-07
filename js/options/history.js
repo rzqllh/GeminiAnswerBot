@@ -1,5 +1,7 @@
 // === Hafizh Rizqullah | GeminiAnswerBot ===
-// js/options/history.js - v4.0 with improved formatting
+// 🔒 Created by Hafizh Rizqullah || Refine by AI Assistant
+// 📄 js/options/history.js
+// 🕓 Updated: v4.0 with PDF export and improved formatting
 
 const HistoryModule = (() => {
   let ELS = {};
@@ -9,7 +11,7 @@ const HistoryModule = (() => {
   const ITEMS_PER_PAGE = 15;
   const SCROLL_THRESHOLD = 100;
 
-  // Clean ALL markdown/formatting from text for display
+  // Clean ALL markdown from text for display
   function _cleanMarkdown(text) {
     if (!text) return '';
     return text
@@ -24,19 +26,15 @@ const HistoryModule = (() => {
   function _parseAnswerFields(answerText) {
     if (!answerText) return { answer: 'N/A', confidence: 'N/A', reason: 'N/A' };
 
-    // Remove thought blocks
     let text = answerText.replace(/\[THOUGHT\][\s\S]*?\[ENDTHOUGHT\]\s*/gi, '').trim();
 
-    // Extract answer
-    const answerMatch = text.match(/Answer:?\s*[`"]*([^`"\n]+)[`"]*/i);
+    const answerMatch = text.match(/\*?\*?Answer:?\*?\*?\s*`?([^`\n]+)`?/i);
     const rawAnswer = answerMatch ? answerMatch[1].trim() : 'N/A';
     const answer = _cleanMarkdown(rawAnswer);
 
-    // Extract confidence - handle **Confidence:** High format
     const confMatch = text.match(/\*?\*?Confidence:?\*?\*?\s*(\d+%|High|Medium|Low)/i);
     const confidence = confMatch ? confMatch[1].trim() : 'N/A';
 
-    // Extract reason
     const reasonMatch = text.match(/\*?\*?Reason:?\*?\*?\s*([\s\S]*?)(?=\n\n|\*\*|$)/i);
     const rawReason = reasonMatch ? reasonMatch[1].trim() : 'N/A';
     const reason = _cleanMarkdown(rawReason);
@@ -56,11 +54,9 @@ const HistoryModule = (() => {
     const card = document.createElement('div');
     card.className = 'history-card';
 
-    // Clean markdown from question
     const rawQuestion = item.cleanedContent?.match(/Question:\s*([\s\S]*?)(?=\nOptions:|\n\n|$)/i)?.[1] || 'Question not found';
     const question = _cleanMarkdown(rawQuestion);
 
-    // Parse and clean options
     const optionsMatch = item.cleanedContent?.match(/Options:\s*([\s\S]*)/i);
     let optionsHtml = '';
     if (optionsMatch) {
@@ -172,6 +168,49 @@ const HistoryModule = (() => {
     UIModule.showToast('Success', 'Exported!', 'success');
   }
 
+  async function exportHistoryAsPDF() {
+    const { history = [] } = await StorageManager.local.get('history');
+    if (history.length === 0) { UIModule.showToast('No History', 'Nothing to export.', 'info'); return; }
+
+    let htmlContent = `<!DOCTYPE html><html><head><title>GeminiAnswerBot History</title>
+      <style>
+        body { font-family: system-ui, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        h1 { color: #1a73e8; border-bottom: 2px solid #1a73e8; padding-bottom: 10px; }
+        .qa-item { margin-bottom: 24px; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; page-break-inside: avoid; }
+        .qa-header { display: flex; justify-content: space-between; color: #666; font-size: 12px; margin-bottom: 8px; }
+        .qa-question { font-weight: 600; margin-bottom: 8px; }
+        .qa-options { margin: 8px 0; padding-left: 20px; }
+        .qa-answer { background: #f5f5f5; padding: 12px; border-radius: 6px; }
+        .confidence-high { color: #22c55e; font-weight: bold; }
+        .confidence-medium { color: #f59e0b; font-weight: bold; }
+        .confidence-low { color: #ef4444; font-weight: bold; }
+      </style></head><body>
+      <h1>📝 GeminiAnswerBot History</h1>
+      <p>Exported: ${new Date().toLocaleString()} | Total: ${history.length} questions</p>`;
+
+    history.forEach((item, i) => {
+      const { answer, confidence, reason } = _parseAnswerFields(item.answerHTML);
+      const confClass = _getConfidenceClass(confidence);
+      const question = _cleanMarkdown(item.cleanedContent?.match(/Question:\s*([\s\S]*?)(?=\nOptions:|$)/i)?.[1] || 'N/A');
+
+      htmlContent += `<div class="qa-item">
+        <div class="qa-header"><span>#${i + 1}</span><span>${new Date(item.timestamp).toLocaleString()}</span></div>
+        <div class="qa-question">${_escapeHtml(question)}</div>
+        <div class="qa-answer">
+          <strong>Answer:</strong> ${_escapeHtml(answer)}<br>
+          <strong>Confidence:</strong> <span class="confidence-${confClass}">${confidence}</span><br>
+          <strong>Reason:</strong> ${_escapeHtml(reason)}
+        </div></div>`;
+    });
+
+    htmlContent += '</body></html>';
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.onload = () => printWindow.print();
+    UIModule.showToast('PDF Export', 'Print dialog opened. Save as PDF.', 'success');
+  }
+
   function handleScroll(e) {
     if (isLoading) return;
     const c = e.target;
@@ -184,9 +223,13 @@ const HistoryModule = (() => {
     ELS = elements;
     ELS.clearHistoryButton?.addEventListener('click', clearHistory);
     ELS.exportHistoryButton?.addEventListener('click', exportHistory);
+
+    const pdfBtn = document.getElementById('exportHistoryPDFButton');
+    if (pdfBtn) pdfBtn.addEventListener('click', exportHistoryAsPDF);
+
     document.addEventListener('historyTabActivated', loadHistory);
     document.querySelector('.settings-content')?.addEventListener('scroll', handleScroll);
   }
 
-  return { initialize };
+  return { initialize, exportHistoryAsPDF };
 })();
