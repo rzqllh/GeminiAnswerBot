@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "GeminiAnswerBot",
-  "version": "4.0.0",
-  "description": "A smart Chrome extension powered by the Google Gemini API.",
+  "version": "5.0.0",
+  "description": "AI-powered quiz assistant with study mode, custom personas, and batch processing.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -35,13 +35,16 @@
       "resources": [
         "assets/ui-enhancements.css",
         "assets/content.css",
+        "assets/widget.css",
         "js/stealth.js",
         "js/utils/helpers.js",
         "js/vendor/mark.min.js",
         "js/vendor/marked.min.js",
         "js/vendor/dompurify.min.js",
         "js/content.js",
-        "js/autoclick.js"
+        "js/autoclick.js",
+        "js/widget.js",
+        "assets/icon.png"
       ],
       "matches": [
         "<all_urls>"
@@ -55,6 +58,13 @@
         "mac": "Alt+Q"
       },
       "description": "Open GeminiAnswerBot"
+    },
+    "toggle-widget": {
+      "suggested_key": {
+        "default": "Alt+W",
+        "mac": "Alt+W"
+      },
+      "description": "Toggle Floating Widget"
     }
   }
 }

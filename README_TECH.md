@@ -17,12 +17,13 @@ GeminiAnswerBot/
 │
 ├── ui/                     # HTML entry points
 │   ├── popup.html          # Main popup interface
-│   └── options.html        # Settings page (6 tabs)
+│   └── options.html        # Settings page (9 tabs)
 │
 ├── assets/                 # Static assets
 │   ├── popup.css           # Popup styles (iOS Liquid Glass design)
 │   ├── content.css         # Injected page styles
 │   ├── options.css         # Settings page styles (Apple HIG)
+│   ├── widget.css          # v5.0: Floating widget styles
 │   └── icon.png            # Extension icon
 │
 ├── js/
@@ -31,16 +32,19 @@ GeminiAnswerBot/
 │   ├── popup.js            # Popup controller & state management
 │   ├── prompts.js          # Default AI prompt templates
 │   ├── autoclick.js        # v4.0: Auto-click answer functionality
+│   ├── widget.js           # v5.0: Floating widget controller
+│   ├── batch.js            # v5.0: Multi-tab batch processing
 │   │
 │   ├── core/               # Core modules
 │   │   ├── Store.js        # Reactive state management
 │   │   └── EventBus.js     # Pub/sub event system
 │   │
 │   ├── services/           # Business logic layer
-│   │   ├── GeminiService.js      # Gemini API + streaming
-│   │   ├── StorageService.js     # Chrome storage wrapper
-│   │   ├── MessagingService.js   # Inter-script communication
-│   │   └── NotificationService.js # Toast notifications
+│   │   ├── GeminiService.js        # Gemini API + streaming
+│   │   ├── StorageService.js       # Chrome storage wrapper
+│   │   ├── MessagingService.js     # Inter-script communication
+│   │   ├── NotificationService.js  # Toast notifications
+│   │   └── VerificationService.js  # v5.0: Answer verification
 │   │
 │   ├── ui/                 # UI components
 │   │   ├── UIManager.js    # Main UI controller
@@ -53,7 +57,10 @@ GeminiAnswerBot/
 │   │   ├── prompts.js      # Custom prompts management
 │   │   ├── history.js      # History display & export
 │   │   ├── data.js         # Backup/restore functionality
-│   │   └── nav.js          # Tab navigation system
+│   │   ├── nav.js          # Tab navigation system
+│   │   ├── tags.js         # v5.0: Tag management
+│   │   ├── personas.js     # v5.0: AI personas
+│   │   └── study.js        # v5.0: Study mode
 │   │
 │   ├── utils/              # Utilities
 │   │   ├── storage.js      # StorageManager singleton
@@ -83,7 +90,6 @@ GeminiAnswerBot/
 ### State Management / Manajemen State
 ```javascript
 // Store.js - Simple reactive store
-// Store.js - Store reaktif sederhana
 const store = new Store({ view: 'loading', answer: null, confidenceScore: null });
 store.subscribe(state => render(state));
 store.setState({ answer: 'New answer', confidenceScore: 'High' });
@@ -93,6 +99,8 @@ store.setState({ answer: 'New answer', confidenceScore: 'High' });
 ```javascript
 // EventBus.js - Pub/sub pattern
 eventBus.on('ui:rescan', () => { /* handle rescan */ });
+eventBus.on('ui:saveToStudy', () => { /* v5.0: save to study mode */ });
+eventBus.on('ui:verifyAnswer', () => { /* v5.0: verify answer */ });
 eventBus.emit('stream:update', { purpose: 'answer', fullText });
 eventBus.emit('stream:done', { purpose: 'answer', finalText, confidenceScore: 'High' });
 ```
@@ -110,33 +118,75 @@ eventBus.emit('stream:done', { purpose: 'answer', finalText, confidenceScore: 'H
 
 ---
 
-## 🆕 v4.0 New Components / Komponen Baru v4.0
+## 🆕 v5.0 New Components / Komponen Baru v5.0
 
-### autoclick.js
-Handles automatic answer selection on quiz pages:
+### study.js
+Study mode for saving and reviewing questions:
 ```javascript
-// Score-based matching for special characters like /, <, >
-function _matchScore(text1, text2) {
-  // Compares normalized text for answer matching
-}
+// Add item to study list
+await StudyModule.addToStudy({
+  question: "What is...",
+  correctAnswer: "Option A",
+  confidence: "High"
+});
 
-// Finds and clicks the best matching radio button
-function findAndClickAnswer(answer, options) {
-  // Iterates through form inputs to find match
-}
+// Start practice quiz
+const items = StudyModule.startQuiz(shuffle = true);
+
+// Mark as learned
+await StudyModule.markAsLearned(itemId, true);
 ```
 
-### features.js
-Manages v4.0 feature settings UI:
-- Auto-click toggle, Context memory, Display mode
-- Theme presets (Ocean, Sunset, Neon, Midnight)
-- Dark/Light/Auto color modes
-- Accent color picker
+### personas.js
+AI persona management:
+```javascript
+// Get active persona's system prompt
+const persona = await PersonasModule.getActivePersona();
+const systemPrompt = PersonasModule.buildSystemPrompt(basePrompt, persona);
 
-### Enhanced GeminiService.js
-- **Multi-language support**: Injects language preference into prompts
-- **Context memory**: Includes previous Q&A pairs for better accuracy
-- **Confidence extraction**: Parses High/Medium/Low from responses
+// Create custom persona
+await PersonasModule.createPersona({
+  name: "My Tutor",
+  icon: "🎓",
+  description: "Friendly and encouraging",
+  systemPrompt: "You are a friendly tutor..."
+});
+```
+
+### batch.js
+Multi-tab batch processing:
+```javascript
+// Scan for quiz tabs
+const tabs = await BatchMode.scanForQuizTabs();
+
+// Start batch processing
+const result = await BatchMode.start(selectedTabIds);
+// Returns: { success, total, successful, failed, results }
+
+// Stop batch
+BatchMode.stop();
+```
+
+### widget.js
+Floating widget controller:
+```javascript
+// Inject widget into page
+FloatingWidget.init();
+
+// Toggle visibility
+FloatingWidget.toggle();
+
+// Save position preference
+FloatingWidget.savePosition({ x: 100, y: 100 });
+```
+
+### VerificationService.js
+Independent answer verification:
+```javascript
+// Verify an answer
+const result = await VerificationService.verify(question, answer);
+// Returns: { status: 'confirmed'|'uncertain'|'wrong', assessment, confidence }
+```
 
 ---
 
@@ -145,10 +195,10 @@ Manages v4.0 feature settings UI:
 ### GeminiService
 Handles API communication with streaming:
 ```javascript
-// Call with streaming response / Panggil dengan streaming response
+// Call with streaming response
 await geminiService.call('answer', content, null, tabId);
 
-// Events emitted / Event yang dipancarkan:
+// Events emitted:
 // - stream:update { purpose, fullText }
 // - stream:done { purpose, finalText, confidenceScore }
 ```
@@ -156,23 +206,23 @@ await geminiService.call('answer', content, null, tabId);
 ### MessagingService
 Tab communication with auto-injection:
 ```javascript
-// Ensure content script loaded / Pastikan content script termuat
+// Ensure content script loaded
 await MessagingService.ensureContentScript(tabId);
 
-// Send message / Kirim pesan
+// Send message
 await MessagingService.sendMessage(tabId, { 
   action: 'highlight-answer', 
   answer: 'Option A' 
 });
 
-// v4.0: Auto-click answer
+// Auto-click answer
 await MessagingService.autoClickAnswer(tabId, answer, options);
 ```
 
 ### Content Script Modules
 
 | Module | EN | ID |
-|--------|----|----|
+|--------|----|----| 
 | `MarkerModule` | Text highlighting with Mark.js | Highlighting teks dengan Mark.js |
 | `QuizModule` | Question/option extraction | Ekstraksi soal/pilihan |
 | `PageModule` | Full page content extraction | Ekstraksi konten halaman penuh |
@@ -194,6 +244,13 @@ await MessagingService.autoClickAnswer(tabId, answer, options);
 - [ ] History saving with confidence
 - [ ] PDF export
 - [ ] Multi-language response
+- [ ] Study Mode save/review (v5.0)
+- [ ] Practice Quiz mode (v5.0)
+- [ ] AI Personas selection (v5.0)
+- [ ] Custom Persona creation (v5.0)
+- [ ] Batch Mode tab scanning (v5.0)
+- [ ] Batch Mode processing (v5.0)
+- [ ] Floating Widget toggle (v5.0)
 ```
 
 ### Console Debugging
@@ -201,6 +258,8 @@ await MessagingService.autoClickAnswer(tabId, answer, options);
 // Popup console - Check storage
 chrome.storage.sync.get(null, console.log);
 chrome.storage.local.get('history', console.log);
+chrome.storage.local.get('studyItems', console.log); // v5.0
+chrome.storage.local.get('customPersonas', console.log); // v5.0
 
 // Content script - Check injection status
 window.geminiAnswerBotContentLoaded
@@ -235,7 +294,7 @@ const CACHE_KEY = 'gemini_state';
 
 ### CSS
 - CSS Variables for theming (`--accent-color`, `--bg-color`)
-- BEM-like class naming (`.panel-header`, `.btn-primary`)
+- Unified classes (`.button`, `.button-primary`, `.settings-card`)
 - Mobile-first responsive design
 
 ---
@@ -290,7 +349,7 @@ Content-Type: application/json
 
 ```bash
 # Package for Chrome Web Store
-zip -r gemini-answer-bot-v4.0.zip . \
+zip -r gemini-answer-bot-v5.0.zip . \
   -x "*.git*" \
   -x "node_modules/*" \
   -x "docs/*" \
@@ -330,9 +389,11 @@ zip -r gemini-answer-bot-v4.0.zip . \
 | Highlight not working | Verify `mark.min.js` in `web_accessible_resources` |
 | Confidence shows N/A | Check regex matches `**Confidence:** High` format |
 | Auto-click wrong answer | Verify `_matchScore()` handles special chars |
+| Personas not loading | Check `StorageManager` is defined |
+| Study items not saving | Verify `chrome.storage.local` permissions |
 
 ---
 
 **Maintainer:** Hafizh Rizqullah (@rzqllh)
 
-**Last Updated:** v4.0 - December 2025
+**Last Updated:** v5.0 - December 2025

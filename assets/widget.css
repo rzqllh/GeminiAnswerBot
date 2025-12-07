@@ -1,0 +1,333 @@
+/* === Hafizh Rizqullah | GeminiAnswerBot ===
+ * 📄 assets/widget.css
+ * 🕓 v5.0 - Floating Widget Styles
+ */
+
+/* Widget Container */
+.gemini-widget {
+    position: fixed;
+    width: 360px;
+    max-height: 480px;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.98));
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    z-index: 2147483647;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.gemini-widget.minimized {
+    max-height: 48px;
+    width: 200px;
+}
+
+.gemini-widget.dragging {
+    opacity: 0.9;
+    cursor: grabbing;
+    transform: scale(1.02);
+}
+
+/* Widget Header */
+.widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    cursor: grab;
+    user-select: none;
+}
+
+.widget-header:active {
+    cursor: grabbing;
+}
+
+.widget-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.widget-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+}
+
+.widget-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.widget-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.widget-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Widget Body */
+.widget-body {
+    padding: 16px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.widget-status {
+    padding: 8px 12px;
+    background: #f0f9ff;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: #0369a1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.widget-status.loading {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.widget-status.success {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.widget-status.error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* Widget Actions */
+.widget-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.widget-action-btn {
+    flex: 1;
+    padding: 10px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.widget-action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.widget-action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Widget Content */
+.widget-content {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.widget-content:empty {
+    display: none;
+}
+
+.widget-content .answer-label {
+    color: #667eea;
+    font-weight: 600;
+}
+
+.widget-content .confidence-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.widget-content .confidence-high {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.widget-content .confidence-medium {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.widget-content .confidence-low {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* Widget Footer */
+.widget-footer {
+    display: flex;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.widget-footer-btn {
+    flex: 1;
+    padding: 8px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    color: #475569;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.widget-footer-btn:hover:not(:disabled) {
+    background: #e2e8f0;
+    color: #1e293b;
+}
+
+.widget-footer-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Verification Badge */
+.verification-result {
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 8px;
+}
+
+.verification-result.verification-confirmed {
+    background: #dcfce7;
+    border: 1px solid #86efac;
+}
+
+.verification-result.verification-wrong {
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+}
+
+.verification-result.verification-uncertain {
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+}
+
+.verification-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.verification-icon {
+    font-size: 18px;
+}
+
+.verification-assessment {
+    font-size: 13px;
+    color: #374151;
+    margin-bottom: 8px;
+}
+
+.verification-correction {
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.verification-confidence {
+    font-size: 11px;
+    color: #6b7280;
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+    .gemini-widget {
+        background: linear-gradient(145deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
+        color: #e2e8f0;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
+
+    .widget-status {
+        background: #1e3a5f;
+        color: #7dd3fc;
+    }
+
+    .widget-status.loading {
+        background: #422006;
+        color: #fcd34d;
+    }
+
+    .widget-status.success {
+        background: #14532d;
+        color: #86efac;
+    }
+
+    .widget-status.error {
+        background: #7f1d1d;
+        color: #fca5a5;
+    }
+
+    .widget-content {
+        background: #1e293b;
+        color: #e2e8f0;
+    }
+
+    .widget-footer {
+        border-color: #334155;
+    }
+
+    .widget-footer-btn {
+        background: #334155;
+        border-color: #475569;
+        color: #e2e8f0;
+    }
+
+    .widget-footer-btn:hover:not(:disabled) {
+        background: #475569;
+    }
+
+    .verification-assessment {
+        color: #d1d5db;
+    }
+
+    .verification-correction {
+        background: rgba(0, 0, 0, 0.2);
+    }
+}

@@ -145,9 +145,9 @@ class App {
                 this.store.setState({ content: text });
                 geminiService.call('answer', text, null, this.tabId);
             } else if (purpose === 'answer') {
-                this.store.setState({ 
-                    answer: text, 
-                    imageStep: 'done', 
+                this.store.setState({
+                    answer: text,
+                    imageStep: 'done',
                     isAnalyzing: false,
                     confidenceScore: confidenceScore ?? null
                 });
@@ -159,6 +159,42 @@ class App {
                 // Explanation done - nothing extra needed, UI updates automatically
                 console.log('Explanation complete');
             }
+        });
+
+        // v5.0: Save to Study Mode
+        eventBus.on('ui:saveToStudy', async () => {
+            const state = this.store.getState();
+            if (!state.answer) {
+                notificationService.error('No answer to save yet.');
+                return;
+            }
+            try {
+                const data = await chrome.storage.local.get('studyItems');
+                const studyItems = data.studyItems || [];
+                studyItems.unshift({
+                    id: Date.now(),
+                    question: state.content?.substring(0, 300) || 'Unknown',
+                    correctAnswer: state.answer?.substring(0, 200) || 'Unknown',
+                    savedAt: new Date().toISOString(),
+                    learned: false,
+                    reviewCount: 0
+                });
+                await chrome.storage.local.set({ studyItems });
+                notificationService.success('Saved to Study Mode!');
+            } catch (e) {
+                notificationService.error('Failed to save.');
+            }
+        });
+
+        // v5.0: Verify Answer
+        eventBus.on('ui:verifyAnswer', async () => {
+            const state = this.store.getState();
+            if (!state.answer) {
+                notificationService.error('No answer to verify.');
+                return;
+            }
+            notificationService.info('Verifying answer...');
+            geminiService.call('verification', `Verify: ${state.content}\nAnswer: ${state.answer}`, null, this.tabId);
         });
     }
 
@@ -174,8 +210,8 @@ class App {
                     content: 'Scanning and cleaning content...',
                     isImageMode: false,
                     isAnalyzing: true,
-            confidenceScore: null
-        });
+                    confidenceScore: null
+                });
                 geminiService.call('cleaning', res.content, null, this.tabId);
             } else {
                 this.store.setState({ view: 'error' });
@@ -292,7 +328,7 @@ class App {
         return null;
     }
 
-    
+
     /**
      * v4.0: Save current Q&A to context memory for session continuity
      */
@@ -300,11 +336,11 @@ class App {
         try {
             const settings = await StorageService.get(['enableContextMemory', 'contextMemoryLimit']);
             if (settings.enableContextMemory === false) return;
-            
+
             const state = this.store.getState();
             const question = state.content?.substring(0, 500) || '';
             const answer = answerText?.substring(0, 500) || '';
-            
+
             if (question && answer) {
                 await StorageService.local.addToContextMemory(
                     { question, answer },

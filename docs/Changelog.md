@@ -2,6 +2,73 @@
 
 All notable changes to GeminiAnswerBot will be documented in this file.
 
+## [5.0.0] - 2024-12-07
+
+### Added
+- **📚 Study Mode**: Save questions for later review with practice quiz functionality
+  - Stats dashboard (Total, To Review, Learned)
+  - Practice quiz with reveal/feedback flow
+  - Mark as learned/need review
+  - Personal notes per question
+  
+- **🤖 AI Personas**: Choose or create custom AI response styles
+  - 6 default personas (Default, Strict Teacher, Friendly Tutor, Exam Coach, Deep Explainer, Quick Answer)
+  - Custom persona creation with icon, name, description
+  - System prompt customization per persona
+  
+- **🔄 Multi-Tab Batch Mode**: Process quizzes across multiple tabs
+  - Tab scanning and selection
+  - Concurrent processing with configurable limits
+  - Progress tracking per tab
+  - Rate limiting for API calls
+  
+- **🏷️ Tag System**: Categorize history items
+  - Default tags (Programming, Math, Science, Language, General)
+  - Custom tag creation
+  - Filter history by tags
+
+- **📱 Floating Widget**: Draggable on-page assistant
+  - Glassmorphism design
+  - Minimize/maximize toggle
+  - Position memory
+  - Keyboard shortcut (Alt+W)
+
+- **🧪 Answer Verification**: Cross-check AI answers
+  - Independent verification prompt
+  - Status badges (Confirmed/Uncertain/Wrong)
+  - Confidence assessment
+
+### Changed
+- Settings page expanded from 6 to 9 tabs
+- `options.js` initialization reordered for dynamic panes
+- All modules now use unified button classes (`button button-primary`)
+- Nav module now dispatches events for all tabs
+
+### Technical
+- New files: `widget.js`, `batch.js`, `tags.js`, `personas.js`, `study.js`, `VerificationService.js`, `widget.css`
+- Added 300+ lines of CSS for new UI components
+- Enhanced EventBus with new events (`ui:saveToStudy`, `ui:verifyAnswer`)
+
+---
+
+## [4.0.0] - 2024-12-05
+
+### Added
+- **🎯 Auto-Click Answer**: Automatically selects the correct answer on the quiz page
+- **📊 Confidence Score**: Shows AI confidence level (High/Medium/Low) for each answer
+- **🧠 Context Memory**: Remembers previous Q&A to improve multi-question accuracy
+- **🌐 Multi-Language**: Responds in your preferred language (auto-detect or manual)
+- **🎨 Theme Customization**: Choose from preset themes (Ocean, Sunset, Neon, Midnight) with dark/light modes
+- **📄 PDF Export**: Export your quiz history as a formatted PDF document
+
+### Technical
+- Added `autoclick.js` for answer selection
+- Added `features.js` for Features & Appearance tabs
+- Enhanced `GeminiService.js` with multi-language and context memory
+- Added `_parseConfidence()` for extracting confidence levels
+
+---
+
 ## [3.4.2] - 2024-12-06
 
 ### Fixed
@@ -157,3 +224,4 @@ All notable changes to GeminiAnswerBot will be documented in this file.
 - **Fixed** - Bug fixes
 - **Removed** - Removed features
 - **Security** - Security improvements
+- **Technical** - Developer-facing changes

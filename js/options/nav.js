@@ -22,9 +22,15 @@ const NavModule = (() => {
     });
     window.location.hash = targetId;
 
-    // Dispatch custom event saat tab history aktif
+    // Dispatch custom events for tab activation
     if (targetId === 'history') {
       document.dispatchEvent(new CustomEvent('historyTabActivated'));
+    } else if (targetId === 'study') {
+      document.dispatchEvent(new CustomEvent('studyTabActivated'));
+    } else if (targetId === 'personas') {
+      document.dispatchEvent(new CustomEvent('personasTabActivated'));
+    } else if (targetId === 'batch') {
+      document.dispatchEvent(new CustomEvent('batchTabActivated'));
     }
   }
 
